@@ -3,8 +3,10 @@ from model_main import *
 from simulation import *
 from scipy.interpolate import interp1d
 from csv_helpers import *
+from plot_helpers import *
 
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
+print(f"Data directory: {DATA_DIR}")
 FIGURES_OUTPUT_DIR = BASE_DIR / "figures"
 # -----------------------------
 # Plotting helpers
@@ -120,161 +122,6 @@ def plot_energies(stored_t, total_energies, marshak_boundary=False, energy_lost_
 
     save_figure("total_energy.png")
 
-
-def plot_standard_front_analytic_and_article_models(
-    times_to_store,
-    *,
-    analytic_positions_marshak=None,
-    analytic_positions_2D=None,
-    analytic_positions_2D_lam_eff=None,
-    analytic_positions_no_marshak=None,
-    analytic_positions_gold_loss=None,
-    analytic_positions_ablation_const_rho=None,
-    wall_material = 'Gold',
-):
-    plot_analytic_if_available(
-        times_to_store,
-        analytic_positions_marshak,
-        label="Analytic x_F(t) (Marshak BC)",
-        linestyle="--",
-        color='purple',
-    )
-    plot_analytic_if_available(
-        times_to_store,
-        analytic_positions_2D,
-        label=f"Analytic x_F(t) ({wall_material} Lost + ablation + varying rho)",
-        linestyle="-",
-        color='red',
-    )
-    plot_analytic_if_available(
-        times_to_store,
-        analytic_positions_2D_lam_eff,
-        label=f"Analytic x_F(t) ({wall_material} Lost + ablation + varying rho + lam_eff)",
-        linestyle="--",
-        color='blue',
-    )
-    plot_analytic_if_available(
-        times_to_store,
-        analytic_positions_no_marshak,
-        label="HR",
-        linestyle="--",
-        color='cyan',
-    )
-    plot_analytic_if_available(
-        times_to_store,
-        analytic_positions_gold_loss,
-        label=f"Analytic x_F(t) ({wall_material} Loss)",
-        linestyle="--",
-        color='orange',
-    )
-    plot_analytic_if_available(
-        times_to_store,
-        analytic_positions_ablation_const_rho,
-        label=f"Analytic x_F(t) ({wall_material} Ablation Const rho)",
-        linestyle="--",
-        color='brown',
-    )
-
-
-def plot_standard_surface_temperature_models(times_to_store, *, Ts_1D=None, Ts_2D=None):
-    plot_analytic_if_available(
-        times_to_store,
-        Ts_1D,
-        label="Analytic 1D Ts(t) (Marshak BC)",
-        linestyle="--",
-        color='blue',
-    )
-    plot_analytic_if_available(
-        times_to_store,
-        Ts_2D,
-        label="Analytic 2D Ts(t) (Gold Lost BC)",
-        linestyle="--",
-        color='red',
-    )
-
-
-def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'Gold', lam_eff_power=1):
-    analytic_positions_no_marshak = analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        wall_material=wall_material,
-        mode="no_marshak",
-    )
-    analytic_positions_marshak, Ts_1D, _, _, *_ = analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        wall_material=wall_material,
-        mode="marshak",
-        vary_rho=False,
-    )
-    analytic_positions_2D, Ts_2D, _, _, *_ = analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        wall_material=wall_material,
-        mode="marshak_ablation",
-        vary_rho=True,
-    )
-    analytic_positions_2D_lam_eff, Ts_2D_lam_eff, _, _, *_ = analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        wall_material=wall_material,
-        mode="marshak_ablation",
-        vary_rho=True,
-        lam_eff=True,
-        power=lam_eff_power,
-    )
-    analytic_wave_front_marshak_gold_loss, Ts_marshak_gold_loss, _, _, _, _ = analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        wall_material=wall_material,
-        mode="marshak_wall_loss",
-        vary_rho=False,
-    )
-    analytic_wave_front_ablation_const_rho, Ts_ablation_const_rho, _, _, _, _ = analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        wall_material=wall_material,
-        mode="marshak_ablation_const_rho",
-    )
-    return {
-        "analytic_positions_no_marshak": analytic_positions_no_marshak,
-        "analytic_positions_marshak": analytic_positions_marshak,
-        "analytic_positions_2D": analytic_positions_2D,
-        "analytic_positions_2D_lam_eff": analytic_positions_2D_lam_eff,
-        "analytic_positions_gold_loss": analytic_wave_front_marshak_gold_loss,
-        "analytic_positions_ablation_const_rho": analytic_wave_front_ablation_const_rho,
-        "Ts_1D": Ts_1D,
-        "Ts_2D": Ts_2D,
-        "Ts_2D_lam_eff": Ts_2D_lam_eff,
-        "Ts_marshak_gold_loss": Ts_marshak_gold_loss,
-        "Ts_ablation_const_rho": Ts_ablation_const_rho,
-    }
-
-
-def export_analytic_positions_csv(times_to_store, grouped_series, output_csv_path):
-    times_ns = np.asarray(times_to_store)
-    combined = {"time_ns": times_ns}
-
-    for group_name, series_dict in grouped_series.items():
-        for series_name, series_values in series_dict.items():
-            if series_values is None:
-                continue
-
-            series_array = np.asarray(series_values)
-            if series_array.shape[0] != times_ns.shape[0]:
-                raise ValueError(
-                    f"Series '{series_name}' length ({series_array.shape[0]}) does not match time array length ({times_ns.shape[0]})."
-                )
-
-            column_name = f"{group_name} ({series_name})" if group_name else series_name
-            combined[column_name] = series_array
-
-    output_dir = os.path.dirname(output_csv_path)
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-
-    pd.DataFrame(combined).to_csv(output_csv_path, index=False)
-    print(f"Saved analytic positions CSV: {output_csv_path}")
 
 # -----------------------------
 # One-call case runner (removes repeated code)
@@ -409,89 +256,30 @@ def plot_surface_temperature_comparison(times_to_store):
 
 
 def plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store):
-    stored_Tm_marshak = pd.read_csv(DATA_DIR / "stored_Tm_marshak.csv", header=None).to_numpy() #convert to numpy array
-    stored_Um_marshak = pd.read_csv(DATA_DIR / "stored_Um_marshak.csv", header=None).to_numpy() #convert to numpy array
-    stored_t_marshak = pd.read_csv(DATA_DIR / "stored_time_marshak.csv", header=None).to_numpy().flatten() #convert to 1D numpy array
-    #front_positions_marshak, total_energies_marshak = compute_front_and_energy(stored_Um_marshak, stored_Tm_marshak)
-    analytic_positions_marshak, _, _, _, _, _= analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak",vary_rho=False)  # stored_t is ns
-    analytic_positions_energy_lost_gold, T_s_array, E_2D, E_wall, _, bessel_data_just_gold = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False)  # stored_t is ns
-    analytic_positions_abaltion_rho_const, _, _, _, _, _ = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_ablation",vary_rho=False)  # stored_t is ns
-    analytic_positions_abaltion_varying_rho, _, _, _, _, _ = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_ablation",vary_rho=True)  # stored_t is ns
-    analytic_positions_abaltion_varying_rho_lam_eff, _, _, _, _, bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_ablation",vary_rho=True, lam_eff=True, power=1.5)  # stored_t is ns
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material='Gold', lam_eff_power=1.5)
+    analytic_positions_marshak = front_series["analytic_positions_marshak"]
+    analytic_positions_energy_lost_gold = front_series["analytic_positions_gold_loss"]
+    analytic_positions_ablation_const_rho = front_series["analytic_positions_ablation_const_rho"]
+    analytic_positions_2D = front_series["analytic_positions_2D"]
+    analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    analytic_positions_no_marshak = front_series["analytic_positions_no_marshak"]
+    T_s_array = front_series["Ts_marshak_gold_loss"]
+    bessel_data = front_series["bessel_data_gold_loss"]
 
-    T_s = [Tm[0] for Tm in stored_Tm_marshak]
-    stored_Tm = pd.read_csv(DATA_DIR / "stored_Tm.csv", header=None).to_numpy() #convert to numpy array
-    stored_Um = pd.read_csv(DATA_DIR / "stored_Um.csv", header=None).to_numpy() #convert to numpy array
-    stored_t = pd.read_csv(DATA_DIR / "stored_time.csv", header=None).to_numpy().flatten() #convert to 1D numpy array
-    # front_positions, __ = compute_front_and_energy(stored_Um, stored_Tm)
     analytic_positions = analytic_wave_front_dispatch(times_to_store, use_seconds=True, mode="no_marshak", vary_rho=False)  # stored_t is ns
 
     plt.figure(figsize=(8, 6))
-    # fit data to analytical
-    #plt.plot(stored_t, front_positions, color='red', linestyle="-", label="Simulated Front Position")
-    #plt.plot(stored_t, front_positions_marshak, color='blue', linestyle="-", label="Simulated Front Position")
-    if analytic_positions is not None:
-        plt.plot(
-            times_to_store, analytic_positions,
-            linestyle="--",
-            label="Analytic x_F(t) (T_s = T_bath(t))",
-            color='red'
-        )
-    if analytic_positions_marshak is not None:
-        plt.plot(
-            times_to_store, analytic_positions_marshak,
-            linestyle="--",
-            label="Analytic x_F(t) (Marshak BC)",
-            color='blue'
-        )
-    # if analytic_positions_ablation_varying_rho_lam_eff is not None:
-    #     plt.plot(
-    #         times_to_store, analytic_positions_ablation_varying_rho_lam_eff,
-    #         linestyle="-",
-    #         label="Analytic x_F(t) energy lost to Gold wall + ablation (varying rho, lam eff)",
-    #          color='purple'
-    #    )
-    if analytic_positions_energy_lost_gold is not None:
-        plt.plot(
-            times_to_store, analytic_positions_energy_lost_gold,
-            linestyle="--",
-            label="Analytic x_F(t) with energy lost to Gold wall",
-            color='orange'
-        )
-    if analytic_positions_abaltion_rho_const is not None:
-        plt.plot(
-            times_to_store, analytic_positions_abaltion_rho_const,
-            linestyle="--",
-            label="Analytic x_F(t) ablation (const rho)",
-            color='green'
-        )
-    if analytic_positions_abaltion_varying_rho is not None:
-        plt.plot(
-            times_to_store, analytic_positions_abaltion_varying_rho,
-            linestyle="--",
-            label="Analytic x_F(t) ablation (varying rho, no lam eff)",
-            color='brown'
+    plot_standard_front_analytic_models(
+        times_to_store, 
+        analytic_positions_marshak=analytic_positions_marshak, 
+        analytic_positions_gold_loss=analytic_positions_energy_lost_gold,
+        analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
+        analytic_positions_2D=analytic_positions_2D,
+        analytic_positions_ablation_const_rho=analytic_positions_ablation_const_rho,
+        analytic_positions_no_marshak=analytic_positions_no_marshak,
         )
 
-    if analytic_positions_abaltion_varying_rho_lam_eff is not None:
-        plt.plot(
-            times_to_store, analytic_positions_abaltion_varying_rho_lam_eff,
-            linestyle="--",
-            label="Analytic x_F(t) ablation (varying rho, lam eff)",
-            color='pink'
-        )
-
-    plot_csv_errorbar(
-        article_front_path("exp_results_back.csv"),
-        y_scale=10,
-        xerr=0.1,
-        fmt='o',
-        capsize=4,
-        elinewidth=1.5,
-        markersize=10,
-        label="Experimental data (article 1)",
-        color='black',
-    )
+    plot_csv_errorbar(article_front_path("exp_results_back.csv"), y_scale=10,xerr=0.1,fmt='o',capsize=4,elinewidth=1.5,markersize=10,label="Experimental data (article 1)", color='black')
 
 
     plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
@@ -506,7 +294,20 @@ def plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store):
     # plt.annotate(f"Std Dev from analytical: {stdev_percent:.2f} %", xy=(0.05, 0.95), xycoords='axes fraction',
     #                 fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     save_figure("front_position - marshak_vs_nonmarshak.png", model1_5=True)
-    
+    export_analytic_positions_csv(
+        times_to_store,
+        {
+            "front_position": {
+                "Marshak": analytic_positions_marshak,
+                "Ablation with varying rho": analytic_positions_2D,
+                "2D effects + lam_eff": analytic_positions_2D_lam_eff,
+                "Ablation with const rho": analytic_positions_ablation_const_rho,
+                "Gold Loss": analytic_positions_energy_lost_gold,
+                "No Marshak": analytic_positions_no_marshak,
+            }
+        },
+        output_csv_path=DATA_DIR / "1.5 model" / "analytic_positions.csv",
+    )
     # Plot radial front profiles z_F(r,t) = z_F(t) * J_0(kappa_0 * r)
     if bessel_data and analytic_positions_energy_lost_gold is not None:
         # Plot 2D spatial view showing front in (r,z) geometry
@@ -781,32 +582,14 @@ def compare_with_article_2_exp1_Massen(times_to_store):
 
     plt.figure(figsize=(8, 6))
     # fit data to analytical
-    if analytic_positions_marshak is not None:
-        plt.plot(
-            times_to_store, analytic_positions_marshak,
-            linestyle="--",
-            label="Analytic x_F(t) (Marshak BC)",
-            color='green'
-        )
+    plot_analytic_if_available(times_to_store, analytic_positions_marshak, label="Analytic x_F(t) (Marshak BC)", linestyle="--", color='green')
     plt.plot(stored_t_marshak, front_positions_marshak, color='red', linestyle="-.", label="Simulated Front Position")
 
-    df = pd.read_csv(article_front_path("150.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    plt.plot(t_csv, x_csv/10, linestyle="--", label="1D Model T=150 eV", color='blue')
-
-    df = pd.read_csv(article_front_path("120.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    plt.plot(t_csv, x_csv/10, linestyle="-.", label="1D Model T=120 eV", color='black')
-
-    df = pd.read_csv(article_front_path("100.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    plt.plot(t_csv, x_csv/10, linestyle="-", label="1D Model T=100 eV", color='red')
+    plot_csv_curves([
+        {"path": article_front_path("150.csv"), "y_scale": 10, "linestyle": "-", "label": "HR Pure", "color": "blue"},
+        {"path": article_front_path("120.csv"), "y_scale": 10, "linestyle": "-.", "label": "HR Doped", "color": "red"},
+        {"path": article_front_path("100.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model Pure", "color": "black"},
+    ])
 
     plt.xlabel("Time (ns)", fontsize = 18)
     plt.ylabel("Wave Front Position (cm)", fontsize = 18)
@@ -845,27 +628,31 @@ def compare_with_article_2_exp2_Xu(times_to_store):
     analytic_positions_ablation_varying_rho = front_series["analytic_positions_2D"]
     analytic_positions_no_marshak = front_series["analytic_positions_no_marshak"]
     analytic_positions_ablation_varying_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    bessel_data = front_series["bessel_data_2D"]
     Ts_1D = front_series["Ts_1D"]
     Ts_2D = front_series["Ts_2D"]
     plt.figure(figsize=(8, 6))
     # fit data to analytical
-    plot_analytic_if_available(times_to_store, analytic_positions_marshak, label="Analytic x_F(t) (Marshak BC)", linestyle="--", color='purple')
-    plot_analytic_if_available(times_to_store, analytic_positions_ablation_varying_rho, label="Analytic x_F(t) (Marshak Ablation Varying Rho)", linestyle="-", color='orange')
-    plot_analytic_if_available(times_to_store, analytic_positions_ablation_varying_rho_lam_eff, label="Analytic x_F(t) (Marshak Ablation Varying Rho, Lam Eff)", linestyle="-", color='purple')
-    plot_analytic_if_available(times_to_store, analytic_positions_no_marshak, label="Analytic x_F(t) (No Marshak BC)", linestyle="--", color='blue')
+    plot_standard_front_analytic_models(
+        times_to_store,
+        analytic_positions_marshak=analytic_positions_marshak,
+        analytic_positions_2D=analytic_positions_ablation_varying_rho,
+        analytic_positions_no_marshak=analytic_positions_no_marshak,
+        analytic_positions_2D_lam_eff=analytic_positions_ablation_varying_rho_lam_eff,
+    )
 
     plot_csv_curves([
-        {"path": article_temperature_path("HR_pure.csv"), "y_scale": 10, "linestyle": "-", "label": "HR Pure", "color": "blue"},
-        {"path": article_temperature_path("HR_doped.csv"), "y_scale": 10, "linestyle": "-.", "label": "HR Doped", "color": "green"},
-        {"path": article_temperature_path("1D_front_pure.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model Pure", "color": "black"},
-        {"path": article_temperature_path("2D_front_pure.csv"), "y_scale": 10, "linestyle": "--", "label": "2D Analytic Model Pure", "color": "black"},
-        {"path": article_temperature_path("1D_front_doped.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model Doped", "color": "red"},
-        {"path": article_temperature_path("2D_front_doped.csv"), "y_scale": 10, "linestyle": "--", "label": "2D Analytic Model Doped", "color": "red"},
+        {"path": article_front_path("HR_pure.csv"), "y_scale": 10, "linestyle": "-", "label": "HR Pure", "color": "blue"},
+        {"path": article_front_path("HR_doped.csv"), "y_scale": 10, "linestyle": "-.", "label": "HR Doped", "color": "green"},
+        {"path": article_front_path("1D_front_pure.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model Pure", "color": "black"},
+        {"path": article_front_path("2D_front_pure.csv"), "y_scale": 10, "linestyle": "--", "label": "2D Analytic Model Pure", "color": "black"},
+        {"path": article_front_path("1D_front_doped.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model Doped", "color": "red"},
+        {"path": article_front_path("2D_front_doped.csv"), "y_scale": 10, "linestyle": "--", "label": "2D Analytic Model Doped", "color": "red"},
     ])
 
     plot_csv_errorbars([
-        {"path": article_temperature_path("exp_results_pure.csv"), "y_scale": 10, "xerr": 0.0, "label": "Expt. pure", "color": "black"},
-        {"path": article_temperature_path("exp_results_doped.csv"), "y_scale": 10, "xerr": 0.0, "label": "Expt. doped", "color": "red"},
+        {"path": article_front_path("exp_results_pure.csv"), "y_scale": 10, "xerr": 0.0, "label": "Expt. pure", "color": "black"},
+        {"path": article_front_path("exp_results_doped.csv"), "y_scale": 10, "xerr": 0.0, "label": "Expt. doped", "color": "red"},
     ])
 
     plt.xlabel("Time (ns)", fontsize = 18)
@@ -900,6 +687,28 @@ def compare_with_article_2_exp2_Xu(times_to_store):
     plt.tight_layout()
 
     save_figure("Temperatures - compare Xu.png", model1_5=True)
+    export_analytic_positions_csv(
+        times_to_store,
+        {
+            "front_position": {
+                "Marshak": analytic_positions_marshak,
+                "Ablation with varying rho": analytic_positions_ablation_varying_rho,
+                "2D effects + lam_eff": analytic_positions_ablation_varying_rho_lam_eff,
+                "No Marshak": analytic_positions_no_marshak,
+            }
+        },
+        output_csv_path=DATA_DIR / "1.5 model" / "analytic_positions.csv",
+    )
+
+    if bessel_data and analytic_positions_ablation_varying_rho is not None:
+        # Plot 2D spatial view showing front in (r,z) geometry
+        plot_2D_front_spatial(bessel_data, analytic_positions_ablation_varying_rho,
+                             times_to_store, times_ns=[1.0, 2.0, 2.5])
+        # Plot temperature heatmaps T(r,z,t)
+        plot_temperature_heatmap_2D(bessel_data, analytic_positions_ablation_varying_rho,
+                        Ts_2D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                        ablation=True)
+
 
 def compare_with_article_2_exp3_13a(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=1)
@@ -909,7 +718,7 @@ def compare_with_article_2_exp3_13a(times_to_store):
     analytic_position_Be_lost, _, _, _, *_ = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be')  # stored_t is ns
     plt.figure(figsize=(8, 6))
     # fit data to analytical
-    plot_standard_front_analytic_and_article_models(
+    plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
         analytic_positions_2D=analytic_positions_2D,
@@ -922,57 +731,16 @@ def compare_with_article_2_exp3_13a(times_to_store):
             label="Analytic x_F(t) (Be Lost)",
             color='cyan'
         )
+    plot_csv_errorbars([
+        {"path": article_front_path("exp_results_gold.csv"), "y_scale": 10, "xerr": 0.03, "label": "Expt. Gold", "color": "black"},
+        {"path": article_front_path("exp_results_be.csv"), "y_scale": 10, "xerr": 0.03, "label": "Expt. Be", "color": "orange"},
+    ])
 
-    df = pd.read_csv(article_front_path("exp_results_gold.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    xerr = 0.03
-    # Plot
-    plt.errorbar(
-        t_csv, x_csv/10,
-        xerr=xerr,
-        fmt='o',
-        capsize=4,
-        elinewidth=1.5,
-        markersize=8,
-        label="Expt. Gold",
-        color='black'
-    )
-    df = pd.read_csv(article_front_path("exp_results_be.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    xerr = 0.03
-    # Plot
-    plt.errorbar(
-        t_csv, x_csv/10,
-        xerr=xerr,
-        fmt='o',
-        capsize=4,
-        elinewidth=1.5,
-        markersize=8,
-        label="Expt. Be",
-        color='orange'
-    )
-
-    df = pd.read_csv(article_front_path("1D_front_gold.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    plt.plot(t_csv, x_csv/10, linestyle="--", label="1D Analytic Model gold", color='red')
-
-    df = pd.read_csv(article_front_path("2D_front_gold.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    plt.plot(t_csv, x_csv/10, linestyle="--", label="2D Analytic Model gold", color='black')
-
-    df = pd.read_csv(article_front_path("2D_front_Be.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    plt.plot(t_csv, x_csv/10, linestyle="--", label="2D Analytic Model Be", color='orange')
+    plot_csv_curves([
+        {"path": article_front_path("1D_front_gold.csv"), "y_scale": 10, "linestyle": "--", "label": "T_D", "color": "red"},
+        {"path": article_front_path("2D_front_gold.csv"), "y_scale": 10, "linestyle": "-", "label": "Ts 1D model", "color": "black"},
+        {"path": article_front_path("2D_front_Be.csv"), "y_scale": 10, "linestyle": "--", "label": "Ts 2D model", "color": "orange"},
+    ])
 
     plt.xlabel("Time (ns)", fontsize = 18)
     plt.ylabel("Wave Front Position (cm)", fontsize = 18)
@@ -1001,7 +769,7 @@ def compare_with_article_2_exp4_14(times_to_store):
     # analytic_positions_marshak = analytic_positions_marshak *(1-0.5**power_law)
     # analytic_positions_no_marshak = analytic_positions_no_marshak *(1-0.5**power_law)
 
-    plot_standard_front_analytic_and_article_models(
+    plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
         analytic_positions_2D=analytic_positions_2D,
@@ -1015,22 +783,9 @@ def compare_with_article_2_exp4_14(times_to_store):
         {"path": article_front_path("2D_model.csv"), "y_scale": 10, "linestyle": "--", "label": "2D Model", "color": "black"},
     ])
 
-    df = pd.read_csv(article_front_path("exp_results.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    yerr = 0.01
-    # Plot
-    plt.errorbar(
-        t_csv, x_csv/10,
-        yerr=yerr,
-        fmt='o',
-        capsize=4,
-        elinewidth=1.5,
-        markersize=8,
-        label="Expt. Be",
-        color='black'
-    )
+    plot_csv_errorbars([
+        {"path": article_front_path("exp_results.csv"), "y_scale": 10, "label": "Expt.", "color": "black"},
+    ])
 
     plt.xlabel("Time (ns)", fontsize = 18)
     plt.ylabel("Wave Front Position (cm)", fontsize = 18)
@@ -1049,7 +804,7 @@ def compare_with_article_2_exp5_15a(times_to_store):
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     plt.figure(figsize=(8, 6))
     # fit data to analytical
-    plot_standard_front_analytic_and_article_models(
+    plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
         analytic_positions_2D=analytic_positions_2D,
@@ -1063,22 +818,9 @@ def compare_with_article_2_exp5_15a(times_to_store):
         {"path": article_front_path("2D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Analytic Model", "color": "black"},
     ])
 
-    df = pd.read_csv(article_front_path("exp_results.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    yerr = 0.01
-    # Plot
-    plt.errorbar(
-        t_csv, x_csv/10,
-        yerr=yerr,
-        fmt='o',
-        capsize=4,
-        elinewidth=1.5,
-        markersize=8,
-        label="Expt. Be",
-        color='black'
-    )
+    plot_csv_errorbars([
+        {"path": article_front_path("exp_results.csv"), "y_scale": 10, "yerr": 0.01, "label": "Expt.", "color": "black"},
+    ])
 
     plt.xlabel("Time (ns)", fontsize = 18)
     plt.ylabel("Wave Front Position (cm)", fontsize = 18)
@@ -1097,7 +839,7 @@ def compare_with_article_2_exp5_15b(times_to_store):
     analytic_positions_ablation_vary_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     plt.figure(figsize=(8, 6))
     # fit data to analytical
-    plot_standard_front_analytic_and_article_models(
+    plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
         analytic_positions_2D=analytic_positions_ablation_vary_rho,
@@ -1111,22 +853,9 @@ def compare_with_article_2_exp5_15b(times_to_store):
         {"path": article_front_path("2D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Analytic Model", "color": "black"},
     ])
 
-    df = pd.read_csv(article_front_path("exp_results.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    yerr = 0.005
-    # Plot
-    plt.errorbar(
-        t_csv, x_csv/10,
-        yerr=yerr,
-        fmt='o',
-        capsize=4,
-        elinewidth=1.5,
-        markersize=8,
-        label="Expt. Be",
-        color='black'
-    )
+    plot_csv_errorbars([
+        {"path": article_front_path("exp_results.csv"), "y_scale": 10, "yerr": 0.005, "label": "Expt.", "color": "black"},
+    ])
 
     plt.xlabel("Time (ns)")
     plt.ylabel("Wave Front Position (cm)")
@@ -1146,70 +875,22 @@ def compare_with_article_2_exp6_16(times_to_store):
     power_law = (4 + alpha - beta) / 4
     analytic_positions_ablation = analytic_positions_ablation * (1-0.4**power_law)  # From section V part 2 where f = 0.4 (40% of maximum radiative flux)
     analytic_positions_ablation_lam_eff = analytic_positions_ablation_lam_eff * (1-0.4**power_law)  # From section V part 2 where f = 0.4 (40% of maximum radiative flux)
-    if analytic_positions_ablation is not None:
-        plt.plot(
-            times_to_store, analytic_positions_ablation,
-            linestyle="--",
-            label="Analytic x_F(t) (ablation + Gold Lost + varying rho)",
-            color='blue'
-        )
-    if analytic_positions_ablation_lam_eff is not None:
-        plt.plot(
-            times_to_store, analytic_positions_ablation_lam_eff,
-            linestyle="-",
-            label="Analytic x_F(t) (ablation + Gold Lost + varying rho + lam eff)",
-            color='orange'
-        )
 
-    df = pd.read_csv(article_front_path("2D_front_pure.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    plt.plot(t_csv, x_csv/10, linestyle="-", label="2D Analytic Model - pure (article)", color='red')
-
-    df = pd.read_csv(article_front_path("2D_front_doped.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    plt.plot(t_csv, x_csv/10, linestyle="-", label="2D Analytic Model - doped (article)", color='black')
-
-    df = pd.read_csv(article_front_path("exp_results_pure.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    xerr = 0.05
-    yerr = 0.001
-    # Plot
-    plt.errorbar(
-        t_csv, x_csv/10,
-        xerr=xerr,
-        yerr=yerr,
-        fmt='o',
-        capsize=4,
-        elinewidth=1.5,
-        markersize=8,
-        label="Expt. pure",
-        color='red'
+    plot_standard_front_analytic_models(
+        times_to_store,
+        analytic_positions_2D=analytic_positions_ablation,
+        analytic_positions_2D_lam_eff=analytic_positions_ablation_lam_eff,
     )
 
-    df = pd.read_csv(article_front_path("exp_results_doped.csv"))
-    # Adjust column names if needed
-    t_csv = df["x"].to_numpy()
-    x_csv = df["y"].to_numpy()
-    xerr = 0.01
-    yerr = 0.001
-    # Plot
-    plt.errorbar(
-        t_csv, x_csv/10,
-        xerr=xerr,
-        yerr=yerr,
-        fmt='o',
-        capsize=4,
-        elinewidth=1.5,
-        markersize=8,
-        label="Expt. doped",
-        color='black'
-    )
+    plot_csv_curves([
+        {"path": article_front_path("2D_front_pure.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Analytic Model - pure (article)", "color": "red"},
+        {"path": article_front_path("2D_front_doped.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Analytic Model - doped (article)", "color": "black"},
+    ])
+
+    plot_csv_errorbars([
+        {"path": article_front_path("exp_results_pure.csv"), "y_scale": 10, "xerr": 0.01, "yerr": 0.001, "label": "Expt. pure", "color": "red"},
+        {"path": article_front_path("exp_results_doped.csv"), "y_scale": 10, "xerr": 0.01, "yerr": 0.001, "label": "Expt. doped", "color": "black"},
+    ])
     
     plt.xlabel("Time (ns)", fontsize = 18)
     plt.ylabel("Wave Front Position (cm)", fontsize = 18)
@@ -1228,6 +909,7 @@ def compare_with_article_2_exp7_17(times_to_store):
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     Ts_1D = front_series["Ts_1D"]
     Ts_2D = front_series["Ts_2D"]
+
     plt.figure(figsize=(8, 6))
     power_law = (4 + alpha - beta) / 4
     analytic_positions_vacuum_lost = analytic_positions_vacuum_lost * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
@@ -1235,7 +917,8 @@ def compare_with_article_2_exp7_17(times_to_store):
     analytic_positions_no_marshak = analytic_positions_no_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
     analytic_positions_2D = analytic_positions_2D * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
     analytic_positions_2D_lam_eff = analytic_positions_2D_lam_eff * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    plot_standard_front_analytic_and_article_models(
+    
+    plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
         analytic_positions_2D=analytic_positions_2D,
@@ -1254,7 +937,7 @@ def compare_with_article_2_exp7_17(times_to_store):
     t_csv = df["x"].to_numpy()
     x_csv = df["y"].to_numpy()
     yerr = 0.1*x_csv/10
-    # Plot
+    # Plot - not the general function for errorbars because we want to customize the error bars
     plt.errorbar(
         t_csv, x_csv/10,
         yerr=yerr,
@@ -1308,7 +991,7 @@ def compare_with_french_gold(times_to_store):
     analytic_positions_ablation_varying_rho = front_series["analytic_positions_2D"]
     
     plt.figure(figsize=(8, 6))
-    plot_standard_front_analytic_and_article_models(
+    plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
         analytic_positions_2D=analytic_positions_ablation_varying_rho,
@@ -1350,7 +1033,7 @@ def compare_with_french_cupper(times_to_store):
     analytic_positions_ablation_varying_rho = front_series["analytic_positions_2D"]
     
     plt.figure(figsize=(8, 6))
-    plot_standard_front_analytic_and_article_models(
+    plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
         analytic_positions_2D=analytic_positions_ablation_varying_rho,
@@ -1495,11 +1178,11 @@ def simulate():
 if __name__ == "__main__":
     #simulate()
     times_to_store = np.linspace(0.01, 3, 1000)
-    plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store)
+    #plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store)
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)
     #compare_with_article_2_exp1_Massen(times_to_store)
-    #compare_with_article_2_exp2_Xu(times_to_store)
+    compare_with_article_2_exp2_Xu(times_to_store)
     #compare_with_article_2_exp3_13a(times_to_store)
     #compare_with_article_2_exp4_14(times_to_store)
     #compare_with_article_2_exp5_15a(times_to_store)

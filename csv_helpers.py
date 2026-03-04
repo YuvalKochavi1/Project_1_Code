@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
-
+import numpy as np
 
 BASE_DIR = Path(__file__).resolve().parent
 # BASE_DIR = C:\Users\TLP-001\Documents\GitHub\WeaponGroup\Project 1
@@ -79,40 +79,35 @@ def plot_csv_errorbar(path, *, y_scale=1.0, label=None, xerr=None, yerr=None, **
         **errorbar_kwargs,
     )
 
-
-def plot_analytic_if_available(x_vals, y_vals, *, label, linestyle="--", color=None):
-    if y_vals is not None:
-        plt.plot(x_vals, y_vals, linestyle=linestyle, label=label, color=color)
-
-
-def plot_csv_curves(curve_specs):
-    for spec in curve_specs:
-        plot_csv_series(
-            spec["path"],
-            y_scale=spec.get("y_scale", 1.0),
-            label=spec.get("label"),
-            linestyle=spec.get("linestyle", "-"),
-            color=spec.get("color"),
-        )
-
-
-def plot_csv_errorbars(errorbar_specs):
-    for spec in errorbar_specs:
-        plot_csv_errorbar(
-            spec["path"],
-            y_scale=spec.get("y_scale", 1.0),
-            label=spec.get("label"),
-            xerr=spec.get("xerr"),
-            yerr=spec.get("yerr"),
-            fmt=spec.get("fmt", "o"),
-            capsize=spec.get("capsize", 4),
-            elinewidth=spec.get("elinewidth", 1.5),
-            markersize=spec.get("markersize", 8),
-            color=spec.get("color"),
-        )
-
-
 def extract_front_positions(dispatch_output):
     if isinstance(dispatch_output, tuple):
         return dispatch_output[0]
     return dispatch_output
+
+def export_analytic_positions_csv(times_to_store, grouped_series, output_csv_path):
+    """
+    Exports analytic positions to a CSV file. The `grouped_series` should be a dictionary where keys are group names (e.g., "Marshak", "2D Shape") and values are dictionaries mapping series names (e.g., "Analytic Front", "Ts") to their corresponding lists of values.
+    """
+    times_ns = np.asarray(times_to_store)
+    combined = {"time_ns": times_ns}
+
+    for group_name, series_dict in grouped_series.items():
+        for series_name, series_values in series_dict.items():
+            if series_values is None:
+                continue
+
+            series_array = np.asarray(series_values)
+            if series_array.shape[0] != times_ns.shape[0]:
+                raise ValueError(
+                    f"Series '{series_name}' length ({series_array.shape[0]}) does not match time array length ({times_ns.shape[0]})."
+                )
+
+            column_name = f"{group_name} ({series_name})" if group_name else series_name
+            combined[column_name] = series_array
+
+    output_dir = os.path.dirname(output_csv_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    pd.DataFrame(combined).to_csv(output_csv_path, index=False)
+    print(f"Saved analytic positions CSV: {output_csv_path}")
