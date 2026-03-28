@@ -2,9 +2,10 @@ from parameters import *
 from model_main import *
 from simulation import *
 from scipy.interpolate import interp1d
+from scipy import special
 from csv_helpers import *
 from plot_helpers import *
-
+from shape_2D_analytical_model import plot_2D_front_spatial, plot_temperature_heatmap_2D, plot_temperature_heatmap_2D_series_model
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
 print(f"Data directory: {DATA_DIR}")
 FIGURES_OUTPUT_DIR = BASE_DIR / "figures"
@@ -60,7 +61,6 @@ def plot_front_positions(stored_t, front_positions, analytic_positions=None, mar
     # plt.annotate(f"Std Dev from analytical: {stdev_percent:.2f} %", xy=(0.05, 0.95), xycoords='axes fraction',
     #                 fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     save_figure("front_position.png")
-
 
 def plot_temperature_profiles(stored_t, stored_Tm):
     colors = plt.cm.viridis(np.linspace(0, 1, len(stored_t)))
@@ -255,7 +255,7 @@ def plot_surface_temperature_comparison(times_to_store):
     save_figure("surface_temperature_comparison.png", model1_5=True)
 
 
-def plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store):
+def Back_SiO2(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, wall_material='Gold', lam_eff_power=1.5)
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
     analytic_positions_energy_lost_gold = front_series["analytic_positions_gold_loss"]
@@ -264,9 +264,8 @@ def plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store):
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     analytic_positions_no_marshak = front_series["analytic_positions_no_marshak"]
     T_s_array = front_series["Ts_marshak_gold_loss"]
-    bessel_data = front_series["bessel_data_gold_loss"]
-
-    analytic_positions = analytic_wave_front_dispatch(times_to_store, use_seconds=True, mode="no_marshak", vary_rho=False)  # stored_t is ns
+    bessel_data = front_series["bessel_data_2D"]
+    data_of_R = front_series["data_of_R_2D"]
 
     plt.figure(figsize=(8, 6))
     plot_standard_front_analytic_models(
@@ -281,6 +280,12 @@ def plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store):
 
     plot_csv_errorbar(article_front_path("exp_results_back.csv"), y_scale=10,xerr=0.1,fmt='o',capsize=4,elinewidth=1.5,markersize=10,label="Experimental data (article 1)", color='black')
 
+    plot_csv_series(
+        article_front_path("ablation_block.csv"),
+        linestyle="-.",
+        label="const ablation from article",
+        color='cyan',
+    )
 
     plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
     plt.ylabel("Wave Front Position (cm)", fontsize=18, fontname='serif')
@@ -293,7 +298,8 @@ def plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store):
     # # annotate the std on the plot, make it look good with a box
     # plt.annotate(f"Std Dev from analytical: {stdev_percent:.2f} %", xy=(0.05, 0.95), xycoords='axes fraction',
     #                 fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-    save_figure("front_position - marshak_vs_nonmarshak.png", model1_5=True)
+    # save_figure("front_position - marshak_vs_nonmarshak.png", model1_5=True)
+    save_figure("front_position - ablation varying rho (n=1.5).png", model1_5=True)
     export_analytic_positions_csv(
         times_to_store,
         {
@@ -307,270 +313,24 @@ def plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store):
             }
         },
         output_csv_path=DATA_DIR / "1.5 model" / "analytic_positions.csv",
+
     )
     # Plot radial front profiles z_F(r,t) = z_F(t) * J_0(kappa_0 * r)
     if bessel_data and analytic_positions_energy_lost_gold is not None:
         # Plot 2D spatial view showing front in (r,z) geometry
-        plot_2D_front_spatial(bessel_data, analytic_positions_energy_lost_gold,
+        plot_2D_front_spatial(bessel_data, analytic_positions_2D,
                              times_to_store, times_ns=[1.0, 2.0, 2.5])
         # Plot temperature heatmaps T(r,z,t)
-        plot_temperature_heatmap_2D(bessel_data, analytic_positions_energy_lost_gold,
+        plot_temperature_heatmap_2D(bessel_data, analytic_positions_2D,
                         T_s_array, times_to_store, times_ns=[1.0, 2.0, 2.5],
                         ablation=True)
-
-def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.0, 2.5]):
-    """
-    Plot z_F(r,t) in 2D spatial coordinates (r, z) showing the curved front
-    from z=0 to z=L at different times.
-    
-    Parameters
-    ----------
-    bessel_data : dict
-        Dictionary with time (ns) as keys, containing Bessel function data
-    z_F_array : array
-        Array of front positions z_F(t) in cm
-    times_array : array
-        Array of times (in ns) corresponding to z_F_array
-    times_ns : list
-        List of times (in ns) to plot
-    """
-    # Find closest available times in data
-    available_times = np.array(list(bessel_data.keys()))
-    
-    fig, axes = plt.subplots(1, len(times_ns), figsize=(18, 8))
-    if len(times_ns) == 1:
-        axes = [axes]
-    
-    for idx, t_target in enumerate(times_ns):
-        # Find closest time in data
-        t_closest = available_times[np.argmin(np.abs(available_times - t_target))]
-        data = bessel_data[t_closest]
-        
-        r_grid = data['r_grid']
-        z_grid = data['z_grid']
-        J0_profiles = data['J0_profiles']
-        J0_profiles_approx = data['J0_profiles_approx']
-        kappa_0 = data['kappa_0']
-        kappa_0_approx = data['kappa_0_approx']
-        albedo = data['albedo']
-        
-        # Get z_F(t) at this time
-        z_F_t = np.interp(t_closest, times_array, z_F_array)
-        
-        # Interpolate J_0 profile at z = z_F(t)
-        J0_at_front = np.zeros_like(r_grid)
-        J0_approx_at_front = np.zeros_like(r_grid)
-        for r_idx in range(len(r_grid)):
-            # Interpolate J_0(r) values along z to get value at z_F
-            J0_interpolator = interp1d(z_grid, J0_profiles[:, r_idx], 
-                                       kind='linear', fill_value='extrapolate')
-            J0_at_front[r_idx] = J0_interpolator(z_F_t)
-            J0_approx_interpolator = interp1d(z_grid, J0_profiles_approx[:, r_idx],
-                                        kind='linear', fill_value='extrapolate')
-            J0_approx_at_front[r_idx] = J0_approx_interpolator(z_F_t)
-        # Normalize so that z_F(r=0, t) = z_F(t)
-        J0_at_center = J0_at_front[0]
-        J_approx_at_center = J0_approx_at_front[0]
-        if J0_at_center != 0:
-            J0_normalized = J0_at_front / J0_at_center
-            J0_normalized_approx = J0_approx_at_front / J_approx_at_center
-        else:
-            J0_normalized = J0_at_front
-            J0_normalized_approx = J0_approx_at_front
-        
-        # Compute radial front profile: z_F(r,t) = z_F(t) * J_0(kappa_0 * r / R)
-        z_F_radial = z_F_t * J0_normalized
-        z_F_radial_approx = z_F_t * J0_normalized_approx
-        
-        ax = axes[idx]
-        
-        # Plot the domain boundaries
-        ax.axhline(y=0, color='black', linewidth=2, label='z = 0 (wall)')
-        ax.axhline(y=L, color='gray', linewidth=2, linestyle='--', label=f'z = L = {L:.2f} cm')
-        ax.axvline(x=0, color='black', linewidth=1, alpha=0.5, label='r = 0 (axis)')
-        ax.axvline(x=R_cm, color='gray', linewidth=2, linestyle='--', label=f'r = R = {R_cm:.2f} cm')
-        
-        # Plot the curved front position
-        ax.plot(r_grid, z_F_radial, linewidth=3, color='red', 
-                label=f'Front z_F(r,t)', linestyle='-', markersize=4)
-        # ax.plot(r_grid, z_F_radial_approx, linewidth=2, color='blue',
-        #         label=f'Approx Front z_F(r,t)', linestyle='--', markersize=4)
-        if t_target != 2.5:
-            df = pd.read_csv(BASE_DIR / "2D" / "data" / f"{int(t_target)}ns.csv")
-        else:
-            df = pd.read_csv(BASE_DIR / "2D" / "data" / "2.5ns.csv")
-        r_csv = df["x"].to_numpy()
-        z_csv = df["y"].to_numpy()
-        ax.plot(r_csv, z_csv, color='blue', label=f'Simulated front ({t_target:.2f} ns)', linestyle='--')
-        
-        # Shade the region behind the front (heated region)
-        ax.fill_between(r_grid, 0, z_F_radial, alpha=0.3, color='orange', 
-                        label='Heated region')
-        
-        ax.set_xlabel('Radial position r (cm)', fontsize=12, fontname='serif')
-        ax.set_ylabel('Axial position z (cm)', fontsize=12, fontname='serif')
-        ax.set_title(f't = {t_closest:.2f} ns\nkappa_0 = {kappa_0:.3f}, kappa_0_approx = {kappa_0_approx:.3f}, albedo = {albedo:.3f}', fontsize=12, fontname='serif')
-        ax.set_ylim([0, L])
-        ax.set_xlim([0, R_cm])
-        ax.grid(True, alpha=0.3)
-        ax.legend(fontsize=9, loc='best', prop={'family': 'serif'})
-        ax.set_aspect('equal', adjustable='box')
-    
-    plt.suptitle('2D Spatial View of Heat Front z_F(r,t) in Cylindrical Geometry', fontsize=14, y=1.00, fontname='serif')
-    plt.tight_layout()
-    
-    save_figure("2D_front_spatial.png", model2_D=True, dpi=150, bbox_inches='tight')
-    plt.close()
-
-
-def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array, times_ns=[1.0, 2.0, 2.5], ablation=False):
-    """
-    Plot 2D temperature heatmaps T(r,z,t) = T_s(t) * (1 - z/z_F(r,t))^(1/(4+alpha-beta))
-    in cylindrical geometry for specified times.
-    
-    Parameters
-    ----------
-    bessel_data : dict
-        Dictionary with time (ns) as keys, containing Bessel function data
-    z_F_array : array
-        Array of front positions z_F(t) in cm
-    T_s_array : array
-        Array of surface temperatures T_s(t) in heV
-    times_array : array
-        Array of times (in ns) corresponding to z_F_array and T_s_array
-    times_ns : list
-        List of times (in ns) to plot
-    """
-    from scipy.interpolate import interp1d
-    
-    # Get material parameters from global scope
-    exponent = 1.0 / (4.0 + alpha - beta)  # Self-similar profile exponent
-    
-    # Find closest available times in data
-    available_times = np.array(list(bessel_data.keys()))
-    
-    data_of_R = None
-    if ablation:
-        data_of_R = R_of_t_z(times_to_store=times_array, show_plot=False, verbose=False)
-
-    fig, axes = plt.subplots(1, len(times_ns), figsize=(18, 6))
-    if len(times_ns) == 1:
-        axes = [axes]
-    
-    for idx, t_target in enumerate(times_ns):
-        # Find closest time in data
-        t_closest = available_times[np.argmin(np.abs(available_times - t_target))]
-        data = bessel_data[t_closest]
-        
-        r_grid = data['r_grid']
-        z_grid = data['z_grid']
-        J0_profiles = data['J0_profiles']
-        kappa_0 = data['kappa_0']
-        albedo = data['albedo']
-        
-        # Get z_F(t) and T_s(t) at this time
-        z_F_t = np.interp(t_closest, times_array, z_F_array)
-        T_s_t = np.interp(t_closest, times_array, T_s_array)
-        
-        # Create 2D mesh grid for temperature calculation
-        n_r = 100
-        n_z = 200
-        r_mesh = np.linspace(0.0, R_cm, n_r)
-        z_mesh = np.linspace(0.0, L, n_z)
-        R_mesh, Z_mesh = np.meshgrid(r_mesh, z_mesh)
-        
-        # Compute z_F(r,t) for each radial position
-        z_F_radial = np.zeros(n_r)
-        for i_r, r_val in enumerate(r_mesh):
-            # Interpolate J_0 at z = z_F_t to get radial variation
-            if r_val <= r_grid[-1]:
-                # Interpolate J_0 profiles at z = z_F_t
-                J0_at_front = np.zeros_like(r_grid)
-                for j_r, r_j in enumerate(r_grid):
-                    J0_interpolator = interp1d(z_grid, J0_profiles[:, j_r], 
-                                               kind='linear', fill_value='extrapolate')
-                    J0_at_front[j_r] = J0_interpolator(z_F_t)
-                
-                # Interpolate to get J_0 at current r_val
-                J0_interp_r = interp1d(r_grid, J0_at_front, kind='linear', 
-                                       fill_value='extrapolate')
-                J0_at_r = J0_interp_r(r_val)
-                
-                # Normalize by centerline value
-                J0_center = J0_at_front[0] if J0_at_front[0] != 0 else 1.0
-                z_F_radial[i_r] = z_F_t * (J0_at_r / J0_center)
-            else:
-                z_F_radial[i_r] = z_F_t
-        
-        # Compute temperature T(r,z,t) on the mesh
-        T_mesh = np.zeros_like(R_mesh)
-        for i_z in range(n_z):
-            for i_r in range(n_r):
-                z_val = z_mesh[i_z]
-                z_F_r = z_F_radial[i_r]
-                
-                if z_val < z_F_r and z_F_r > 0:
-                    # Self-similar profile: T = T_s * (1 - z/z_F)^exponent
-                    T_mesh[i_z, i_r] = T_s_t * ((1.0 - z_val / z_F_r) ** exponent)
-                else:
-                    # Beyond front: T = 0
-                    T_mesh[i_z, i_r] = 0.0
-        
-        ax = axes[idx]
-        
-        # Create heatmap with gouraud shading
-        pcm = ax.pcolormesh(R_mesh, Z_mesh, T_mesh, shading='gouraud', cmap='Spectral_r')
-        
-        # Add contour lines with temperature labels in eV
-        # Use evenly spaced levels from 0 to T_s to avoid clustering near front
-        contour_levels = np.array([1,1.2,1.3,1.4, 1.5]) # 4 evenly spaced levels
-        contour = ax.contour(R_mesh, Z_mesh, T_mesh, levels=contour_levels, colors='black', 
-                            linewidths=0.5, alpha=0.3)
-        ax.clabel(contour, inline=True, fontsize=8, fmt='%.1f')
-        
-        # Plot the front position
-        ax.plot(r_mesh, z_F_radial, linewidth=3, color='cyan', 
-                label=f'Front z_F(r,t)', linestyle='--')
-
-        # Plot ablation contour r = R(t,z) if available
-        if data_of_R is not None and len(data_of_R) > 0:
-            r_times = np.array(list(data_of_R.keys()), dtype=float)
-            t_r = r_times[np.argmin(np.abs(r_times - t_closest))]
-            r_profile = np.asarray(data_of_R[t_r], dtype=float)
-            z_profile = np.asarray(z, dtype=float)
-
-            if z_profile.size == r_profile.size and z_profile.size > 1:
-                r_interp = np.interp(z_mesh, z_profile, r_profile, left=np.nan, right=np.nan)
-                valid = np.isfinite(r_interp)
-                if np.any(valid):
-                    r_interp_plot = np.clip(r_interp[valid], 0.0, R_cm)
-                    ax.plot(r_interp_plot, z_mesh[valid], color='white', linewidth=2.5,
-                            linestyle='-', label='Ablation contour R(t,z)')
-        
-        # Add colorbar
-        cbar = plt.colorbar(pcm, ax=ax)
-        cbar.set_label('Temperature T (heV)')
-        
-        # Add grounded shading at z=0 (ground boundary)
-        
-        # Domain boundaries
-        ax.axhline(y=0, color='white', linewidth=2, linestyle='-', alpha=0.7)
-        ax.axhline(y=L, color='gray', linewidth=1, linestyle='--', alpha=0.5)
-        ax.axvline(x=R_cm, color='gray', linewidth=1, linestyle='--', alpha=0.5)
-        ax.set_xlabel('Radial position r (cm)')
-        ax.set_ylabel('Axial position z (cm)')
-        ax.set_title(f't = {t_closest:.2f} ns\nT_s = {T_s_t:.3f} heV, α = {albedo:.3f}')
-        ax.set_ylim([0, L])  # Focus on heated region
-        ax.set_xlim([0, R_cm])
-        ax.legend(fontsize=9, loc='upper right')
-        ax.set_aspect('equal', adjustable='box')
-    
-    plt.suptitle(f'Temperature Distribution T(r,z,t) with Self-Similar Profile (exponent = {exponent:.3f})', 
-                y=1.00, fontsize=20)
-    plt.tight_layout()
-    
-    save_figure("temperature_heatmap_2D.png", model2_D=True, dpi=150, bbox_inches='tight')
-    plt.close()
+        # plot_temperature_heatmap_2D_series_model(
+        #     analytic_positions_energy_lost_gold,
+        #     T_s_array,
+        #     times_to_store,
+        #     bessel_data=bessel_data,
+        #     data_of_R=data_of_R,
+        # )
 
 
 def compare_with_article_2_exp1_Massen(times_to_store):
@@ -708,6 +468,7 @@ def compare_with_article_2_exp2_Xu(times_to_store):
         plot_temperature_heatmap_2D(bessel_data, analytic_positions_ablation_varying_rho,
                         Ts_2D, times_to_store, times_ns=[1.0, 2.0, 2.5],
                         ablation=True)
+        
 
 
 def compare_with_article_2_exp3_13a(times_to_store):
@@ -1023,8 +784,8 @@ def compare_with_french_gold(times_to_store):
         FIGURES_OUTPUT_DIR / "analytic_positions_french_gold.csv",
     )
 
-def compare_with_french_cupper(times_to_store):
-    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Cupper", lam_eff_power=1)
+def compare_with_french_copper(times_to_store):
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Copper", lam_eff_power=1)
     analytic_positions_ablation_varying_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     analytic_positions_ablation_const_rho = front_series["analytic_positions_ablation_const_rho"]
     analytic_positions_gold_loss = front_series["analytic_positions_gold_loss"]
@@ -1178,11 +939,11 @@ def simulate():
 if __name__ == "__main__":
     #simulate()
     times_to_store = np.linspace(0.01, 3, 1000)
-    #plot_both_marshak_and_nonmarshak_heat_fronts(times_to_store)
+    Back_SiO2(times_to_store)
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)
     #compare_with_article_2_exp1_Massen(times_to_store)
-    compare_with_article_2_exp2_Xu(times_to_store)
+    #compare_with_article_2_exp2_Xu(times_to_store)
     #compare_with_article_2_exp3_13a(times_to_store)
     #compare_with_article_2_exp4_14(times_to_store)
     #compare_with_article_2_exp5_15a(times_to_store)
@@ -1191,6 +952,6 @@ if __name__ == "__main__":
     #compare_with_article_2_exp7_17(times_to_store)
     #compare_with_french_gold(times_to_store)
     #compare_n_1(times_to_store)
-    #compare_with_french_cupper(times_to_store)
+    #compare_with_french_copper(times_to_store)
     # plot_surface_temperature_comparison(times_to_store)
     plot_albedo_z0_vs_time(times_to_store)

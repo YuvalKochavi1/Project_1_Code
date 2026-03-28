@@ -8,7 +8,7 @@ def plot_analytic_if_available(x_vals, y_vals, *, label, linestyle="--", color=N
     if y_vals is not None:
         plt.plot(x_vals, y_vals, linestyle=linestyle, label=label, color=color)
 
-def plot_csv_series(path, *, y_scale=1.0, label=None, **plot_kwargs):
+def plot_csv_series(path, *, y_scale=10, label=None, **plot_kwargs):
     x_vals, y_vals = read_xy_csv(path)
     plt.plot(x_vals, y_vals / y_scale, label=label, **plot_kwargs)
 

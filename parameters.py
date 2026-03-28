@@ -51,7 +51,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = "C6H12"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = "SiO2"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 
 if Material == "SiO2":
     Experiment = "Back"
@@ -68,18 +68,6 @@ if Material == "SiO2":
     t_array_TD, T_array_TD = load_time_temp(csv_path)
     #T_array_TD = np.full_like(t_array_TD, 150)  # eV (the get_TD function will scale it down by 0.01)
     #lambda_ross = 0.18 # Rosseland mean free path (cm) at maximum temperature (1.8 Hev)
-
-elif Material == "Gold":
-    # self similarity model fudge factors - gold
-    f = 3.4 * 10**13          # fudge factor for sigma (new model) [erg/g]
-    g = 1 / 7200      
-    alpha = 1.5       # opacity exponent
-    beta = 1.6       # beta exponent
-    lambda_param = 0.2
-    mu = 0.14
-    rho = 19.32      # initial density (g/cm^3)
-    csv_path = article_temperature_path("T_drive.csv")
-    t_array_TD, T_array_TD = load_time_temp(csv_path)
 
 elif Material == "C11H16Pb0.3852":
     Experiment = "Massen"
@@ -319,8 +307,114 @@ elif Material == "french_cupper":
     L = 0.4      
     Nz = 500   # increase resolution because domain is much larger
 
+# self similarity model fudge factors - gold
+f_gold = 3.4 * 10**13          # fudge factor for sigma (new model) [erg/g]
+g_gold = 1 / 7200      
+alpha_gold = 1.5       # opacity exponent
+beta_gold = 1.6       # beta exponent
+lambda_param_gold = 0.2
+mu_gold = 0.14
+rho_gold = 19.32      # initial density (g/cm^3)
+
+# self similarity model fudge factors - Be     
+alpha_be = 4.893       # opacity exponent
+beta_be = 1.0902      # beta exponent
+lambda_param_be = 0.6726
+mu_be = 0.0701
+rho_be = 1.85      # initial density (g/cm^3)
+
+# self similarity model fudge factors - Copper 
+alpha_copper = 2.21       # opacity exponent
+beta_copper = 1.35     # beta exponent
+lambda_param_copper = 0.29
+mu_copper = 0.14
+rho_copper = 8.96      # initial density (g/cm^3)
+
 z = np.linspace(0.0, L, Nz)
 dz = z[1] - z[0]
+
+# Radial grid for 2D cylindrical (Foam)
+Nr = 1000
+r_grid = np.linspace(0.0, R_cm, Nr)
+dr = r_grid[1] - r_grid[0]
+
+
+def solve_q_from_dr0(gold_width, N, dr0):
+    """
+    Solve q >= 1 such that sum_{k=0}^{N-1} dr0*q^k = gold_width.
+    """
+    if N < 1:
+        raise ValueError("N must be >= 1")
+    if dr0 <= 0:
+        raise ValueError("dr0 must be > 0")
+    if gold_width <= 0:
+        raise ValueError("gold_width must be > 0")
+    if dr0 * N > gold_width:
+        print(f"dr0*N = {dr0*N} exceeds gold_width = {gold_width}")
+        raise ValueError("dr0 too large: even uniform widths N*dr0 exceed gold_width")
+
+    # Uniform special case.
+    if abs(dr0 * N - gold_width) / gold_width < 1e-12:
+        return 1.0
+
+    def S(q):
+        return dr0 * (q**N - 1.0) / (q - 1.0)
+
+    q_lo = 1.0 + 1e-12
+    q_hi = 2.0
+    while S(q_hi) < gold_width:
+        q_hi *= 2.0
+        if q_hi > 1e6:
+            raise RuntimeError("Failed to bracket q; check inputs.")
+
+    for _ in range(80):
+        q_mid = 0.5 * (q_lo + q_hi)
+        if S(q_mid) < gold_width:
+            q_lo = q_mid
+        else:
+            q_hi = q_mid
+
+    return 0.5 * (q_lo + q_hi)
+
+
+def make_r_two_block(R_foam, gold_width, Nr_foam, Nr_gold, dr0=None):
+    """
+    Build radial nodes for:
+      - foam region [0, R_foam]: uniform with Nr_foam nodes
+      - gold region [R_foam, R_foam+gold_width]: geometric widths
+
+    dr0 is the first gold cell width at the foam-gold interface.
+    """
+    if Nr_foam < 2:
+        raise ValueError("Nr_foam must be >= 2")
+    if Nr_gold < 1:
+        raise ValueError("Nr_gold must be >= 1")
+    if R_foam <= 0 or gold_width <= 0:
+        raise ValueError("R_foam and gold_width must be > 0")
+    if dr0 is None:
+        raise ValueError("Provide dr0=...")
+
+    r_foam = np.linspace(0.0, R_foam, Nr_foam)
+
+    q = solve_q_from_dr0(gold_width, Nr_gold, dr0)
+    widths = dr0 * (q ** np.arange(Nr_gold))
+    r_gold_block = R_foam + np.concatenate(([0.0], np.cumsum(widths)))
+
+    R_total = R_foam + gold_width
+    r_gold_block[-1] = R_total
+
+    r = np.concatenate((r_foam, r_gold_block))
+    r = np.unique(r)
+
+    info = {"q": float(q), "dr0": float(dr0), "widths": widths, "R_total": R_total}
+    return r, info
+
+# Radial grid for 2D cylindrical (Gold extension)
+Nr_gold = 100
+w_Au = 1e-4
+dr0_gold = w_Au / 4000
+r_gold, r_gold_info = make_r_two_block(R_cm, w_Au, Nr, Nr_gold, dr0=dr0_gold)
+
 
 t_final_sec = 3e-9 
 dt_sec = 5e-15

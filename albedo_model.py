@@ -11,7 +11,7 @@ class AlbedoModel:
         Compute albedo at a single time step from the flux balance.
 
         The albedo is defined as the ratio of reflected to incident flux:
-            a(t) = F_in / F_out = (σ_SB * T_s^4 * area + Ė_w/2) / (σ_SB * T_s^4 * area - Ė_w/2)
+            a(t) = F_out / F_in = (σ_SB * T_s^4 * area - Ė_w/2) / (σ_SB * T_s^4 * area + Ė_w/2)
 
         where:
           - T_s: surface temperature in HeV
@@ -52,7 +52,7 @@ class AlbedoModel:
         Compute albedo array from stored time series data.
 
         Albedo is computed at each time step using the flux balance equation:
-            a(t) = F_in / F_out = (σ_SB * T_s^4 * area + Ė_w/2) / (σ_SB * T_s^4 * area - Ė_w/2)
+            a(t) = F_out / F_in = (σ_SB * T_s^4 * area - Ė_w/2) / (σ_SB * T_s^4 * area + Ė_w/2)
 
         Parameters
         ----------

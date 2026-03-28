@@ -63,21 +63,23 @@ def read_xy_csv(path):
     return df["x"].to_numpy(), df["y"].to_numpy()
 
 
-def plot_csv_series(path, *, y_scale=1.0, label=None, **plot_kwargs):
-    x_vals, y_vals = read_xy_csv(path)
-    plt.plot(x_vals, y_vals / y_scale, label=label, **plot_kwargs)
+def ensure_dir(path):
+    path = Path(path)
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
-def plot_csv_errorbar(path, *, y_scale=1.0, label=None, xerr=None, yerr=None, **errorbar_kwargs):
-    x_vals, y_vals = read_xy_csv(path)
-    plt.errorbar(
-        x_vals,
-        y_vals / y_scale,
-        xerr=xerr,
-        yerr=yerr,
-        label=label,
-        **errorbar_kwargs,
-    )
+def save_series_csv(path, data_dict):
+    path = Path(path)
+    ensure_dir(path.parent)
+    pd.DataFrame(data_dict).to_csv(path, index=False)
+
+
+def save_array_npz(path, **arrays):
+    path = Path(path)
+    ensure_dir(path.parent)
+    np.savez_compressed(path, **arrays)
+
 
 def extract_front_positions(dispatch_output):
     if isinstance(dispatch_output, tuple):

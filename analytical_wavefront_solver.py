@@ -39,7 +39,6 @@ class AnalyticalWavefrontSolver:
         lam_eff=False,
         power=2,
         R_average_for_lambda_geom=True,
-        good_way=False,
     ):
         return self.march_fn(
             times_to_store,
@@ -52,7 +51,6 @@ class AnalyticalWavefrontSolver:
             lam_eff=lam_eff,
             power=power,
             R_average_for_lambda_geom=R_average_for_lambda_geom,
-            good_way=good_way,
         )
 
     def analytic_wave_front_marshak(self, times_to_store, *, use_seconds=True, wall_material='Gold', lam_eff=False, power=2):
@@ -91,7 +89,6 @@ class AnalyticalWavefrontSolver:
         lam_eff=False,
         power=2,
         R_average_for_lambda_geom=False,
-        good_way=False,
     ):
         return self.marshak_appendixA_march(
             times_to_store,
@@ -104,7 +101,6 @@ class AnalyticalWavefrontSolver:
             lam_eff=lam_eff,
             power=power,
             R_average_for_lambda_geom=R_average_for_lambda_geom,
-            good_way=good_way,
         )
 
     def analytic_wave_front_dispatch(
@@ -118,7 +114,6 @@ class AnalyticalWavefrontSolver:
         lam_eff=False,
         power=2,
         R_average_for_lambda_geom=False,
-        good_way=True,
     ):
         if mode == "no_marshak":
             return self.analytic_wave_front_no_marshak(times_to_store, use_seconds=use_seconds, lam_eff=lam_eff, power=power)
@@ -135,6 +130,5 @@ class AnalyticalWavefrontSolver:
                 lam_eff=lam_eff,
                 power=power,
                 R_average_for_lambda_geom=R_average_for_lambda_geom,
-                good_way=good_way,
             )
         raise ValueError(f"Unknown mode: {mode}")

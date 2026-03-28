@@ -116,3 +116,58 @@ class AblationModel:
         if volume > original_volume:
             return rho
         return rho * original_volume / volume
+
+    @staticmethod
+    def mask_wall_cells_from_ablation(T_mesh, R_mesh, z_mesh, data_of_R, t_ref):
+        """
+        Return temperature mesh masked to foam-only cells and contour points for R(t,z).
+
+        Cells with r > R_new(z,t) are gold and are masked out (set to NaN).
+
+        Parameters
+        ----------
+        T_mesh : np.ndarray
+            2D temperature field (Nz, Nr)
+        R_mesh : np.ndarray
+            2D radial coordinate grid (Nz, Nr)
+        z_mesh : np.ndarray
+            1D axial coordinate array (Nz,)
+        data_of_R : dict
+            Dictionary mapping time (float) to R_array (1D profile)
+        t_ref : float
+            Reference time for interpolation
+
+        Returns
+        -------
+        tuple
+            T_mesh_plot (NaN in gold cells), contour_r, contour_z
+        """
+        T_mesh_plot = T_mesh
+        contour_r = None
+        contour_z = None
+
+        if data_of_R is None or len(data_of_R) == 0:
+            return T_mesh_plot, contour_r, contour_z, None
+
+        r_times = np.array(list(data_of_R.keys()), dtype=float)
+        t_r = r_times[np.argmin(np.abs(r_times - t_ref))]
+        r_profile = np.asarray(data_of_R[t_r], dtype=float)
+        z_profile = np.asarray(z, dtype=float)
+
+        if z_profile.size != r_profile.size or z_profile.size <= 1:
+            return T_mesh_plot, contour_r, contour_z, T_mesh_plot_wall
+
+        r_interp = np.interp(z_mesh, z_profile, r_profile, left=np.nan, right=np.nan)
+        valid = np.isfinite(r_interp)
+        if not np.any(valid):
+            return T_mesh_plot, contour_r, contour_z
+
+        r_interface = np.clip(r_interp, 0.0, R_cm)
+        foam_mask = valid[:, None] & (R_mesh <= r_interface[:, None])
+        wall_mask = valid[:, None] & (R_mesh > r_interface[:, None])
+        T_mesh_plot_foam = np.where(foam_mask, T_mesh, np.nan)
+        T_mesh_plot_wall = np.where(wall_mask, T_mesh, np.nan)
+
+        contour_r = r_interface[valid]
+        contour_z = z_mesh[valid]
+        return T_mesh_plot_foam, contour_r, contour_z, T_mesh_plot_wall

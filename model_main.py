@@ -130,20 +130,226 @@ def analytic_wave_front_no_marshak(times_to_store, *, use_seconds=True, lam_eff=
 # SECTION 2: MARSHAK BOUNDARY ITERATION (APPENDIX A) - CORE ENGINE
 # ============================================================================
 
-def _marshak_appendixA_march(
-    times_to_store,
-    *,
-    use_seconds=True,
-    wall_loss=False,
-    ablation=False,
-    vary_rho=False,
-    flat_top_profile=False,
-    wall_material='Gold',
-    lam_eff=False,
-    power=2,
-    R_average_for_lambda_geom=True,
-    good_way=False
+def _compute_Z1_from_C(eps, C_here, rho_here):
+    return (f ** 2) * (rho_here ** (2.0 * (1.0 - mu))) * (2.0 + eps) * (1.0 - eps) * C_here
+
+
+def _compute_ablation_step(i, t_sec, dt_i, t_heat, Ts_prev, xF_prev, wall_material, rho_here, data_of_R):
+    global _ABLATION_R_ARRAY
+    dE_wall_hJ = 0.0
+    if wall_material == 'Copper':
+        csv_path = U_TILDA_DIR / "u_tilda_copper(rho)_464_5.csv"
+        u_tilde = AblationModel.get_u_tilda_closest(csv_path, rho_here)
+    elif wall_material == 'Gold':
+        csv_path = U_TILDA_DIR / "u_tilda_gold(rho)_510.1.csv"
+        u_tilde = AblationModel.get_u_tilda_closest(csv_path, rho_here)
+    else:
+        u_tilde = None
+
+    if wall_material in ('Gold', 'Copper'):
+        if i > 1:
+            R_array_prev = _ABLATION_R_ARRAY.copy()
+        else:
+            R_array_prev = None
+        R_array = AblationModel.compute_R_t(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, R_array_prev, wall_material=wall_material, u_tilde=u_tilde,)
+    else:
+        R_array = np.full_like(z, R_cm)
+
+    _ABLATION_R_ARRAY = R_array
+    data_of_R[t_sec[i]] = R_array.copy()
+    A_i = np.pi * R_array[0] ** 2
+
+    if wall_material in ('Gold', 'Copper'):
+        dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i],dt_i,t_heat,R_cm,Ts_prev,xF_prev,flat_top_profile=True,wall=wall_material,)
+
+    return R_array, A_i, dE_wall_hJ
+
+
+_ABLATION_R_ARRAY = np.full_like(z, R_cm)
+
+
+def _update_flux_and_energy(i, dt_i, base_flux, area, ablation, wall_loss, A, F, E, E_wall_erg, E_wall_array_erg, dE_wall_hJ):
+    if ablation:
+        E_wall_erg += dE_wall_hJ * 1e9
+        E_wall_array_erg[i] = E_wall_erg
+        F[i] = base_flux - (dE_wall_hJ * 1e9) / (A[i] * dt_i)
+        E[i] = E[i - 1] + 0.5 * (F[i] * A[i] + F[i - 1] * A[i - 1]) * dt_i / area
+    elif wall_loss:
+        # Convert wall energy loss from hJ to erg and subtract from flux
+        E_wall_erg += dE_wall_hJ * 1e9
+        E_wall_array_erg[i] = E_wall_erg
+        F[i] = base_flux - (dE_wall_hJ * 1e9) / (area * dt_i)
+        E[i] = E[i - 1] + 0.5 * (F[i] + F[i - 1]) * dt_i
+    else:
+        # No ablation, no wall loss: just integrate the base flux
+        E_wall_array_erg[i] = E_wall_erg
+        F[i] = base_flux
+        E[i] = E[i - 1] + 0.5 * (F[i] + F[i - 1]) * dt_i
+    return E_wall_erg
+
+
+def _update_vary_rho_terms(i, dt_i, Ts_prev, xF_prev, R_array, t_sec, p, K, eps, In, C_changing_rho, Z1_changing_rho, new_rho,  lam_eff, power, R_average_for_lambda_geom, g_eff_array, lambda_eff_array):
+    new_rho[i] = AblationModel.compute_rho_effective(R_cm, R_array, xF_prev)
+
+    if not lam_eff:
+        In[i] = In[i - 1] + dt_i / 2 * (new_rho[i] ** p + new_rho[i - 1] ** p)
+        C_changing_rho[i] = (K / t_sec[i]) * In[i]
+    else:
+        lambda_ross = g * (Ts_prev ** alpha) * (rho ** (-lambda_param - 1))
+        xF_index = np.searchsorted(z, xF_prev)
+        if R_average_for_lambda_geom:
+            R_average = np.mean(R_array[:xF_index + 1]) if xF_index > 0 else R_array[0]
+        else:
+            R_average = R_cm
+
+        lambda_geom = 2 * R_average
+        lambda_eff = ((lambda_geom ** (-power) + lambda_ross ** (-power))) ** (-1 / power)
+        lambda_eff_array[i] = lambda_eff
+        g_eff = g * (lambda_eff / lambda_ross)
+        g_eff_array[i] = g_eff
+        w_i = g_eff_array[i] / g
+        w_im1 = g_eff_array[i - 1] / g
+        In[i] = In[i - 1] + 0.5 * dt_i * (w_i * (new_rho[i] ** p) + w_im1 * (new_rho[i - 1] ** p))
+        C_changing_rho[i] = (K / t_sec[i]) * In[i]
+
+    Z1_changing_rho[i] = _compute_Z1_from_C(eps, C_changing_rho[i], new_rho[i])
+
+
+def _update_wall_penetration_profiles(i, t_sec, dt_i, t_heat, Ts_i, xF_i, wall_material, wall_penetration_depth_cm_profile,):
+    """Update cumulative wall penetration and map it to geometric gold radial grid.
+
+    The wall front is measured from fixed foam boundary R_cm to R_cm + w_Au,
+    while the ablation interface profile is tracked separately for plotting.
+    """
+    delta_penetration_depth_cm = WallLossModel.compute_wall_front_profile(t_sec[i], dt_i, t_heat, Ts_i, xF_i, flat_top_profile=False, wall=wall_material,)
+    delta_penetration_depth_cm = np.asarray(delta_penetration_depth_cm, dtype=float)
+
+    if delta_penetration_depth_cm.shape == wall_penetration_depth_cm_profile.shape:
+        # we can directly add the new penetration depth to the what we have so far
+        wall_penetration_depth_cm_profile += np.clip(delta_penetration_depth_cm, 0.0, None)
+        wall_penetration_depth_cm_profile = np.clip(wall_penetration_depth_cm_profile, 0.0, w_Au)
+
+    # Wall-front location is referenced to the fixed foam boundary R_cm.
+    wall_front_radius_profile = np.minimum(
+        R_cm + wall_penetration_depth_cm_profile,
+        r_gold[-1],
+    )
+
+    wall_penetration_radius_profile = np.minimum(
+        wall_front_radius_profile,
+        r_gold[-1], # don't allow penetration beyond the end of the gold grid
+    )
+    wall_penetration_cell_idx_profile = np.searchsorted(
+        r_gold,
+        wall_penetration_radius_profile,
+        side='right',
+    ) - 1
+    wall_penetration_cell_idx_profile = np.clip(
+        wall_penetration_cell_idx_profile,
+        0,
+        len(r_gold) - 1,
+    )
+
+    return (
+        wall_penetration_depth_cm_profile,
+        wall_penetration_radius_profile,
+        wall_penetration_cell_idx_profile,
+    )
+
+
+def _update_t_heat(xF_i, t_heat, t_i):
+    for j in range(len(z)):
+        if z[j] <= xF_i and t_heat[j] == np.inf:
+            t_heat[j] = t_i
+
+def _compute_z_front_radial_snapshot(z_front, j0_profile):
+    """Compute z_F(r,t) from centerline front and radial J0 profile."""
+    j0_center = j0_profile[0] if j0_profile[0] != 0 else 1.0
+    # j0_center is zero beacuse J_0(0) = 1, but we want to avoid division by zero if the profile is zero at the center for some reason. In that case, we can just return z_front as is, since the radial profile would be flat.
+    return float(z_front) * (j0_profile / j0_center)
+
+
+def _store_bessel_snapshot(
+    i,
+    t_sec,
+    Ts_i,
+    dt_i,
+    xF_i,
+    E_wall_array_erg,
+    bessel_data,
+    data_of_R=None,
+    t_ref_sec=None,
+    wall_interface_radius_profile=None,
+    wall_penetration_depth_cm_profile=None,
+    wall_penetration_radius_profile=None,
+    wall_penetration_cell_idx_profile=None,
 ):
+    dE_wall = E_wall_array_erg[i] - E_wall_array_erg[i - 1]
+    albedo = AlbedoModel.compute_albedo_step(Ts_i, dE_wall, dt_i)
+    lambda_ross = g * (Ts_i ** alpha) * (rho ** (-lambda_param - 1))
+    epsilon = 3 / 4 * (1 - albedo) * (1 / lambda_ross) * R_cm
+    kappa_0 = kappa_roots(epsilon, R_cm, n_roots=1)[0]
+    kappa_0_approx = np.sqrt(2 * epsilon) / R_cm
+
+    J0_profile = special.j0(kappa_0 * r_grid)
+    J0_profile_approx = special.j0(kappa_0_approx * r_grid)
+    z_F_radial = _compute_z_front_radial_snapshot(xF_i, J0_profile)
+    z_F_radial_approx = _compute_z_front_radial_snapshot(xF_i, J0_profile_approx)
+    J0_profiles = np.tile(J0_profile, (len(z), 1)) # shape (Nz, Nr)
+    J0_profiles_approx = np.tile(J0_profile_approx, (len(z), 1))
+    
+    # Compute z_F at r=R_cm (edge of foam) using kappa_0
+    z_F_at_rcm = xF_i * special.j0(kappa_0 * R_cm)
+
+    snapshot = {
+        'r_grid': r_grid.copy(),
+        'z_grid': z.copy(),
+        'J0_profiles': J0_profiles.copy(),
+        'J0_profiles_approx': J0_profiles_approx.copy(),
+        'kappa_0': kappa_0,
+        'kappa_0_approx': kappa_0_approx,
+        'z_F_radial': z_F_radial.copy(),
+        'z_F_radial_approx': z_F_radial_approx.copy(),
+        'z_F_at_rcm': z_F_at_rcm,
+        'epsilon': epsilon,
+        'albedo': albedo,
+        'lambda_ross': lambda_ross,
+    }
+
+    # Classify foam vs wall cells once in solver and store for plotting.
+    if data_of_R is not None and t_ref_sec is not None and len(data_of_R) > 0:
+        z_mesh = z
+        r_mesh = r_grid
+        R_mesh, _ = np.meshgrid(r_mesh, z_mesh)
+        dummy_temperature = np.ones((z_mesh.size, r_mesh.size), dtype=float)
+        T_masked_foam, contour_r, contour_z, T_masked_wall = AblationModel.mask_wall_cells_from_ablation(dummy_temperature, R_mesh, z_mesh, data_of_R, t_ref_sec,)
+        snapshot['ablation_foam_mask'] = np.isfinite(T_masked_foam)
+        snapshot['ablation_wall_mask'] = np.isfinite(T_masked_wall)
+        snapshot['ablation_contour_r'] = None if contour_r is None else np.asarray(contour_r, dtype=float)
+        snapshot['ablation_contour_z'] = None if contour_z is None else np.asarray(contour_z, dtype=float)
+
+    if wall_penetration_depth_cm_profile is not None:
+        snapshot['wall_penetration_depth_cm_profile'] = np.asarray(wall_penetration_depth_cm_profile, dtype=float)
+    if wall_penetration_radius_profile is not None:
+        snapshot['wall_penetration_radius_profile'] = np.asarray(wall_penetration_radius_profile, dtype=float)
+    if wall_penetration_cell_idx_profile is not None:
+        snapshot['wall_penetration_cell_idx_profile'] = np.asarray(wall_penetration_cell_idx_profile, dtype=int)
+    if wall_penetration_depth_cm_profile is not None or wall_penetration_radius_profile is not None:
+        snapshot['r_gold_grid'] = r_gold.copy()
+
+    bessel_data[t_sec[i] * 1e9] = snapshot
+
+
+def _restore_marshak_outputs(xF, Ts, E_total_hJ, E_wall_hJ_array, order, t_sec_in, data_of_R, t_sec):
+    xF_out = WavefrontHelpers.restore_original_order(xF, order, t_sec_in.size) / 1.02
+    Ts_out = WavefrontHelpers.restore_original_order(Ts, order, t_sec_in.size)
+    E_out = WavefrontHelpers.restore_original_order(E_total_hJ, order, t_sec_in.size)
+    Ew_out = WavefrontHelpers.restore_original_order(E_wall_hJ_array, order, t_sec_in.size)
+    data_of_R_ns = {1e9 * t_sec_in[i]: data_of_R[t_sec[i]] for i in range(t_sec_in.size)}
+    return xF_out, Ts_out, E_out, Ew_out, data_of_R_ns
+
+def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False, ablation=False,
+ vary_rho=False, flat_top_profile=False, wall_material='Gold', lam_eff=False, power=2, R_average_for_lambda_geom=True,):
     """
     Shared engine for Marshak boundary iteration (Appendix A).
     March in time:
@@ -161,21 +367,15 @@ def _marshak_appendixA_march(
       (xF, Ts, E_total_hJ, E_wall_hJ_array)
     """
     t_sec, order, t_sec_in = WavefrontHelpers.prepare_times(times_to_store, use_seconds=use_seconds)
-    if t_sec[-1] > 1e-5:
-        t_sec = t_sec * 1e-9
     if t_sec.size == 0:
         return np.array([]), np.array([]), np.array([]), np.array([])
+    if t_sec[-1] > 1e-5:
+        t_sec = t_sec * 1e-9
 
     eps, sigma_SB_hev, C0, pref = WavefrontHelpers.compute_constants_for_wavefront()
 
     # Heating-time per spatial zone (globals: z)
     t_heat = np.full_like(z, np.inf)
-
-    # Appendix A Z1 uses C (but we may update it if vary_rho=True)
-    # Z1 = f^2 * rho^(2(1-mu)) * (2+eps)(1-eps) * C
-    # Z2 = Z1 * ∫_0^{t-dt} H(t') dt'  = Z1 * I_prev
-    def compute_Z1(C_here, rho_here):
-        return (f ** 2) * (rho_here ** (2.0 * (1.0 - mu))) * (2.0 + eps) * (1.0 - eps) * C_here
     
     # storage
     xF = np.zeros_like(t_sec)
@@ -184,11 +384,12 @@ def _marshak_appendixA_march(
     I  = np.zeros_like(t_sec)
     F  = np.zeros_like(t_sec)
     E  = np.zeros_like(t_sec)  # "energy-like" integral over flux (per area-ish, matching your current usage)
+    z_F_rcm = np.zeros_like(t_sec)  # z_F at r=R_cm (edge of foam)
 
     new_rho = np.full_like(t_sec, rho, dtype=float)
     C_changing_rho = np.full_like(t_sec, 0, dtype=float)
     Z1_changing_rho = np.full_like(t_sec, 0, dtype=float)
-    Z1_changing_rho[0] = compute_Z1(C0, rho)
+    Z1_changing_rho[0] = _compute_Z1_from_C(eps, C0, rho)
     A = np.full_like(t_sec, np.pi * R_cm ** 2, dtype=float)
     C_changing_rho[0] = C0
     In = np.full_like(t_sec, 0, dtype=float)
@@ -208,14 +409,11 @@ def _marshak_appendixA_march(
     xF[0] = 0.0
     g_eff_array = np.full_like(t_sec, g, dtype=float)
     lambda_eff_array = np.full_like(t_sec, 0, dtype=float)
-    C_eff_array = np.full_like(t_sec, C0, dtype=float)
     E_wall_array_erg[0] = 0.0
     data_of_R = {t: np.full_like(z, R_cm) for t in t_sec}  # store R(t) data if ablation
+    wall_penetration_depth_cm_profile = np.zeros_like(z, dtype=float)
     
     # Bessel function data storage for each time step
-    # Create radial grid from 0.01 cm to R_cm
-    n_r_points = 100
-    r_grid = np.linspace(0.0, R_cm, n_r_points)
     # Dictionary to store J_0(kappa_0 * r) profiles for each (time, z) pair
     bessel_data = {}  # keys: time (ns), values: dict with 'r_grid', 'J0_profiles' (shape: [Nz, Nr])
 
@@ -225,15 +423,18 @@ def _marshak_appendixA_march(
     K = (16.0 / (4.0 + alpha)) * (g * sigma_SB_hev) / (3.0 * f)
     p = mu - lambda_param - 2.0
 
-
     # initial Z1
-    Z1 = compute_Z1(C0, rho)
+    Z1 = _compute_Z1_from_C(eps, C0, rho)
+    R_array = np.full_like(z, R_cm)
+    global _ABLATION_R_ARRAY # store previous R_array for ablation step
+    _ABLATION_R_ARRAY = R_array.copy()
     for i in range(1, len(t_sec)):
         dt_i = t_sec[i] - t_sec[i - 1]
         if dt_i <= 0.0:
             dt_i = 0.0
         TD_now = get_TD(t_sec[i] * 1e9, t_array_TD, T_array_TD)
         Ts_prev = Ts[i - 1]
+        C_eff = C0
         if lam_eff and (not vary_rho):
             lambda_ross = g*(Ts_prev**alpha)*(rho**(-lambda_param-1))
             lambda_geom = 2*R_cm
@@ -251,7 +452,7 @@ def _marshak_appendixA_march(
             # now C_eff comes from the integral (not relaxation)
             C_eff = (K / t_sec[i]) * Iw[i]
 
-            Z1 = compute_Z1(C_eff, rho)
+            Z1 = _compute_Z1_from_C(eps, C_eff, rho)
         # ---- Compute flux (Eq. 12) and integrate to E ----
         # Base Marshak flux:
         base_flux = 2.0 * sigma_SB_hev * (TD_now**4 - Ts_prev**4)
@@ -261,84 +462,16 @@ def _marshak_appendixA_march(
         dE_wall_hJ = 0.0
 
         if ablation:
-            # Ablation geometry + wall loss are coupled here in your code
-            if wall_material == 'Cupper':
-                csv_path = U_TILDA_DIR / "u_tilda_cupper(rho)_464_5.csv"
-                u_tilde = AblationModel.get_u_tilda_closest(csv_path, rho)
-            elif wall_material == 'Gold':
-                csv_path = U_TILDA_DIR / "u_tilda_gold(rho)_510.1.csv"
-                u_tilde = AblationModel.get_u_tilda_closest(csv_path, rho)
-            if wall_material == 'Gold' or wall_material == 'Cupper':
-                if i > 1:
-                    R_array_prev = R_array.copy()
-                    R_array = AblationModel.compute_R_t(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, R_array_prev, wall_material=wall_material, u_tilde=u_tilde)  # [cm]
-                else:
-                    R_array_prev = None
-                    R_array = AblationModel.compute_R_t(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, R_array_prev, wall_material=wall_material, u_tilde=u_tilde)  # [cm]
-            data_of_R[t_sec[i]] = R_array.copy()
-            A[i] = np.pi * R_array[0] ** 2
-
-            # your wall loss call in ablation branch
-            if wall_material == 'Gold' or wall_material == 'Cupper':
-                dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, xF[i - 1],flat_top_profile=True, wall=wall_material) #flat top T always True for ablation
-                E_wall_erg += dE_wall_hJ * 1e9
-                E_wall_array_erg[i] = E_wall_erg
-
-            F[i] = base_flux - (dE_wall_hJ * 1e9) / (A[i] * dt_i)
-
-            # your ablation E update included A_n/area factor
-            E[i] = E[i - 1] + 0.5 * (F[i] * A[i] + F[i - 1] * A[i-1]) * dt_i / area
-
+            R_array, A[i], dE_wall_hJ = _compute_ablation_step(i, t_sec, dt_i, t_heat, Ts_prev, z_F_rcm[i-1], wall_material, rho, data_of_R,)
         elif wall_loss:
-            dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, xF[i - 1], flat_top_profile=True, wall=wall_material)
+            dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, z_F_rcm[i-1], flat_top_profile=True, wall=wall_material,)
 
-            E_wall_erg += dE_wall_hJ * 1e9
-            E_wall_array_erg[i] = E_wall_erg
-
-            F[i] = base_flux - (dE_wall_hJ * 1e9) / (area * dt_i)
-            E[i] = E[i - 1] + 0.5 * (F[i] + F[i - 1]) * dt_i
-
-        else:
-            E_wall_array_erg[i] = E_wall_erg
-            F[i] = base_flux
-            E[i] = E[i - 1] + 0.5 * (F[i] + F[i - 1]) * dt_i
+        E_wall_erg = _update_flux_and_energy(i, dt_i,base_flux, area,ablation, wall_loss, A, F, E, E_wall_erg, E_wall_array_erg, dE_wall_hJ,)
 
         # ---- If vary_rho: update rho_eff and C_changing_rho and Z1 ----
         if vary_rho and ablation:
-            new_rho[i] = AblationModel.compute_rho_effective(R_cm, R_array, xF[i - 1])
-            if not lam_eff:
-                In[i] = In[i-1] + dt_i/2 * (new_rho[i]**p + new_rho[i-1]**p)
-                C_changing_rho[i] = (K / t_sec[i]) * In[i]
-                Z1_changing_rho[i] = (f ** 2) * (2.0 + eps) * (1.0 - eps) * C_changing_rho[i] * (new_rho[i] ** (2.0 * (1.0 - mu)))
-            else:
-                lambda_ross = g*(Ts_prev**alpha)*(rho**(-lambda_param-1))
-                xF_index = np.searchsorted(z, xF[i-1])
-                if R_average_for_lambda_geom:
-                    R_average = np.mean(R_array[:xF_index+1]) if xF_index> 0 else R_array[0]
-                    #R_average = R_array[0]
-                else:
-                    R_average = R_cm
-                lambda_geom = 2*R_average
-                lambda_eff = ((lambda_geom**(-power) + lambda_ross**(-power)))**(-1/power)
-                lambda_eff_array[i] = lambda_eff
-                g_eff = g * ( lambda_eff / lambda_ross )
-                g_eff_array[i] = g_eff
-
-                    # --- integrate (g_eff/g)*rho^p together ---
-                w_i   = g_eff_array[i]   / g
-                w_im1 = g_eff_array[i-1] / g  # make sure g_eff_array[0] is initialized!
-
-                In[i] = In[i-1] + 0.5 * dt_i * (
-                    w_i   * (new_rho[i]   ** p) +
-                    w_im1 * (new_rho[i-1] ** p)
-                )
-                # --- now C uses the combined integral directly ---
-                C_changing_rho[i] = (K / t_sec[i]) * In[i]
-
-                C_eff_array[i] = C_changing_rho[i]  # if you don't need separate C_eff
-                Z1_changing_rho[i] = (f**2) * (2.0 + eps) * (1.0 - eps) * C_changing_rho[i] * (new_rho[i] ** (2.0 * (1.0 - mu)))
+            _update_vary_rho_terms(i, dt_i, Ts_prev, z_F_rcm[i-1], R_array, t_sec, p, K, eps, In, C_changing_rho, Z1_changing_rho, new_rho, lam_eff, power, R_average_for_lambda_geom, g_eff_array,lambda_eff_array,)
         
-            
         # ---- Solve Eq. (A.3) for H ----
         E2 = E[i] ** 2
         I_prev = I[i - 1]
@@ -357,41 +490,21 @@ def _marshak_appendixA_march(
             C_use = C_eff
         xF2 = pref * C_use * (H[i] ** (-eps)) * I[i]
         xF[i] = np.sqrt(np.maximum(xF2, 0.0))
-
-        # update t_heat
-        for j in range(len(z)):
-            if z[j] <= xF[i] and t_heat[j] == np.inf:
-                t_heat[j] = t_sec[i]
-        
+        z_F_rcm[i] = xF[i]
+        (wall_penetration_depth_cm_profile, wall_penetration_radius_profile, wall_penetration_cell_idx_profile,) = _update_wall_penetration_profiles(
+                i, t_sec, dt_i, t_heat, Ts[i], z_F_rcm[i-1], wall_material, wall_penetration_depth_cm_profile,)
         if wall_loss and i > 1:
-            dE_wall = E_wall_array_erg[i] - E_wall_array_erg[i - 1]
-            albedo = AlbedoModel.compute_albedo_step(Ts[i], dE_wall, dt_i)
-            lambda_ross = g*(Ts[i]**alpha)*(rho**(-lambda_param-1))
-            epsilon = 3/4*(1 - albedo)*(1/lambda_ross)*R_cm
-            kappa_0 = kappa_roots(epsilon, R_cm, n_roots=1)[0]
-            kappa_0_approx = np.sqrt(2*epsilon)/R_cm  # for small epsilon, J_0(kappa_0*R_cm) ~ 0 => kappa_0 ~ sqrt(2*epsilon/R_cm)
-            
-            # Compute J_0(kappa_0 * r) for each z position
-            J0_profiles = np.zeros((len(z), len(r_grid)))
-            J0_profiles_approx = np.zeros((len(z), len(r_grid)))
-            for j_idx in range(len(z)):
-                # J_0(kappa_0 * r / R_cm) for each radial point
-                J0_profiles[j_idx, :] = special.j0(kappa_0 * r_grid)
-                J0_profiles_approx[j_idx, :] = special.j0(kappa_0_approx * r_grid)
-            
-            # Store data with time as key (in nanoseconds)
-            t_ns = t_sec[i] * 1e9
-            bessel_data[t_ns] = {
-                'r_grid': r_grid.copy(),  # radial grid in cm
-                'z_grid': z.copy(),        # axial grid in cm
-                'J0_profiles': J0_profiles.copy(),  # shape: (Nz, Nr), J_0(kappa_0*r) at each (z, r)
-                'J0_profiles_approx': J0_profiles_approx.copy(),  # shape: (Nz, Nr), J_0(kappa_0_approx*r) at each (z, r)
-                'kappa_0': kappa_0,
-                'kappa_0_approx': kappa_0_approx,
-                'epsilon': epsilon,
-                'albedo': albedo,
-                'lambda_ross': lambda_ross
-            }
+            #calcultates the bessel function profiles and parameters for the current time step and stores them in bessel_data for later retrieval and plotting
+            _store_bessel_snapshot(i, t_sec, Ts[i], dt_i, xF[i], E_wall_array_erg, bessel_data, data_of_R=data_of_R if ablation else None, t_ref_sec=t_sec[i] if ablation else None, wall_penetration_depth_cm_profile=wall_penetration_depth_cm_profile, wall_penetration_radius_profile=wall_penetration_radius_profile, wall_penetration_cell_idx_profile=wall_penetration_cell_idx_profile,)
+
+            # Extract z_F at r=R_cm from the current time snapshot.
+            t_key = t_sec[i] * 1e9
+            if t_key in bessel_data and 'z_F_at_rcm' in bessel_data[t_key]:
+                z_F_rcm[i] = bessel_data[t_key]['z_F_at_rcm']
+
+
+        #calculating t_heat - according to the definition of t_heat, we want to find the time at which each spatial zone z is first reached by the heat front. The heat front position at r=R_cm is given by z_F_rcm[i], so we check for each spatial zone z[j] whether it has been reached by the heat front (z[j] <= z_F_rcm[i]) and if it hasn't been reached before (t_heat[j] == np.inf). If both conditions are true, we update t_heat[j] to the current time t_sec[i].
+        _update_t_heat(z_F_rcm[i], t_heat, t_sec[i])
             
     # Convert energies to hJ like your return:
     # You returned: E*1e-9*area, E_wall_array*1e-9
@@ -400,37 +513,7 @@ def _marshak_appendixA_march(
     E_total_hJ = E * 1e-9 * area
     E_wall_hJ_array = E_wall_array_erg * 1e-9
 
-    # restore original order for all arrays
-    xF_out = WavefrontHelpers.restore_original_order(xF, order, t_sec_in.size) / 1.02
-    Ts_out = WavefrontHelpers.restore_original_order(Ts, order, t_sec_in.size)
-    E_out  = WavefrontHelpers.restore_original_order(E_total_hJ, order, t_sec_in.size)
-    Ew_out = WavefrontHelpers.restore_original_order(E_wall_hJ_array, order, t_sec_in.size)
-    #truen the times in data_of_R to ns
-    data_of_R = {1e9*t_sec_in[i]: data_of_R[t_sec[i]] for i in range(t_sec_in.size)}
-    # if vary_rho and ablation:
-    #     plt.plot(t_sec*1e9, new_rho)
-    #     plt.xlabel("Time (ns)")
-    #     plt.ylabel("Effective Density (g/cm^3)")
-    #     plt.title("Effective Density vs Time")
-    #     plt.grid()
-    #     plt.show()
-    # power = 10
-    # lambda_ross = g*(Ts**alpha)*(rho**(-lambda_param-1))
-    # lambda_geom = 2*R_cm
-    # lambda_param_eff_array = [lambda_ross_i * lambda_geom * (1/(lambda_geom**power + lambda_ross_i**power))**(1/power) for lambda_ross_i in lambda_ross]
-    # if lam_eff:
-    #     lambda_ross_array= g*(Ts**alpha)*(rho**(-lambda_param-1))
-    #     plt.plot(t_sec*1e9, lambda_eff_array, label="Effective lambda_param")
-    #     plt.plot(t_sec*1e9, lambda_ross_array, label="lambda ross")
-    #     plt.plot(t_sec*1e9, [lambda_geom for _ in t_sec], label="Geometric lambda_param")
-    #     plt.xlabel("Time (ns)")
-    #     plt.ylabel("g_eff / g")
-    #     plt.xlim(0.01, t_sec[-1]*1e9)
-    #     plt.ylim(0, 0.13)
-    #     plt.title(f"Effective g vs Time {{wall_loss = {wall_loss}, ablation={ablation}, vary_rho={vary_rho}}}")
-    #     plt.grid()
-    #     plt.legend()
-    #     plt.show()
+    xF_out, Ts_out, E_out, Ew_out, data_of_R = _restore_marshak_outputs(xF, Ts, E_total_hJ, E_wall_hJ_array, order, t_sec_in, data_of_R, t_sec,)
     return xF_out, Ts_out, E_out, Ew_out, data_of_R, bessel_data
 
 
@@ -470,7 +553,7 @@ def analytic_wave_front_marshak_gold_loss(times_to_store, *, use_seconds=True, w
 
 # --- Mode 4: Marshak + ablation (includes gold wall loss) ---
 
-def analytic_wave_front_marshak_ablation(times_to_store, *, use_seconds=True, vary_rho=False, wall_material='Gold', lam_eff=False, power=2, R_average_for_lambda_geom=False, good_way=False):
+def analytic_wave_front_marshak_ablation(times_to_store, *, use_seconds=True, vary_rho=False, wall_material='Gold', lam_eff=False, power=2, R_average_for_lambda_geom=False):
     """
     Marshak boundary iteration + ablation + wall loss to gold.
     Returns: xF, Ts, E_total_hJ, E_wall_hJ_array
@@ -483,7 +566,6 @@ def analytic_wave_front_marshak_ablation(times_to_store, *, use_seconds=True, va
         lam_eff=lam_eff,
         power=power,
         R_average_for_lambda_geom=R_average_for_lambda_geom,
-        good_way=good_way,
     )
 
 # --- Mode dispatcher: selectable entry point ---
@@ -498,7 +580,6 @@ def analytic_wave_front_dispatch(
     lam_eff=False,
     power=2,
     R_average_for_lambda_geom=False,
-    good_way=True,
 ):
     """
     mode options:
@@ -516,7 +597,6 @@ def analytic_wave_front_dispatch(
         lam_eff=lam_eff,
         power=power,
         R_average_for_lambda_geom=R_average_for_lambda_geom,
-        good_way=good_way,
     )
 
 ######################################################################################
