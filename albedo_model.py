@@ -1,5 +1,6 @@
 import numpy as np
 from parameters import *
+from wall_loss_model import WallLossModel
 
 
 class AlbedoModel:
@@ -85,3 +86,102 @@ class AlbedoModel:
             albedo[i] = AlbedoModel.compute_albedo_step(T_s_array[i], dE_wall, dt_sec)
 
         return albedo
+
+    @staticmethod
+    def compute_wall_energy_loss_profile_at_interface(
+        t_sec, dt_sec, t_heat, T_profile_z, xF, wall_material='Gold', R_ablation_profile=None
+    ):
+        """
+        Compute wall energy loss per z-cell at the foam-gold interface.
+        
+        Evaluates wall areal loading (and hence penetration depth) at each z-cell
+        at either r=R_cm (no ablation) or r=R_ablation(z) (with ablation),
+        then returns both the per-cell profile and the spatially-averaged value.
+
+        Parameters
+        ----------
+        t_sec : float
+            Current time in seconds.
+        dt_sec : float
+            Timestep in seconds.
+        t_heat : np.ndarray
+            Heating time for each z-cell (seconds), shape (Nz,).
+        T_profile_z : np.ndarray or float
+            Temperature profile or constant value at interface.
+            If array, shape (Nz,).
+            If float, constant T_0 everywhere.
+        xF : float
+            Heat front position at r=R_cm (cm).
+        wall_material : str
+            Wall material ('Gold', 'Copper', 'Be').
+        R_ablation_profile : np.ndarray, optional
+            Ablation radius profile R(z), shape (Nz,).
+            If None, uses fixed R_cm everywhere (non-ablation case).
+
+        Returns
+        -------
+        tuple
+            (dE_wall_profile_per_cell, dE_wall_averaged)
+            - dE_wall_profile_per_cell: incremental penetration depth per z-cell (cm)
+            - dE_wall_averaged: spatially-averaged penetration depth (cm)
+        """
+        z_array = np.asarray(z, dtype=float)
+        t_heat = np.asarray(t_heat, dtype=float)
+        
+        # Convert scalar temperature to profile if needed
+        if np.isscalar(T_profile_z):
+            T_profile = np.full_like(z_array, T_profile_z, dtype=float)
+        else:
+            T_profile = np.asarray(T_profile_z, dtype=float)
+        
+        # Use R_cm if no ablation profile provided
+        if R_ablation_profile is None:
+            R_ablation_profile = np.full_like(z_array, R_cm, dtype=float)
+        else:
+            R_ablation_profile = np.asarray(R_ablation_profile, dtype=float)
+        
+        # Compute incremental areal loading for each z-cell at the interface
+        dE_wall_profile = np.zeros_like(z_array, dtype=float)
+        
+        for i in range(len(z_array)):
+            if z_array[i] > xF:
+                # Cell beyond front: no energy loss
+                dE_wall_profile[i] = 0.0
+                continue
+            
+            t_exposed = t_sec - t_heat[i]
+            if t_exposed <= 0:
+                dE_wall_profile[i] = 0.0
+                continue
+            
+            T_local = float(T_profile[i])
+            if not np.isfinite(T_local) or T_local <= 0:
+                dE_wall_profile[i] = 0.0
+                continue
+            
+            # Get material-specific areal loading function
+            if wall_material == 'Gold':
+                areal_loading_fn = WallLossModel.gold_areal_loading_g_per_cm2
+                rho_wall = rho_gold
+            elif wall_material == 'Copper':
+                areal_loading_fn = WallLossModel.Copper_areal_loading_g_per_cm2
+                rho_wall = rho_copper
+            elif wall_material == 'Be':
+                areal_loading_fn = WallLossModel.Be_areal_loading_g_per_cm2
+                rho_wall = rho_be
+            else:
+                dE_wall_profile[i] = 0.0
+                continue
+            
+            # Cumulative areal loading approach (not incremental)
+            m_now = areal_loading_fn(max(t_exposed, 0.0), T_local)
+            dE_wall_profile[i] = m_now / rho_wall  # convert to penetration depth
+        
+        # Compute spatial average (only over cells within front)
+        within_front = z_array <= xF
+        if np.any(within_front):
+            dE_wall_averaged = np.mean(dE_wall_profile[within_front])
+        else:
+            dE_wall_averaged = 0.0
+        
+        return dE_wall_profile, dE_wall_averaged

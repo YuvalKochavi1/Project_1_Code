@@ -12,6 +12,7 @@ from eigen_bessel_solver import kappa_roots
 
 def _closest_time_data(bessel_data, target_time):
     available_times = np.array(list(bessel_data.keys()))
+    print(available_times)
     t_closest = available_times[np.argmin(np.abs(available_times - target_time))]
     return t_closest, bessel_data[t_closest]
 
@@ -145,7 +146,18 @@ def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.
         axes = [axes]
 
     for idx, t_target in enumerate(times_ns):
-        t_closest, data = _closest_time_data(bessel_data, t_target)
+        if bessel_data and len(bessel_data) > 0:
+            t_closest, data = _closest_time_data(bessel_data, t_target)
+        else:
+            # Fallback for modes that do not populate bessel_data (e.g. no wall-loss Marshak).
+            t_closest = float(t_target)
+            z_F_t = np.interp(t_closest, times_array, z_F_array)
+            data = {
+                'r_grid': np.asarray(r_grid, dtype=float),
+                'r_gold_grid': np.asarray(r_grid, dtype=float),
+                'z_grid': np.asarray(z, dtype=float),
+                'z_F_radial': np.full_like(np.asarray(r_grid, dtype=float), z_F_t, dtype=float),
+            }
 
         r_grid = data['r_grid']
         z_grid = data['z_grid']
@@ -206,7 +218,7 @@ def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.
     plt.close()
 
 
-def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,times_ns=[1.0, 2.0, 2.5], ablation=False, wall="Gold", show_plot=True,):
+def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,times_ns=[1.0, 2.0, 2.5], ablation=False, wall="Gold", show_plot=True, title_suffix=""):
     """
     Plot 2D temperature heatmaps T(r,z,t) = T_s(t) * (1 - z/z_F(r,t))^(1/(4+alpha-beta))
     in cylindrical geometry for specified times.
@@ -242,7 +254,19 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
         axes = [axes]
 
     for idx, t_target in enumerate(times_ns):
-        t_closest, data = _closest_time_data(bessel_data, t_target)
+        if bessel_data and len(bessel_data) > 0:
+            t_closest, data = _closest_time_data(bessel_data, t_target)
+        else:
+            # Fallback for modes that do not populate bessel_data.
+            t_closest = float(t_target)
+            z_F_t = np.interp(t_closest, times_array, z_F_array)
+            r_grid_base = np.asarray(globals()['r_grid'], dtype=float)
+            data = {
+                'r_grid': r_grid_base,
+                'r_gold_grid': r_grid_base,
+                'z_grid': np.asarray(z, dtype=float),
+                'z_F_radial': np.full_like(r_grid_base, z_F_t, dtype=float),
+            }
 
         r_grid = data['r_grid']
         z_grid = data['z_grid']
@@ -335,17 +359,17 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
         pcm = ax.pcolormesh(R_mesh, Z_mesh, T_mesh_plot, shading='gouraud', cmap='Spectral_r')
 
         # Add contour lines with temperature labels in eV
-        contour_levels = np.array([1, 1.2, 1.3, 1.4, 1.5])
-        contour = ax.contour(
-            R_mesh,
-            Z_mesh,
-            T_mesh_plot,
-            levels=contour_levels,
-            colors='black',
-            linewidths=0.5,
-            alpha=0.3,
-        )
-        ax.clabel(contour, inline=True, fontsize=8, fmt='%.1f')
+        # contour_levels = np.array([1, 1.2, 1.3, 1.4, 1.5])
+        # contour = ax.contour(
+        #     R_mesh,
+        #     Z_mesh,
+        #     T_mesh_plot,
+        #     levels=contour_levels,
+        #     colors='black',
+        #     linewidths=0.5,
+        #     alpha=0.3,
+        # )
+        # ax.clabel(contour, inline=True, fontsize=8, fmt='%.1f')
 
         if (
             ablation_contour_r is not None
@@ -356,7 +380,7 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
                 ablation_contour_r,
                 ablation_contour_z,
                 color='white',
-                linewidth=2.5,
+                linewidth=1.0,
                 linestyle='-',
                 label='Ablation contour R(t,z)',
             )
@@ -375,8 +399,9 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
         ax.set_xlabel('Radial position r (cm)')
         ax.set_ylabel('Axial position z (cm)')
         ax.set_title(f't = {t_closest:.2f} ns')
-        ax.set_ylim([0, L/2])
-        ax.set_xlim([0.075, float(r_mesh[-1])])
+        print(f"Plotting time {t_closest:.2f} ns, t_target was {t_target:.2f} ns")
+        ax.set_ylim([0, L])
+        ax.set_xlim([0.0, float(r_mesh[-1])])
         ax.legend(fontsize=9, loc='upper right')
         ax.set_aspect('auto')
 
@@ -387,7 +412,7 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
     )
     plt.tight_layout()
 
-    save_figure('temperature_heatmap_2D.png', model2_D=True, dpi=150, bbox_inches='tight')
+    save_figure(f'temperature_heatmap_2D{title_suffix}.png', model2_D=True, dpi=150, bbox_inches='tight')
     if show_plot:
         backend = plt.get_backend().lower()
         if 'agg' not in backend:

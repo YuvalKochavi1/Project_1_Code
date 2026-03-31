@@ -215,19 +215,29 @@ def _update_vary_rho_terms(i, dt_i, Ts_prev, xF_prev, R_array, t_sec, p, K, eps,
     Z1_changing_rho[i] = _compute_Z1_from_C(eps, C_changing_rho[i], new_rho[i])
 
 
-def _update_wall_penetration_profiles(i, t_sec, dt_i, t_heat, Ts_i, xF_i, wall_material, wall_penetration_depth_cm_profile,):
+def _update_wall_penetration_profiles(i, t_sec, dt_i, t_heat, Ts_i, xF_i, wall_material, wall_penetration_depth_cm_profile, vary_rho,):
     """Update cumulative wall penetration and map it to geometric gold radial grid.
 
     The wall front is measured from fixed foam boundary R_cm to R_cm + w_Au,
     while the ablation interface profile is tracked separately for plotting.
     """
-    delta_penetration_depth_cm = WallLossModel.compute_wall_front_profile(t_sec[i], dt_i, t_heat, Ts_i, xF_i, flat_top_profile=False, wall=wall_material,)
+    #xF_i is the current front position at r=R_cm.
+    delta_penetration_depth_cm = WallLossModel.compute_wall_front_profile(t_sec[i], dt_i, t_heat, Ts_i, xF_i, flat_top_profile=True, wall=wall_material,)
     delta_penetration_depth_cm = np.asarray(delta_penetration_depth_cm, dtype=float)
 
     if delta_penetration_depth_cm.shape == wall_penetration_depth_cm_profile.shape:
         # we can directly add the new penetration depth to the what we have so far
         wall_penetration_depth_cm_profile += np.clip(delta_penetration_depth_cm, 0.0, None)
         wall_penetration_depth_cm_profile = np.clip(wall_penetration_depth_cm_profile, 0.0, w_Au)
+
+        # Enforce physically consistent shape for z <= xF_i:
+        # penetration should be non-increasing with depth.
+        heated_end = int(np.searchsorted(z, xF_i, side='right'))
+        if heated_end > 1:
+            heated_profile = np.clip(wall_penetration_depth_cm_profile[:heated_end], 0.0, w_Au)
+            # Use an upper-envelope projection so near-surface values are not depressed by noise.
+            heated_profile_monotone = np.maximum.accumulate(heated_profile[::-1])[::-1]
+            wall_penetration_depth_cm_profile[:heated_end] = np.clip(heated_profile_monotone, 0.0, w_Au)
 
     # Wall-front location is referenced to the fixed foam boundary R_cm.
     wall_front_radius_profile = np.minimum(
@@ -492,7 +502,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
         xF[i] = np.sqrt(np.maximum(xF2, 0.0))
         z_F_rcm[i] = xF[i]
         (wall_penetration_depth_cm_profile, wall_penetration_radius_profile, wall_penetration_cell_idx_profile,) = _update_wall_penetration_profiles(
-                i, t_sec, dt_i, t_heat, Ts[i], z_F_rcm[i-1], wall_material, wall_penetration_depth_cm_profile,)
+                i, t_sec, dt_i, t_heat, Ts[i], z_F_rcm[i-1], wall_material, wall_penetration_depth_cm_profile, vary_rho,)
         if wall_loss and i > 1:
             #calcultates the bessel function profiles and parameters for the current time step and stores them in bessel_data for later retrieval and plotting
             _store_bessel_snapshot(i, t_sec, Ts[i], dt_i, xF[i], E_wall_array_erg, bessel_data, data_of_R=data_of_R if ablation else None, t_ref_sec=t_sec[i] if ablation else None, wall_penetration_depth_cm_profile=wall_penetration_depth_cm_profile, wall_penetration_radius_profile=wall_penetration_radius_profile, wall_penetration_cell_idx_profile=wall_penetration_cell_idx_profile,)
@@ -501,11 +511,9 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
             t_key = t_sec[i] * 1e9
             if t_key in bessel_data and 'z_F_at_rcm' in bessel_data[t_key]:
                 z_F_rcm[i] = bessel_data[t_key]['z_F_at_rcm']
-
-
-        #calculating t_heat - according to the definition of t_heat, we want to find the time at which each spatial zone z is first reached by the heat front. The heat front position at r=R_cm is given by z_F_rcm[i], so we check for each spatial zone z[j] whether it has been reached by the heat front (z[j] <= z_F_rcm[i]) and if it hasn't been reached before (t_heat[j] == np.inf). If both conditions are true, we update t_heat[j] to the current time t_sec[i].
         _update_t_heat(z_F_rcm[i], t_heat, t_sec[i])
-            
+
+        #calculating t_heat - according to the definition of t_heat, we want to find the time at which each spatial zone z is first reached by the heat front. The heat front position at r=R_cm is given by z_F_rcm[i], so we check for each spatial zone z[j] whether it has been reached by the heat front (z[j] <= z_F_rcm[i]) and if it hasn't been reached before (t_heat[j] == np.inf). If both conditions are true, we update t_heat[j] to the current time t_sec[i].            
     # Convert energies to hJ like your return:
     # You returned: E*1e-9*area, E_wall_array*1e-9
     # That's (erg/cm^2)*area -> erg ; *1e-9 -> hJ (since 1 hJ = 1e-7 J = 1e0 erg? careful)

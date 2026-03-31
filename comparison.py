@@ -263,8 +263,16 @@ def Back_SiO2(times_to_store):
     analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     analytic_positions_no_marshak = front_series["analytic_positions_no_marshak"]
-    T_s_array = front_series["Ts_marshak_gold_loss"]
-    bessel_data = front_series["bessel_data_2D"]
+    Ts_2D = front_series["Ts_2D"]
+    Ts_ablation_const_rho = front_series["Ts_ablation_const_rho"]
+    Ts_gold_loss = front_series["Ts_marshak_gold_loss"]
+    Ts_lam_eff = front_series["Ts_2D_lam_eff"]
+    Ts_1D = front_series["Ts_1D"]
+    bessel_data_2D = front_series["bessel_data_2D"]
+    bessel_data_ablation_const_rho = front_series["bessel_data_ablation_const_rho"]
+    bessel_data_2D_lam_eff = front_series["bessel_data_2D_lam_eff"]
+    bessel_data_marshak = front_series["bessel_data_marshak"]
+    bessel_data_gold_loss = front_series["bessel_data_gold_loss"]
     data_of_R = front_series["data_of_R_2D"]
 
     plt.figure(figsize=(8, 6))
@@ -315,22 +323,26 @@ def Back_SiO2(times_to_store):
         output_csv_path=DATA_DIR / "1.5 model" / "analytic_positions.csv",
 
     )
-    # Plot radial front profiles z_F(r,t) = z_F(t) * J_0(kappa_0 * r)
-    if bessel_data and analytic_positions_energy_lost_gold is not None:
-        # Plot 2D spatial view showing front in (r,z) geometry
-        plot_2D_front_spatial(bessel_data, analytic_positions_2D,
-                             times_to_store, times_ns=[1.0, 2.0, 2.5])
-        # Plot temperature heatmaps T(r,z,t)
-        plot_temperature_heatmap_2D(bessel_data, analytic_positions_2D,
-                        T_s_array, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                        ablation=True)
-        # plot_temperature_heatmap_2D_series_model(
-        #     analytic_positions_energy_lost_gold,
-        #     T_s_array,
-        #     times_to_store,
-        #     bessel_data=bessel_data,
-        #     data_of_R=data_of_R,
-        # )
+    # Plot 2D spatial view showing front in (r,z) geometry
+    # plot_2D_front_spatial(bessel_data_2D, analytic_positions_2D,
+    #                      times_to_store, times_ns=[1.0, 2.0, 2.5])
+    # Plot temperature heatmaps T(r,z,t)
+    plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
+                    Ts_2D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=True, title_suffix="(varying rho)")
+    plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
+                    Ts_lam_eff, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=True, title_suffix="(lam_eff)")
+    plot_temperature_heatmap_2D(bessel_data_ablation_const_rho, analytic_positions_ablation_const_rho,
+                    Ts_ablation_const_rho, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=True, title_suffix="(const rho)")
+    plot_temperature_heatmap_2D(bessel_data_gold_loss, analytic_positions_energy_lost_gold,
+                    Ts_gold_loss, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=False, title_suffix="(gold wall loss)")
+    plot_temperature_heatmap_2D(bessel_data_marshak, analytic_positions_marshak,
+                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=False, title_suffix="(Marshak BC)")
+    
 
 
 def compare_with_article_2_exp1_Massen(times_to_store):
@@ -595,16 +607,20 @@ def compare_with_article_2_exp5_15a(times_to_store):
 def compare_with_article_2_exp5_15b(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=2)
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
-    analytic_positions_ablation_vary_rho = front_series["analytic_positions_2D"]
+    analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_position_HR = front_series["analytic_positions_no_marshak"]
-    analytic_positions_ablation_vary_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    Ts_2D = front_series["Ts_2D"]
+    Ts_lam_eff = front_series["Ts_2D_lam_eff"]
+    bessel_data_2D = front_series["bessel_data_2D"]
+    bessel_data_2D_lam_eff = front_series["bessel_data_2D_lam_eff"]
     plt.figure(figsize=(8, 6))
     # fit data to analytical
     plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
-        analytic_positions_2D=analytic_positions_ablation_vary_rho,
-        analytic_positions_2D_lam_eff=analytic_positions_ablation_vary_rho_lam_eff,
+        analytic_positions_2D=analytic_positions_2D,
+        analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
         analytic_positions_no_marshak=analytic_position_HR,
     )
 
@@ -627,6 +643,14 @@ def compare_with_article_2_exp5_15b(times_to_store):
     plt.tight_layout()
     plt.show()
     save_figure("front_position - compare Moore C8H7Cl.png", model1_5=True)
+
+    plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
+                    Ts_2D, times_to_store, times_ns=[1.5, 2.50, 3.72],
+                    ablation=True, title_suffix="(varying rho)")
+    plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
+                    Ts_lam_eff, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=True, title_suffix="(lam_eff)")
+
 
 def compare_with_article_2_exp6_16(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=1)
@@ -939,7 +963,7 @@ def simulate():
 if __name__ == "__main__":
     #simulate()
     times_to_store = np.linspace(0.01, 3, 1000)
-    Back_SiO2(times_to_store)
+    #Back_SiO2(times_to_store)
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)
     #compare_with_article_2_exp1_Massen(times_to_store)
@@ -947,7 +971,7 @@ if __name__ == "__main__":
     #compare_with_article_2_exp3_13a(times_to_store)
     #compare_with_article_2_exp4_14(times_to_store)
     #compare_with_article_2_exp5_15a(times_to_store)
-    #compare_with_article_2_exp5_15b(times_to_store)
+    compare_with_article_2_exp5_15b(times_to_store)
     #compare_with_article_2_exp6_16(times_to_store)
     #compare_with_article_2_exp7_17(times_to_store)
     #compare_with_french_gold(times_to_store)
