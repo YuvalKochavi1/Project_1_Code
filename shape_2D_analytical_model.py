@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap
 from scipy.interpolate import interp1d
 
 from csv_helpers import save_figure
@@ -8,6 +9,80 @@ from parameters import L, R_cm, alpha, beta, z, r_grid, Experiment, Material, al
 from model_main import BASE_DIR
 from scipy import special
 from eigen_bessel_solver import kappa_roots
+from colormaps import VISIT_LIKE_CMAP, PAPER_CMAP, PRR_BACK_CMAP, PRR_MOORE_CMAP
+
+def _resolve_colormap_settings(
+    color_style="default",
+    *,
+    cmap=None,
+    vmin=None,
+    vmax=None,
+    cbar_ticks=None,
+):
+    """Resolve colormap and scale configuration for temperature heatmaps."""
+    style = str(color_style).strip().lower()
+
+    style_presets = {
+        "default": {
+            "cmap": "Spectral_r",
+            "vmin": None,
+            "vmax": None,
+            "cbar_ticks": None,
+        },
+        # Visit-style appearance: blue -> cyan -> green -> yellow -> red.
+        "visit": {
+            "cmap": VISIT_LIKE_CMAP,
+            "vmin": 0.00,
+            "vmax": 2.5,
+            # Matches 0, 63, 125, 187, 250 eV from the reference figure (converted to heV).
+            "cbar_ticks": (0.00, 0.63, 1.25, 1.87, 2.50),
+        },
+        # Paper colorbar: blue/purple to dark red gradient extracted from paper figure.
+        "paper": {
+            "cmap": PAPER_CMAP,
+            "vmin": 0.00,
+            "vmax": 2.5,
+            "cbar_ticks": (0.00, 0.63, 1.25, 1.87, 2.50),
+        },
+        # PRR back palette extracted from the provided RGB samples.
+        "prr_back": {
+            "cmap": PRR_BACK_CMAP,
+            "vmin": 0.00,
+            "vmax": 2.00,
+            "cbar_ticks": (0.00, 0.63, 1.25, 1.87, 2.00),
+        },
+        # PRR Moore palette extracted from the provided RGB samples.
+        "prr_moore": {
+            "cmap": PRR_MOORE_CMAP,
+            "vmin": 0.00,
+            "vmax": 3.00,
+            "cbar_ticks": (0.00, 0.74, 1.47, 2.21, 3.00),
+        },
+    }
+
+    if style not in style_presets:
+        print(f"Warning: unknown color_style '{color_style}', falling back to default. Available styles: 'default', 'visit', 'paper', 'prr_back', 'prr_moore'.")
+        style = "default"
+
+    resolved = style_presets[style].copy()
+
+    if cmap is not None:
+        resolved["cmap"] = cmap
+    if vmin is not None:
+        resolved["vmin"] = float(vmin)
+    if vmax is not None:
+        resolved["vmax"] = float(vmax)
+    if cbar_ticks is not None:
+        resolved["cbar_ticks"] = cbar_ticks
+
+    return resolved
+
+
+def _normalize_color_option(color_option=None, color_style="default"):
+    """Return selected preset name while supporting legacy/new argument names."""
+    if color_option is not None:
+        return str(color_option).strip().lower()
+    return str(color_style).strip().lower()
 
 
 def _closest_time_data(bessel_data, target_time):
@@ -19,6 +94,8 @@ def _closest_time_data(bessel_data, target_time):
 def _load_simulated_front_csv(t_target):
     if abs(float(t_target) - 2.5) < 1e-9:
         filename = '2.5ns.csv'
+    elif abs(float(t_target) - 3.72) < 1e-9:
+        filename = '3.72ns.csv'
     else:
         filename = f'{int(round(float(t_target)))}ns.csv'
 
@@ -56,6 +133,8 @@ def _compute_wall_heyney_horizontal_profile(
     is_ablation=True,
     r_mesh_wall=None,
     penetration_radius_profile=None,
+    shock_radius_profile=None,
+    shock_plateau_fraction=0.07,
 ):
     """Build Henyey-like wall profile with explicit ablation/non-ablation behavior."""
     if r_mesh_wall is None:
@@ -99,6 +178,13 @@ def _compute_wall_heyney_horizontal_profile(
         if r_stop <= r_start + eps:
             continue
 
+        shock_stop = None
+        if shock_radius_profile is not None and i_z < shock_radius_profile.size:
+            shock_stop_raw = float(shock_radius_profile[i_z]) # the shock wave stop which can (and will if not zero) be beyond the penetration stop
+            if shock_stop_raw < R_cm - eps:
+                shock_stop_raw = R_cm + max(shock_stop_raw, 0.0)
+            shock_stop = float(np.clip(shock_stop_raw, r_stop, r_mesh_wall[-1]))
+
         if (
             is_ablation
             and
@@ -120,6 +206,11 @@ def _compute_wall_heyney_horizontal_profile(
         eta = np.clip(eta, 0.0, 1.0)
         T_wall_row = Ts_local * np.power(np.maximum(1.0 - eta, 0.0), exponent_wall)
         T_wall[i_z, wall_idx] = T_wall_row
+
+        if shock_stop is not None and shock_stop > r_stop + eps:
+            shock_idx = np.where((r_mesh_wall >= r_stop) & (r_mesh_wall <= shock_stop))[0]
+            if shock_idx.size > 0:
+                T_wall[i_z, shock_idx] = shock_plateau_fraction * Ts_local
 
     return T_wall
 
@@ -218,7 +309,23 @@ def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.
     plt.close()
 
 
-def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,times_ns=[1.0, 2.0, 2.5], ablation=False, wall="Gold", show_plot=True, title_suffix=""):
+def plot_temperature_heatmap_2D(
+    bessel_data,
+    z_F_array,
+    T_s_array,
+    times_array,
+    times_ns=[1.0, 2.0, 2.5],
+    ablation=False,
+    wall="Gold",
+    show_plot=True,
+    title_suffix="",
+    color_option=None,
+    color_style="default",
+    cmap=None,
+    vmin=None,
+    vmax=None,
+    cbar_ticks=None,
+):
     """
     Plot 2D temperature heatmaps T(r,z,t) = T_s(t) * (1 - z/z_F(r,t))^(1/(4+alpha-beta))
     in cylindrical geometry for specified times.
@@ -235,6 +342,13 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
         Array of times (in ns) corresponding to z_F_array and T_s_array
     times_ns : list
         List of times (in ns) to plot
+    color_option : str, optional
+        Preferred argument to choose colormap/scale preset.
+        Supported: "default", "visit".
+    color_style : str
+        Backward-compatible alias for preset choice.
+    cmap, vmin, vmax, cbar_ticks : optional
+        Manual overrides for the preset values.
     """
     # Get material parameters from global scope
     exponent = 1.0 / (4.0 + alpha - beta)  # Self-similar profile exponent
@@ -248,8 +362,20 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
         print(f"Warning: Unrecognized wall material '{wall}', using foam exponent for the wall heyney-like profile.")
         exponent_wall = exponent
 
+    selected_color_style = _normalize_color_option(color_option=color_option, color_style=color_style)
+    cmap_settings = _resolve_colormap_settings(
+        selected_color_style,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        cbar_ticks=cbar_ticks,
+    )
 
-    fig, axes = plt.subplots(1, len(times_ns), figsize=(18, 6))
+    plot_cmap = plt.get_cmap(cmap_settings['cmap']).copy()
+    plot_cmap.set_bad('white')
+
+
+    fig, axes = plt.subplots(1, len(times_ns), figsize=(18, 6), gridspec_kw={'wspace': 0.08})
     if len(times_ns) == 1:
         axes = [axes]
 
@@ -306,6 +432,12 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
             if penetration_profile.shape != z_mesh.shape:
                 penetration_profile = np.full_like(z_mesh, R_cm, dtype=float)
 
+        shock_profile = data.get('shock_penetration_radius_profile')
+        if shock_profile is not None:
+            shock_profile = np.asarray(shock_profile, dtype=float)
+            if shock_profile.shape != z_mesh.shape:
+                shock_profile = None
+
         if ablation:
             ablation_contour_r = data.get('ablation_contour_r')
             ablation_contour_z = data.get('ablation_contour_z')
@@ -333,6 +465,7 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
                     is_ablation=True,
                     r_mesh_wall=r_mesh,
                     penetration_radius_profile=penetration_profile,
+                    shock_radius_profile=shock_profile,
                 )
                 wall_valid = np.isfinite(T_wall_profile)
                 if np.any(wall_valid):
@@ -348,15 +481,32 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
                 is_ablation=False,
                 r_mesh_wall=r_mesh,
                 penetration_radius_profile=penetration_profile,
+                shock_radius_profile=shock_profile,
             )
             wall_valid = np.isfinite(T_wall_profile)
             if np.any(wall_valid):
                 T_mesh_plot[wall_valid] = T_wall_profile[wall_valid]
 
+        if shock_profile is not None:
+            shock_mask = np.isfinite(shock_profile)
+            if np.any(shock_mask):
+                T_mesh_plot = np.array(T_mesh_plot, copy=True)
+                for i_z, shock_r in enumerate(shock_profile):
+                    if np.isfinite(shock_r):
+                        T_mesh_plot[i_z, r_mesh > shock_r] = np.nan
+
         ax = axes[idx]
 
         # Create heatmap with gouraud shading
-        pcm = ax.pcolormesh(R_mesh, Z_mesh, T_mesh_plot, shading='gouraud', cmap='Spectral_r')
+        pcm = ax.pcolormesh(
+            R_mesh,
+            Z_mesh,
+            T_mesh_plot,
+            shading='gouraud',
+            cmap=plot_cmap,
+            vmin=cmap_settings['vmin'],
+            vmax=cmap_settings['vmax'],
+        )
 
         # Add contour lines with temperature labels in eV
         # contour_levels = np.array([1, 1.2, 1.3, 1.4, 1.5])
@@ -371,25 +521,27 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
         # )
         # ax.clabel(contour, inline=True, fontsize=8, fmt='%.1f')
 
-        if (
-            ablation_contour_r is not None
-            and ablation_contour_z is not None
-            and len(ablation_contour_r) > 1
-        ):
-            ax.plot(
-                ablation_contour_r,
-                ablation_contour_z,
-                color='white',
-                linewidth=1.0,
-                linestyle='-',
-                label='Ablation contour R(t,z)',
-            )
+        # if (
+        #     ablation_contour_r is not None
+        #     and ablation_contour_z is not None
+        #     and len(ablation_contour_r) > 1
+        # ):
+        #     ax.plot(
+        #         ablation_contour_r,
+        #         ablation_contour_z,
+        #         color='white',
+        #         linewidth=1.0,
+        #         linestyle='-',
+        #         #label='Ablation contour R(t,z)',
+        #     )
 
         # Plot the front position
-        ax.plot(r_mesh_foam, z_F_radial, linewidth=3, color='cyan', label='Front z_F(r,t)', linestyle='--')
+        #ax.plot(r_mesh_foam, z_F_radial, linewidth=3, color='cyan', label='Front z_F(r,t)', linestyle='--')
 
         # Add colorbar
-        cbar = plt.colorbar(pcm, ax=ax)
+        cbar = plt.colorbar(pcm, ax=ax, pad=0.01, fraction=0.046)
+        if cmap_settings['cbar_ticks'] is not None:
+            cbar.set_ticks(cmap_settings['cbar_ticks'])
         cbar.set_label('Temperature T (heV)')
 
         # Domain boundaries
@@ -402,15 +554,16 @@ def plot_temperature_heatmap_2D(bessel_data, z_F_array, T_s_array, times_array,t
         print(f"Plotting time {t_closest:.2f} ns, t_target was {t_target:.2f} ns")
         ax.set_ylim([0, L])
         ax.set_xlim([0.0, float(r_mesh[-1])])
+        ax.set_aspect('equal', adjustable='box')
         ax.legend(fontsize=9, loc='upper right')
-        ax.set_aspect('auto')
 
     plt.suptitle(
         f'Temperature Distribution T(r,z,t) with Self-Similar Profile (exponent = {exponent:.3f})',
         y=1.00,
         fontsize=20,
     )
-    plt.tight_layout()
+    fig.subplots_adjust(wspace=0.08)
+    plt.tight_layout(pad=0.6, w_pad=0.2)
 
     save_figure(f'temperature_heatmap_2D{title_suffix}.png', model2_D=True, dpi=150, bbox_inches='tight')
     if show_plot:
@@ -502,12 +655,27 @@ def plot_temperature_heatmap_2D_series_model(
     n_terms=40,
     n_r=100,
     n_z=200,
+    color_option=None,
+    color_style="default",
+    cmap=None,
+    vmin=None,
+    vmax=None,
+    cbar_ticks=None,
 ):
     """
     Plot field from compute_T4_2D_series_from_front for selected times.
 
     If plot_T4 is True, plots T^4 directly; otherwise plots T = (T^4)^(1/4).
     """
+    selected_color_style = _normalize_color_option(color_option=color_option, color_style=color_style)
+    cmap_settings = _resolve_colormap_settings(
+        selected_color_style,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        cbar_ticks=cbar_ticks,
+    )
+
     fig, axes = plt.subplots(1, len(times_ns), figsize=(18, 6))
     if len(times_ns) == 1:
         axes = [axes]
@@ -536,7 +704,15 @@ def plot_temperature_heatmap_2D_series_model(
         field_label = 'Temperature T (HeV)'
 
         ax = axes[idx]
-        pcm = ax.pcolormesh(R_mesh, Z_mesh, field_mesh, shading='gouraud', cmap='Spectral_r')
+        pcm = ax.pcolormesh(
+            R_mesh,
+            Z_mesh,
+            field_mesh,
+            shading='gouraud',
+            cmap=cmap_settings['cmap'],
+            vmin=cmap_settings['vmin'],
+            vmax=cmap_settings['vmax'],
+        )
 
         if data_of_R is not None and len(data_of_R) > 0:
             r_times = np.array(list(data_of_R.keys()), dtype=float)
@@ -553,6 +729,8 @@ def plot_temperature_heatmap_2D_series_model(
                     #         linestyle='-', label='Ablation contour R(t,z)')
 
         cbar = plt.colorbar(pcm, ax=ax)
+        if cmap_settings['cbar_ticks'] is not None:
+            cbar.set_ticks(cmap_settings['cbar_ticks'])
         cbar.set_label(field_label)
 
         ax.axhline(y=0, color='white', linewidth=2, linestyle='-', alpha=0.7)

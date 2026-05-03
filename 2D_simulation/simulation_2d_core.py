@@ -745,10 +745,19 @@ class SelfSimilarDiffusion2D:
 
         Foam region is defined consistently with the material mask: r < R_foam.
         Convert to hJ by multiplying by 1e-9 (since 1 erg = 1e-9 hJ).
+        
+        In vacuum mode, the entire radial region is foam (up to R_foam).
         """
 
         r_nodes = np.asarray(self.r, dtype=float)
         mask_foam = r_nodes < float(self.R_foam)
+        if np.count_nonzero(mask_foam) < 2:
+            # Fallback: return zeros if mask has < 2 nodes
+            Um = np.asarray(stored_Um)
+            if Um.ndim == 2:
+                return np.array([0.0])
+            else:
+                return np.zeros(Um.shape[0], dtype=float)
         return self._compute_energy_region(stored_Um, mask_r=mask_foam)
 
     def compute_energy_gold(self, stored_Um):
@@ -756,10 +765,26 @@ class SelfSimilarDiffusion2D:
 
         Gold region is defined consistently with the material mask: r >= R_foam.
         Convert to hJ by multiplying by 1e-9 (since 1 erg = 1e-9 hJ).
+        
+        Returns zero array if no gold region exists (vacuum mode).
         """
+        # In vacuum mode (gold_width=0), there's no gold region; return zeros
+        if not self.r_info.get('has_gold', True):
+            Um = np.asarray(stored_Um)
+            if Um.ndim == 2:
+                return np.array([0.0])
+            else:
+                return np.zeros(Um.shape[0], dtype=float)
 
         r_nodes = np.asarray(self.r, dtype=float)
         mask_gold = r_nodes >= float(self.R_foam)
+        if np.count_nonzero(mask_gold) < 2:
+            # Fallback: return zeros if mask has < 2 nodes (shouldn't happen with proper grids, but safety)
+            Um = np.asarray(stored_Um)
+            if Um.ndim == 2:
+                return np.array([0.0])
+            else:
+                return np.zeros(Um.shape[0], dtype=float)
         return self._compute_energy_region(stored_Um, mask_r=mask_gold)
 
     def compute_front_surface(
@@ -886,15 +911,20 @@ def make_r_two_block(R_foam, gold_width, Nr_foam, Nr_gold, dr0=None):
     """
     if Nr_foam < 2:
         raise ValueError("Nr_foam must be >= 2")
-    if Nr_gold < 1:
-        raise ValueError("Nr_gold must be >= 1")
-    if R_foam <= 0 or gold_width <= 0:
-        raise ValueError("R_foam and gold_width must be > 0")
+    if R_foam <= 0:
+        raise ValueError("R_foam must be > 0")
 
+    # Allow gold_width <= 0 to represent no gold (vacuum): return foam-only grid
+    r_foam = np.linspace(0.0, R_foam, Nr_foam)
+    if gold_width is None or gold_width <= 0:
+        info = {"has_gold": False, "q": None, "dr0": None, "widths": np.array([]), "R_total": float(R_foam)}
+        return r_foam, info
+
+    # From here on we assume a positive gold block
+    if Nr_gold < 1:
+        raise ValueError("Nr_gold must be >= 1 for a non-zero gold width")
     if dr0 is None:
         raise ValueError("Provide dr0=...")
-
-    r_foam = np.linspace(0.0, R_foam, Nr_foam)
 
     # Gold widths
     q = solve_q_from_dr0(gold_width, Nr_gold, dr0)
@@ -912,7 +942,7 @@ def make_r_two_block(R_foam, gold_width, Nr_foam, Nr_gold, dr0=None):
     # (and remove duplicates safely if you want)
     r = np.unique(r)
 
-    info = {"q": float(q), "dr0": float(dr0), "widths": widths, "R_total": R_total}
+    info = {"has_gold": True, "q": float(q), "dr0": float(dr0), "widths": widths, "R_total": float(R_total)}
     return r, info
 
 

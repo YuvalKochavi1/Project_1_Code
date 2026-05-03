@@ -81,6 +81,64 @@ class WallLossModel:
         return 2 * np.pi * R_cm_local * 10 * dE_total
 
     @staticmethod
+    def E_wall_array_dt(t, dt, t_heat, T0, xF, flat_top_profile=True, wall='Gold'):
+        """Compute wall energy loss per z-cell at the foam-gold interface for an array of z values.
+        Will be used to compute the wall albedo profile as a function of z at the interface."""
+        dE_array = np.zeros_like(z, dtype=float)
+        for i in range(len(z)):
+            if z[i] <= xF:
+                t_exposed = t - t_heat[i]
+                if flat_top_profile:
+                    if wall == 'Gold':
+                        delta_e_i = WallLossModel.E_wall_gold(t_exposed, T0) - WallLossModel.E_wall_gold(t_exposed - dt, T0)
+                    elif wall == "Copper":
+                        delta_e_i = WallLossModel.E_wall_copper(t_exposed, T0) - WallLossModel.E_wall_copper(t_exposed - dt, T0)
+                    elif wall == 'Be':
+                        delta_e_i = WallLossModel.E_wall_be(t_exposed, T0) - WallLossModel.E_wall_be(t_exposed - dt, T0)
+                    elif wall == 'Vacuum':
+                        delta_e_i = WallLossModel.delta_e_vacuum_hJ_per_mm2(dt, T0)
+                    else:
+                        delta_e_i = 0.0
+                else:
+                    if wall == 'Gold':
+                        xi = z[i]
+                        if xi < xF and xF > 0:
+                            exponent = 1.0 / (4.0 + alpha - beta)
+                            T_local = T0 * (1 - xi / xF) ** exponent
+                            delta_e_i = WallLossModel.E_wall_gold(t_exposed, T_local) - WallLossModel.E_wall_gold(t_exposed - dt, T_local)
+                        else:
+                            delta_e_i = 0.0
+                    elif wall == 'Be':
+                        xi = z[i]
+                        if xi < xF and xF > 0:
+                            exponent = 1.0 / (4.0 + alpha - beta)
+                            T_local = T0 * (1 - xi / xF) ** exponent
+                            delta_e_i = WallLossModel.E_wall_be(t_exposed, T_local) - WallLossModel.E_wall_be(t_exposed - dt, T_local)
+                        else:
+                            delta_e_i = 0.0
+                    elif wall == 'Copper':
+                        xi = z[i]
+                        if xi < xF and xF > 0:
+                            exponent = 1.0 / (4.0 + alpha - beta)
+                            T_local = T0 * (1 - xi / xF) ** exponent
+                            delta_e_i = WallLossModel.E_wall_copper(t_exposed, T_local) - WallLossModel.E_wall_copper(t_exposed - dt, T_local)
+                        else:
+                            delta_e_i = 0.0
+                    elif wall == 'Vacuum':
+                        xi = z[i]
+                        if xi < xF and xF > 0:
+                            exponent = 1.0 / (4.0 + alpha - beta)
+                            T_local = T0 * (1 - xi / xF) ** exponent
+                            delta_e_i = WallLossModel.delta_e_vacuum_hJ_per_mm2(dt, T_local)
+                        else:
+                            delta_e_i = 0.0
+                    else:
+                        delta_e_i = 0.0
+                dE_array[i] = delta_e_i
+        dE_array_erg = dE_array * 1e11
+        return dE_array_erg
+
+    @staticmethod
     def delta_e_vacuum_hJ_per_mm2(dt_sec, T_hev):
         """Vacuum radiative energy loss increment in hJ/mm^2 for a timestep."""
         sigma_SB_cgs = 5.670374419e-5
@@ -95,13 +153,6 @@ class WallLossModel:
         if t_exposed <= 0:
             return 0.0
         return 0.59 * T0**3.35 * (t_exposed * 1e9)**0.59
-
-    @staticmethod
-    def E_wall_gold_dot(t_exposed, T0):
-        """Time-derivative form for gold wall loss in hJ/(mm^2*s)."""
-        if t_exposed <= 0:
-            return 0.0
-        return (0.59)**2 * T0**3.35 * (t_exposed * 1e9)**(-0.41)
 
     @staticmethod
     def E_wall_copper(t_exposed, T0):
@@ -153,6 +204,40 @@ class WallLossModel:
         else:
             sigma_au = 0.0
         return sigma_au / rho_wall
+
+    @staticmethod
+    def shock_packing_pressure(T0):
+        """Packing pressure P0 as a function of interface temperature T0."""
+        return 2.71 * (T0 ** 2.63)
+
+    @staticmethod
+    def shock_mass_parameter(t_exposed, T0):
+        """Shock mass parameter m_s using the local exposure time in seconds."""
+        if t_exposed <= 0:
+            return 0.0
+        P0 = WallLossModel.shock_packing_pressure(T0)
+        return 5.38e-3 * (P0 ** 0.5) * t_exposed
+
+    @staticmethod
+    def shock_penetration_depth_cm(t_exposed, T0):
+        """Approximate shock-front penetration depth in cm."""
+        return WallLossModel.shock_mass_parameter((t_exposed * 1e9), T0) / rho_gold
+
+    @staticmethod
+    def compute_shock_front_profile(t, dt, t_heat, T0, xF, *, wall='Gold'):
+        """Compute the shock-front penetration depth profile on the global z-grid."""
+        shock_profile = np.zeros_like(z, dtype=float)
+        if wall != 'Gold':
+            return shock_profile
+
+        for i in range(len(z)):
+            if z[i] <= xF:
+                t_exposed = t - t_heat[i]
+                if t_exposed <= 0:
+                    continue
+                T_local = T0 # it's flattop since its hydrodynamics and not marshak waves
+                shock_profile[i] = max(WallLossModel.shock_penetration_depth_cm(t_exposed, T_local), 0.0)
+        return shock_profile
 
     @staticmethod
     def compute_wall_front_profile(t, dt, t_heat, T0, xF, *, flat_top_profile=True, wall='Gold'):

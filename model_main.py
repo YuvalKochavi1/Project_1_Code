@@ -267,6 +267,54 @@ def _update_wall_penetration_profiles(i, t_sec, dt_i, t_heat, Ts_i, xF_i, wall_m
     )
 
 
+def _update_shock_profiles(i, t_sec, dt_i, t_heat, Ts_i, xF_i, wall_material, wall_penetration_radius_profile):
+    """Compute the shock penetration profile from the wall front.
+    
+    The shock front extends from the wall penetration front (already-penetrated wall interface). 
+    Both shock_penetration_depth and shock_front_radius are 1D arrays (one value per depth z).
+    """
+    if wall_material != 'Gold':
+        shock_penetration_depth_cm_profile = np.zeros_like(z, dtype=float)
+        shock_front_radius_profile = np.asarray(wall_penetration_radius_profile, dtype=float).copy()
+    else:
+        # Compute shock penetration depth profile on z-grid
+        shock_penetration_depth_cm_profile = WallLossModel.compute_shock_front_profile(
+            t_sec[i],
+            dt_i,
+            t_heat,
+            Ts_i,
+            xF_i,
+            wall=wall_material,
+        )
+        shock_penetration_depth_cm_profile = np.asarray(shock_penetration_depth_cm_profile, dtype=float)
+        shock_penetration_depth_cm_profile = np.clip(shock_penetration_depth_cm_profile, 0.0, None)
+
+        # Compute shock front radius profile: r_shock(z) = wall_front(z) + shock_depth(z)
+        # The shock extends from the wall penetration front into the gold region
+        wall_front = np.asarray(wall_penetration_radius_profile, dtype=float)
+        shock_front_radius_profile = np.minimum(
+            wall_front + shock_penetration_depth_cm_profile,
+            r_gold[-1],
+        )
+
+    shock_penetration_cell_idx_profile = np.searchsorted(
+        r_gold,
+        shock_front_radius_profile,
+        side='right',
+    ) - 1
+    shock_penetration_cell_idx_profile = np.clip(
+        shock_penetration_cell_idx_profile,
+        0,
+        len(r_gold) - 1,
+    )
+
+    return (
+        shock_penetration_depth_cm_profile,
+        shock_front_radius_profile,
+        shock_penetration_cell_idx_profile,
+    )
+
+
 def _update_t_heat(xF_i, t_heat, t_i):
     for j in range(len(z)):
         if z[j] <= xF_i and t_heat[j] == np.inf:
@@ -289,27 +337,38 @@ def _store_bessel_snapshot(
     bessel_data,
     data_of_R=None,
     t_ref_sec=None,
+    t_heat=None,
     wall_interface_radius_profile=None,
     wall_penetration_depth_cm_profile=None,
     wall_penetration_radius_profile=None,
     wall_penetration_cell_idx_profile=None,
+    shock_penetration_depth_cm_profile=None,
+    shock_penetration_radius_profile=None,
+    shock_penetration_cell_idx_profile=None,
 ):
     dE_wall = E_wall_array_erg[i] - E_wall_array_erg[i - 1]
-    albedo = AlbedoModel.compute_albedo_step(Ts_i, dE_wall, dt_i)
+    if i <= 2:
+        albedo = AlbedoModel.compute_albedo_step(Ts_i, dE_wall, dt_i, xF_i)
+    else:
+        # Find closest time key in bessel_data to avoid floating-point key mismatch
+        t_prev_ns = t_sec[i-1] * 1e9
+        closest_key = min(bessel_data.keys(), key=lambda k: abs(k - t_prev_ns)) if bessel_data else None
+        albedo = bessel_data[closest_key]['avg_albedo']
+    albedo_old = AlbedoModel.compute_albedo_step(Ts_i, dE_wall, dt_i, xF_i)
     lambda_ross = g * (Ts_i ** alpha) * (rho ** (-lambda_param - 1))
     epsilon = 3 / 4 * (1 - albedo) * (1 / lambda_ross) * R_cm
     kappa_0 = kappa_roots(epsilon, R_cm, n_roots=1)[0]
     kappa_0_approx = np.sqrt(2 * epsilon) / R_cm
-
+    
+    # Compute z_F at r=R_cm (edge of foam) using kappa_0
+    z_F_at_rcm = xF_i * special.j0(kappa_0 * R_cm)
+    albedo_array, avg_albedo = AlbedoModel.compute_albedo_profile(t_sec[i], dt_i, t_heat, Ts_i, z_F_at_rcm, wall_material='Gold')
     J0_profile = special.j0(kappa_0 * r_grid)
     J0_profile_approx = special.j0(kappa_0_approx * r_grid)
     z_F_radial = _compute_z_front_radial_snapshot(xF_i, J0_profile)
     z_F_radial_approx = _compute_z_front_radial_snapshot(xF_i, J0_profile_approx)
     J0_profiles = np.tile(J0_profile, (len(z), 1)) # shape (Nz, Nr)
     J0_profiles_approx = np.tile(J0_profile_approx, (len(z), 1))
-    
-    # Compute z_F at r=R_cm (edge of foam) using kappa_0
-    z_F_at_rcm = xF_i * special.j0(kappa_0 * R_cm)
 
     snapshot = {
         'r_grid': r_grid.copy(),
@@ -322,9 +381,13 @@ def _store_bessel_snapshot(
         'z_F_radial_approx': z_F_radial_approx.copy(),
         'z_F_at_rcm': z_F_at_rcm,
         'epsilon': epsilon,
+        'albedo_old': albedo_old,
         'albedo': albedo,
         'lambda_ross': lambda_ross,
     }
+
+    snapshot['albedo_array'] = albedo_array
+    snapshot['avg_albedo'] = avg_albedo
 
     # Classify foam vs wall cells once in solver and store for plotting.
     if data_of_R is not None and t_ref_sec is not None and len(data_of_R) > 0:
@@ -344,6 +407,12 @@ def _store_bessel_snapshot(
         snapshot['wall_penetration_radius_profile'] = np.asarray(wall_penetration_radius_profile, dtype=float)
     if wall_penetration_cell_idx_profile is not None:
         snapshot['wall_penetration_cell_idx_profile'] = np.asarray(wall_penetration_cell_idx_profile, dtype=int)
+    if shock_penetration_depth_cm_profile is not None:
+        snapshot['shock_penetration_depth_cm_profile'] = np.asarray(shock_penetration_depth_cm_profile, dtype=float)
+    if shock_penetration_radius_profile is not None:
+        snapshot['shock_penetration_radius_profile'] = np.asarray(shock_penetration_radius_profile, dtype=float)
+    if shock_penetration_cell_idx_profile is not None:
+        snapshot['shock_penetration_cell_idx_profile'] = np.asarray(shock_penetration_cell_idx_profile, dtype=int)
     if wall_penetration_depth_cm_profile is not None or wall_penetration_radius_profile is not None:
         snapshot['r_gold_grid'] = r_gold.copy()
 
@@ -422,6 +491,9 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
     E_wall_array_erg[0] = 0.0
     data_of_R = {t: np.full_like(z, R_cm) for t in t_sec}  # store R(t) data if ablation
     wall_penetration_depth_cm_profile = np.zeros_like(z, dtype=float)
+    shock_penetration_depth_cm_profile = np.zeros_like(z, dtype=float)
+    shock_penetration_radius_profile = np.full_like(z, R_cm, dtype=float)
+    shock_penetration_cell_idx_profile = np.zeros_like(z, dtype=int)
     
     # Bessel function data storage for each time step
     # Dictionary to store J_0(kappa_0 * r) profiles for each (time, z) pair
@@ -503,9 +575,11 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
         z_F_rcm[i] = xF[i]
         (wall_penetration_depth_cm_profile, wall_penetration_radius_profile, wall_penetration_cell_idx_profile,) = _update_wall_penetration_profiles(
                 i, t_sec, dt_i, t_heat, Ts[i], z_F_rcm[i-1], wall_material, wall_penetration_depth_cm_profile, vary_rho,)
+        (shock_penetration_depth_cm_profile, shock_penetration_radius_profile, shock_penetration_cell_idx_profile,) = _update_shock_profiles(
+            i, t_sec, dt_i, t_heat, Ts[i], z_F_rcm[i-1], wall_material, wall_penetration_radius_profile,)
         if wall_loss and i > 1:
             #calcultates the bessel function profiles and parameters for the current time step and stores them in bessel_data for later retrieval and plotting
-            _store_bessel_snapshot(i, t_sec, Ts[i], dt_i, xF[i], E_wall_array_erg, bessel_data, data_of_R=data_of_R if ablation else None, t_ref_sec=t_sec[i] if ablation else None, wall_penetration_depth_cm_profile=wall_penetration_depth_cm_profile, wall_penetration_radius_profile=wall_penetration_radius_profile, wall_penetration_cell_idx_profile=wall_penetration_cell_idx_profile,)
+            _store_bessel_snapshot(i, t_sec, Ts[i], dt_i, xF[i], E_wall_array_erg, bessel_data, data_of_R=data_of_R if ablation else None, t_ref_sec=t_sec[i] if ablation else None, t_heat=t_heat, wall_penetration_depth_cm_profile=wall_penetration_depth_cm_profile, wall_penetration_radius_profile=wall_penetration_radius_profile, wall_penetration_cell_idx_profile=wall_penetration_cell_idx_profile, shock_penetration_depth_cm_profile=shock_penetration_depth_cm_profile, shock_penetration_radius_profile=shock_penetration_radius_profile, shock_penetration_cell_idx_profile=shock_penetration_cell_idx_profile,)
 
             # Extract z_F at r=R_cm from the current time snapshot.
             t_key = t_sec[i] * 1e9

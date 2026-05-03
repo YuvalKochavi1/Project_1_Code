@@ -323,26 +323,55 @@ def Back_SiO2(times_to_store):
         output_csv_path=DATA_DIR / "1.5 model" / "analytic_positions.csv",
 
     )
+    
+    # Extract z_grid from one of the bessel data snapshots for albedo plots
+    z_grid_for_plots = None
+    if bessel_data_2D and len(bessel_data_2D) > 0:
+        first_snapshot = list(bessel_data_2D.values())[0]
+        if 'z_grid' in first_snapshot:
+            z_grid_for_plots = first_snapshot['z_grid']
+    
+    # Plot albedo arrays for different models (only for specific times)
+    plot_albedo_arrays(bessel_data_2D, z_grid=z_grid_for_plots, 
+                       title="Albedo Profiles - 2D (varying rho)", times_ns=[1.0, 2.0, 2.5])
+    save_figure("albedo_profiles_2D_varying_rho.png", model1_5=True)
+    
+    plot_albedo_arrays(bessel_data_2D_lam_eff, z_grid=z_grid_for_plots,
+                       title="Albedo Profiles - 2D (lam_eff)", times_ns=[1.0, 2.0, 2.5])
+    save_figure("albedo_profiles_2D_lam_eff.png", model1_5=True)
+    
+    plot_albedo_arrays(bessel_data_ablation_const_rho, z_grid=z_grid_for_plots,
+                       title="Albedo Profiles - Ablation (const rho)", times_ns=[1.0, 2.0, 2.5])
+    save_figure("albedo_profiles_ablation_const_rho.png", model1_5=True)
+    
+    plot_albedo_arrays(bessel_data_gold_loss, z_grid=z_grid_for_plots,
+                       title="Albedo Profiles - Gold Loss", times_ns=[1.0, 2.0, 2.5])
+    save_figure("albedo_profiles_gold_loss.png", model1_5=True)
+    
+    plot_albedo_arrays(bessel_data_marshak, z_grid=z_grid_for_plots,
+                       title="Albedo Profiles - Marshak BC", times_ns=[1.0, 2.0, 2.5])
+    save_figure("albedo_profiles_marshak.png", model1_5=True)
+    
     # Plot 2D spatial view showing front in (r,z) geometry
     # plot_2D_front_spatial(bessel_data_2D, analytic_positions_2D,
     #                      times_to_store, times_ns=[1.0, 2.0, 2.5])
     # Plot temperature heatmaps T(r,z,t)
     plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
-                    Ts_2D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=True, title_suffix="(varying rho)")
+                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=True, title_suffix="(varying rho)", color_option = "prr_back")
     plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
-                    Ts_lam_eff, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=True, title_suffix="(lam_eff)")
+                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=True, title_suffix="(lam_eff)", color_option = "prr_back")
     plot_temperature_heatmap_2D(bessel_data_ablation_const_rho, analytic_positions_ablation_const_rho,
-                    Ts_ablation_const_rho, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=True, title_suffix="(const rho)")
+                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=True, title_suffix="(const rho)", color_option = "prr_back")
     plot_temperature_heatmap_2D(bessel_data_gold_loss, analytic_positions_energy_lost_gold,
-                    Ts_gold_loss, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=False, title_suffix="(gold wall loss)")
+                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=False, title_suffix="(gold wall loss)", color_option = "prr_back")
     plot_temperature_heatmap_2D(bessel_data_marshak, analytic_positions_marshak,
                     Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=False, title_suffix="(Marshak BC)")
-    
+                    ablation=False, title_suffix="(Marshak BC)", color_option = "prr_back")
+
 
 
 def compare_with_article_2_exp1_Massen(times_to_store):
@@ -570,11 +599,17 @@ def compare_with_article_2_exp4_14(times_to_store):
     save_figure("front_position - compare Back SiO2 low energy.png", model1_5=True)
     
 def compare_with_article_2_exp5_15a(times_to_store):
+    """Moore SiO2 experiment"""
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=1)
     analytic_position_HR = front_series["analytic_positions_no_marshak"]
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
     analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    Ts_2D = front_series["Ts_2D"]
+    Ts_marshak = front_series["Ts_1D"]
+    Ts_lam_eff = front_series["Ts_2D_lam_eff"]
+    bessel_data_2D = front_series["bessel_data_2D"]
+    bessel_data_2D_lam_eff = front_series["bessel_data_2D_lam_eff"]
     plt.figure(figsize=(8, 6))
     # fit data to analytical
     plot_standard_front_analytic_models(
@@ -604,13 +639,23 @@ def compare_with_article_2_exp5_15a(times_to_store):
     plt.tight_layout()
     save_figure("front_position - compare Moore SiO2.png", model1_5=True)
 
+    plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
+                    Ts_marshak, times_to_store, times_ns=[1, 2, 3],
+                    ablation=True, title_suffix="(varying rho)", color_option = "prr_moore")
+    plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
+                    Ts_marshak, times_to_store, times_ns=[1, 2, 3],
+                    ablation=True, title_suffix="(lam_eff)", color_option = "prr_moore")
+
+
 def compare_with_article_2_exp5_15b(times_to_store):
+    """Moore C8H7Cl experiment"""
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=2)
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
     analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_position_HR = front_series["analytic_positions_no_marshak"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     Ts_2D = front_series["Ts_2D"]
+    Ts_marshak = front_series["Ts_1D"]
     Ts_lam_eff = front_series["Ts_2D_lam_eff"]
     bessel_data_2D = front_series["bessel_data_2D"]
     bessel_data_2D_lam_eff = front_series["bessel_data_2D_lam_eff"]
@@ -644,12 +689,33 @@ def compare_with_article_2_exp5_15b(times_to_store):
     plt.show()
     save_figure("front_position - compare Moore C8H7Cl.png", model1_5=True)
 
+    # Plot surface temperatures
+    plt.figure(figsize=(8, 6))
+    plot_csv_series(
+        article_temperature_path("T_drive.csv"),
+        y_scale=100,
+        linestyle="--",
+        label="T_D (Drive)",
+        color="green",
+    )
+    plot_analytic_if_available(times_to_store, Ts_marshak, label="Marshak (1D)", linestyle="-", color='blue')
+    plot_analytic_if_available(times_to_store, Ts_2D, label="2D Model (varying rho)", linestyle="-", color='black')
+    plot_analytic_if_available(times_to_store, Ts_lam_eff, label="2D Model (lam_eff)", linestyle="--", color='red')
+    plt.xlabel("Time (ns)", fontsize=18)
+    plt.ylabel("Surface Temperature T_s (HeV)", fontsize=18)
+    plt.title(f"Surface Temperature vs Time  - Material: {Material} (Figure 15b)")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    save_figure("temperatures - compare Moore C8H7Cl.png", model1_5=True)
+
     plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
-                    Ts_2D, times_to_store, times_ns=[1.5, 2.50, 3.72],
-                    ablation=True, title_suffix="(varying rho)")
+                    Ts_marshak, times_to_store, times_ns=[1.5, 2.50, 3.72],
+                    ablation=True, title_suffix="(varying rho)", color_option = "paper")
     plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
-                    Ts_lam_eff, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=True, title_suffix="(lam_eff)")
+                    Ts_marshak, times_to_store, times_ns=[1.0, 2.0, 3.72],
+                    ablation=True, title_suffix="(lam_eff)", color_option = "visit")
 
 
 def compare_with_article_2_exp6_16(times_to_store):
@@ -911,14 +977,63 @@ def plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=Tru
         raise ValueError("No bessel_data available to plot albedo.")
 
     t_ns = np.array(sorted(bessel_data.keys()), dtype=float)
-    albedo_z0 = np.array([bessel_data[t]['albedo'] for t in t_ns], dtype=float)
+    albedo_old = np.array([bessel_data[t].get('albedo_old', np.nan) for t in t_ns], dtype=float)
+    albedo_new = np.array([bessel_data[t].get('avg_albedo', np.nan) for t in t_ns], dtype=float)
+
+    def _loess_smooth(x_vals, y_vals, span=5):
+        """Simple LOESS-like local linear smoother with tricube weights."""
+        x_vals = np.asarray(x_vals, dtype=float)
+        y_vals = np.asarray(y_vals, dtype=float)
+        n = x_vals.size
+        if n == 0:
+            return y_vals
+
+        span = int(max(3, min(span, n)))
+        y_smooth = np.full(n, np.nan, dtype=float)
+
+        for i in range(n):
+            left = max(0, i - span // 2)
+            right = min(n, left + span)
+            left = max(0, right - span)
+
+            xw = x_vals[left:right]
+            yw = y_vals[left:right]
+            valid = np.isfinite(yw)
+            if np.count_nonzero(valid) < 2:
+                y_smooth[i] = y_vals[i] if np.isfinite(y_vals[i]) else 0.0
+                continue
+
+            xw = xw[valid]
+            yw = yw[valid]
+            d = np.abs(xw - x_vals[i])
+            dmax = np.max(d)
+            if dmax <= 0:
+                y_smooth[i] = np.mean(yw)
+                continue
+
+            u = d / dmax
+            w = (1.0 - u**3) ** 3
+            X = np.column_stack((np.ones_like(xw), xw))
+            WX = X * w[:, None]
+            beta, *_ = np.linalg.lstsq(WX, yw * w, rcond=None)
+            y_smooth[i] = beta[0] + beta[1] * x_vals[i]
+
+        return y_smooth
+
+    span = 5
+    albedo_old_smooth = _loess_smooth(t_ns, albedo_old, span=span)
+    albedo_new_smooth = _loess_smooth(t_ns, albedo_new, span=span)
 
     plt.figure(figsize=(8, 6))
-    plt.plot(t_ns, albedo_z0, color='black', linestyle='-', linewidth=2, label='Albedo at z=0')
+    plt.plot(t_ns, albedo_old, color='gray', linestyle='-', linewidth=1.0, alpha=0.4, label='Albedo old (raw)')
+    plt.plot(t_ns, albedo_new, color='salmon', linestyle='-', linewidth=1.0, alpha=0.4, label='Albedo new (raw)')
+    plt.plot(t_ns, albedo_old_smooth, color='black', linestyle='-', linewidth=2, label=f'Albedo old (LOESS span={span})')
+    plt.plot(t_ns, albedo_new_smooth, color='red', linestyle='-', linewidth=2, label=f'Albedo new (LOESS span={span})')
     plt.xlabel("Time (ns)")
     plt.ylabel("Albedo")
     plt.title(f"Albedo at z=0 vs Time - Material: {Material}")
     plt.grid(True, alpha=0.3)
+    plt.xlim(0.2, max(t_ns)*1.1)
     plt.legend()
     plt.tight_layout()
 
@@ -960,9 +1075,27 @@ def simulate():
     # results_tau0 = run_case(times_to_store=times_to_store, reset_initial_conditions=True, marshak_boundary=False)
     # plot_front_positions_and_energies(show_plots=show_plots, marshak_boundary=False)
 
+# Let's create a function that by getting a material name, it will run the appropriate comparison function for that material. This way we can easily switch between materials and their corresponding comparisons.
+def compare_for_material(times_to_store):
+    if Material == "SiO2":
+        Back_SiO2(times_to_store)
+        compare_with_french_gold(times_to_store)
+    elif Material == "SiO2_Moore":
+        compare_with_article_2_exp5_15a(times_to_store)
+    elif Material == "C8H7Cl":
+        compare_with_article_2_exp5_15b(times_to_store)
+    elif Material == "Ta2O5":
+        Back_SiO2(times_to_store)
+    elif Material == "Gold":
+        compare_with_french_gold(times_to_store)
+    elif Material == "Copper":
+        compare_with_french_copper(times_to_store)
+    else:
+        print(f"No comparison function defined for material: {Material}")
+
 if __name__ == "__main__":
     #simulate()
-    times_to_store = np.linspace(0.01, 3, 1000)
+    times_to_store = np.linspace(0.01, 4, 1000)
     #Back_SiO2(times_to_store)
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)
@@ -970,8 +1103,8 @@ if __name__ == "__main__":
     #compare_with_article_2_exp2_Xu(times_to_store)
     #compare_with_article_2_exp3_13a(times_to_store)
     #compare_with_article_2_exp4_14(times_to_store)
-    #compare_with_article_2_exp5_15a(times_to_store)
-    compare_with_article_2_exp5_15b(times_to_store)
+    compare_with_article_2_exp5_15a(times_to_store)
+    #compare_with_article_2_exp5_15b(times_to_store)
     #compare_with_article_2_exp6_16(times_to_store)
     #compare_with_article_2_exp7_17(times_to_store)
     #compare_with_french_gold(times_to_store)

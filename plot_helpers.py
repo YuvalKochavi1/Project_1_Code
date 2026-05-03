@@ -2,6 +2,7 @@ import numpy as np
 from model_main import analytic_wave_front_dispatch
 import matplotlib.pyplot as plt
 from csv_helpers import *
+from shape_2D_analytical_model import _closest_time_data
 
 def plot_analytic_if_available(x_vals, y_vals, *, label, linestyle="--", color=None):
     """Helper function to plot analytic curves if the data is available (i.e., not None). This is used to conditionally plot the analytic curves in the comparison plots without needing to check for None every time we call this function."""
@@ -193,3 +194,70 @@ def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'G
         "data_of_R_ablation_const_rho": data_of_R_ablation_const_rho,
         "bessel_data_ablation_const_rho": bessel_data_ablation_const_rho,
     }
+
+
+def plot_albedo_arrays(bessel_data, z_grid=None, title="Albedo Profiles vs Depth", figsize=(18, 6), times_ns=None):
+    """
+    Plot albedo arrays for selected times in bessel_data in separate subplots.
+    
+    Parameters
+    ----------
+    bessel_data : dict
+        Dictionary with keys as time (ns) and values as snapshots containing 'albedo_array' and 'avg_albedo'
+    z_grid : array-like, optional
+        Spatial grid (z values). If None, indices are used on x-axis.
+    title : str
+        Plot title
+    figsize : tuple
+        Figure size (width, height)
+    times_ns : list, optional
+        List of specific times (in ns) to plot. If None, all times are plotted.
+    
+    Returns
+    -------
+    fig, axes
+        Matplotlib figure and axes objects
+    """
+    if not bessel_data or len(bessel_data) == 0:
+        print("Warning: bessel_data is empty, cannot plot albedo arrays")
+        return None, None
+    
+    # Default to plotting first 3 times if not specified
+    if times_ns is None:
+        all_times_ns = sorted(bessel_data.keys())
+        times_ns = all_times_ns[:min(3, len(all_times_ns))]
+    
+    fig, axes = plt.subplots(1, len(times_ns), figsize=figsize)
+    if len(times_ns) == 1:
+        axes = [axes]
+    
+    for idx, t_target in enumerate(times_ns):
+        # Find closest time in bessel_data
+        t_closest, data = _closest_time_data(bessel_data, t_target)
+        
+        if 'albedo_array' in data and 'avg_albedo' in data:
+            albedo_array = data['albedo_array']
+            avg_albedo = data['avg_albedo']
+            
+            # Use provided z_grid or indices
+            if z_grid is not None:
+                x_vals = z_grid
+            else:
+                x_vals = np.arange(len(albedo_array))
+            
+            ax = axes[idx]
+            ax.plot(x_vals, albedo_array, marker='o', markersize=6, 
+                   color='steelblue', linewidth=2.0)
+            
+            ax.set_xlabel('Depth (z)', fontsize=11)
+            ax.set_ylabel('Albedo (a)', fontsize=11)
+            ax.set_title(f't = {t_closest:.2f} ns\n⟨a⟩ = {avg_albedo:.3f}', fontsize=12)
+            ax.grid(True, alpha=0.3)
+            ax.set_ylim([0, 1.0])
+            
+            print(f"Plotting albedo at time {t_closest:.2f} ns, t_target was {t_target:.2f} ns")
+    
+    fig.suptitle(title, fontsize=14, y=1.00)
+    fig.tight_layout()
+    
+    return fig, axes

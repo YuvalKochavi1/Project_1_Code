@@ -42,8 +42,8 @@ mpl.rcParams["mathtext.default"] = "regular"
 def create_simulation(
     *,
     material: str = "SiO2",
-    Nz: int = 10,
-    Nr_foam: int = 10,
+    Nz: int = 100,
+    Nr_foam: int = 100,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
