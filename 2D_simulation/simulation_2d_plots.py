@@ -14,6 +14,14 @@ from csv_helpers import ensure_dir, save_series_csv
 from simulation_2d_core import K_per_Hev, cell_to_vertices, edges_from_nodes_with_bounds
 
 
+def _get_gold_label(sim):
+    """Return 'gold' or 'vacuum' suffix based on whether sim has a gold layer."""
+    if sim.gold_width > 0:
+        return "gold"
+    else:
+        return "vacuum"
+
+
 def _save_temperature_cell_csv(csv_path, r_edges, z_edges, T_cell):
     """Save a 2D temperature field as a flat CSV table with cell-center coordinates."""
     csv_path = Path(csv_path)
@@ -88,7 +96,8 @@ def plot_temperature_maps_gouraud(
         cbar.set_label("Material temperature T (HeV)", fontname="serif")
 
         time_ns = t_plot * 1e9
-        fig_name = f"Tmap_{time_ns:.1f}ns"
+        gold_label = _get_gold_label(sim)
+        fig_name = f"Tmap_{time_ns:.1f}ns_{gold_label}"
         fig.savefig(out_dir / f"{fig_name}.png", dpi=250)
         plt.close(fig)
 
@@ -138,7 +147,8 @@ def plot_temperature_maps_simple(
         plt.ylabel("z (cm)")
 
         time_ns = t_plot * 1e9
-        fig_name = f"heatmap_{time_ns:.1f}ns"
+        gold_label = _get_gold_label(sim)
+        fig_name = f"heatmap_{time_ns:.1f}ns_{gold_label}"
         plt.savefig(out_dir / f"{fig_name}.png")
         plt.close()
 
@@ -151,6 +161,7 @@ def plot_temperature_maps_simple(
 
 
 def plot_front_vs_time(
+    sim,
     stored_t,
     front_z_cm,
     *,
@@ -162,6 +173,12 @@ def plot_front_vs_time(
     base_dir = Path(base_dir)
     figure_data_dir = Path(figure_data_dir)
     ensure_dir(out_path.parent)
+    
+    # Insert gold/vacuum label into filename
+    gold_label = _get_gold_label(sim)
+    stem = out_path.stem
+    suffix = out_path.suffix
+    out_path = out_path.parent / f"{stem}_{gold_label}{suffix}"
 
     plt.figure(figsize=(8, 6))
     plt.plot(stored_t * 1e9, np.asarray(front_z_cm) * 1e1)
@@ -228,6 +245,13 @@ def plot_front_surface(
     plt.ylim(0.0, sim.Lz)
     plt.grid()
     plt.legend(prop={"family": "serif"})
+    
+    # Insert gold/vacuum label into filename
+    gold_label = _get_gold_label(sim)
+    stem = out_path.stem
+    suffix = out_path.suffix
+    out_path = out_path.parent / f"{stem}_{gold_label}{suffix}"
+    
     plt.savefig(out_path)
     plt.close()
 
@@ -254,6 +278,12 @@ def plot_energy_comparison(
     base_dir = Path(base_dir)
     figure_data_dir = Path(figure_data_dir)
     ensure_dir(out_path.parent)
+    
+    # Insert gold/vacuum label into filename
+    gold_label = _get_gold_label(sim)
+    stem = out_path.stem
+    suffix = out_path.suffix
+    out_path = out_path.parent / f"{stem}_{gold_label}{suffix}"
 
     energy_foam = sim.compute_energy_foam(stored_Um) * 1e-9
     energy_gold = sim.compute_energy_gold(stored_Um) * 1e-9

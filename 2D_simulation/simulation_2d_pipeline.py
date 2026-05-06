@@ -42,8 +42,8 @@ mpl.rcParams["mathtext.default"] = "regular"
 def create_simulation(
     *,
     material: str = "SiO2",
-    Nz: int = 100,
-    Nr_foam: int = 100,
+    Nz: int = 50,
+    Nr_foam: int = 50,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -83,7 +83,7 @@ def create_simulation(
     }
     gold_params = {
         "f": 3.4e13,
-        "g": 1/7200,
+        "g": 1e-10, #1/7200,
         "alpha": 1.5,
         "beta_exp": 1.6,
         "lambda_param": 0.2,
@@ -118,7 +118,7 @@ def run_simulation(
     dtfac: float = 0.05,
     dtmin: float | None = 5e-15,
     dtmax: float | None = 2e-12,
-    bc_r_outer: str = "dirichlet_bath",
+    bc_r_outer: str = "marshak_wall",
     marshak_boundary: bool = True,
 ):
     """Run a simulation and return stored arrays (same as the old script)."""
@@ -173,7 +173,7 @@ def run_default_pipeline(*, material: str = "SiO2"):
         dtfac=0.05,
         dtmin=5e-15,
         dtmax=2e-12,
-        bc_r_outer="dirichlet_bath",
+        bc_r_outer="marshak_wall",
         marshak_boundary=True,
     )
 
@@ -197,6 +197,7 @@ def run_default_pipeline(*, material: str = "SiO2"):
         figure_data_dir=FIGURE_DATA_DIR_2D,
     )
     plot_front_vs_time(
+        sim,
         stored_t,
         front_z_cm,
         out_path=FIGURES_DIR_2D / "front_position - Front Position vs Time at r=0.png",

@@ -51,7 +51,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = "SiO2_Moore"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = "C8H7Cl"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 
 if Material == "SiO2":
     Experiment = "Back"
@@ -139,7 +139,7 @@ if Material == "SiO2_Moore":
     lambda_param = 0.75
     mu = 0.09
     rho = 0.1249    # initial density (g/cm^3)
-    R_cm = 0.1      # radius of the foam cylinder (cm) - The diameter is 2 mm
+    R_cm = 0.08      # radius of the foam cylinder (cm) - The diameter is 2 mm
     csv_path = article_temperature_path("T_drive.csv")
     t_array_TD, T_array_TD = load_time_temp(csv_path)
     T_array_TD = (340.2/368.1)**0.25 * T_array_TD  # Moore data correction

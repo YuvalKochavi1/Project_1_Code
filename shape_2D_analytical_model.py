@@ -325,6 +325,7 @@ def plot_temperature_heatmap_2D(
     vmin=None,
     vmax=None,
     cbar_ticks=None,
+    show_shock=True,
 ):
     """
     Plot 2D temperature heatmaps T(r,z,t) = T_s(t) * (1 - z/z_F(r,t))^(1/(4+alpha-beta))
@@ -349,6 +350,8 @@ def plot_temperature_heatmap_2D(
         Backward-compatible alias for preset choice.
     cmap, vmin, vmax, cbar_ticks : optional
         Manual overrides for the preset values.
+    show_shock : bool, optional
+        If True (default), displays the shock boundary. If False, hides the shock.
     """
     # Get material parameters from global scope
     exponent = 1.0 / (4.0 + alpha - beta)  # Self-similar profile exponent
@@ -487,7 +490,7 @@ def plot_temperature_heatmap_2D(
             if np.any(wall_valid):
                 T_mesh_plot[wall_valid] = T_wall_profile[wall_valid]
 
-        if shock_profile is not None:
+        if show_shock and shock_profile is not None:
             shock_mask = np.isfinite(shock_profile)
             if np.any(shock_mask):
                 T_mesh_plot = np.array(T_mesh_plot, copy=True)
@@ -529,7 +532,7 @@ def plot_temperature_heatmap_2D(
         #     ax.plot(
         #         ablation_contour_r,
         #         ablation_contour_z,
-        #         color='white',
+        #         color='black',
         #         linewidth=1.0,
         #         linestyle='-',
         #         #label='Ablation contour R(t,z)',
@@ -555,7 +558,7 @@ def plot_temperature_heatmap_2D(
         ax.set_ylim([0, L])
         ax.set_xlim([0.0, float(r_mesh[-1])])
         ax.set_aspect('equal', adjustable='box')
-        ax.legend(fontsize=9, loc='upper right')
+        # ax.legend(fontsize=9, loc='upper right')
 
     plt.suptitle(
         f'Temperature Distribution T(r,z,t) with Self-Similar Profile (exponent = {exponent:.3f})',

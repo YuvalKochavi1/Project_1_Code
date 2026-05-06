@@ -68,6 +68,14 @@ def get_TD(t_query_ns, t_ns, T_eV):
     Tret = T_eV[i-1] if abs(t_query_ns - t_ns[i-1]) <= abs(t_query_ns - t_ns[i]) else T_eV[i]
     return 0.01 * Tret  # eV -> HeV
 
+
+def outer_dr(r):
+    """Return the last radial spacing used at the outer boundary face."""
+    r = np.asarray(r, dtype=float)
+    if r.size < 2:
+        return 1.0
+    return float(r[-1] - r[-2])
+
 # -----------------------------
 # Adaptive dt (same idea as yours)
 # -----------------------------
@@ -386,41 +394,43 @@ class SelfSimilarDiffusion2D:
     # ============================================================
     # Implicit step: build and solve sparse system for E^{n+1}
     # ============================================================
-    def implicit_step(self, *, t, dt_local, bc_r_outer="dirichlet_bath", marshak_boundary=False):
+    def implicit_step(self, *, t, dt_local, bc_r_outer="marshak_wall", marshak_boundary=False):
         """
-        bc_r_outer: "neumann0" (dE/dr=0 at r=R) or "dirichlet_bath"
+        bc_r_outer: "neumann0" (dE/dr=0 at r=R), "dirichlet_bath", or "marshak_wall"
         Axis r=0 always uses neumann symmetry.
         z=0: Dirichlet drive, z=Lz: Dirichlet bath
         """
         Nz, Nr = self.Nz, self.Nr
         dz = self.dz
 
-        E_old = self.E
-        UR_old = self.UR
+        E_n = self.E  # E^n: radiation energy at time n
+        U_n = self.UR  # U^n: material energy at time n
 
-        # lagged coefficients from UR^n
-        Tn = (UR_old / self.a) ** 0.25
-        Dn = self.D_of_T(Tn)
-        betan = self.beta_of_T(Tn)
-        sigman = self.sigma_of_T(Tn)
-
-
-        # coupling diag
-        A = betan * dt_local * self.chi * self.c * sigman
-        coupling = self.chi * self.c * sigman / (1.0 + A)  # χ c σ/(1+A)
+        # lagged coefficients from U^n
+        T_n = (U_n / self.a) ** 0.25  # T^n: temperature at time n
+        D_n = self.D_of_T(T_n)  # D^n: diffusion coefficient at time n
+        beta_n = self.beta_of_T(T_n)  # β^n
+        sigma_n = self.sigma_of_T(T_n)  # σ^n: opacity at time n
 
 
-        # Face diffusion (z-faces and r-faces)
-        # z-face: between i and i+1, shape (Nz-1, Nr)
+        # A^n = β^n Δt χ c σ^n: absorption characteristic
+        A_n = beta_n * dt_local * self.chi * self.c * sigma_n
+        # C^n = χ c σ^n / (1 + A^n): effective coupling coefficient
+        C_n = self.chi * self.c * sigma_n / (1.0 + A_n)
+
+
+        # Face diffusion at time n: D^n_{faces}
+        # D_z_face: diffusion coeff at z-faces, shape (Nz-1, Nr)
+        # D_r_face: diffusion coeff at r-faces, shape (Nz, Nr-1)
         if self.kind_of_D_face == "harmonic":
-            Dz_face = 2.0 * Dn[:-1, :] * Dn[1:, :] / (Dn[:-1, :] + Dn[1:, :] + 1e-30)
-            Dr_face = 2.0 * Dn[:, :-1] * Dn[:, 1:] / (Dn[:, :-1] + Dn[:, 1:] + 1e-30)
+            D_z_face = 2.0 * D_n[:-1, :] * D_n[1:, :] / (D_n[:-1, :] + D_n[1:, :] + 1e-30)
+            D_r_face = 2.0 * D_n[:, :-1] * D_n[:, 1:] / (D_n[:, :-1] + D_n[:, 1:] + 1e-30)
         elif self.kind_of_D_face == "arithmetic":
-            Dz_face = 0.5 * (Dn[:-1, :] + Dn[1:, :])
-            Dr_face = 0.5 * (Dn[:, :-1] + Dn[:, 1:])
+            D_z_face = 0.5 * (D_n[:-1, :] + D_n[1:, :])
+            D_r_face = 0.5 * (D_n[:, :-1] + D_n[:, 1:])
         elif self.kind_of_D_face == "geometric":
-            Dz_face = np.sqrt(Dn[:-1, :] * Dn[1:, :])
-            Dr_face = np.sqrt(Dn[:, :-1] * Dn[:, 1:])
+            D_z_face = np.sqrt(D_n[:-1, :] * D_n[1:, :])
+            D_r_face = np.sqrt(D_n[:, :-1] * D_n[:, 1:])
         else:
             raise ValueError("kind_of_D_face must be harmonic/arithmetic/geometric")
 
@@ -442,89 +452,104 @@ class SelfSimilarDiffusion2D:
         E_left = self.E_left_drive(t)
         E_right = self.E_right_bath()
 
-        w_mh = self._r_weights["w_mh"]
-        w_ph = self._r_weights["w_ph"]
-        w_axis = self._r_weights["w_axis"]
-        w_mh_outer = self._r_weights["w_mh_outer"]
-        w_ph_outer = self._r_weights["w_ph_outer"]
+        # Radial geometry weight factors (λ^r weights, precomputed)
+        lambda_r_mh = self._r_weights["w_mh"]  # λ^r_{j-1/2}
+        lambda_r_ph = self._r_weights["w_ph"]  # λ^r_{j+1/2}
+        lambda_r_axis = self._r_weights["w_axis"]  # λ^r axis (j=0)
+        lambda_r_mh_outer = self._r_weights["w_mh_outer"]  # λ^r_{j-1/2} at outer
+        lambda_r_ph_outer = self._r_weights["w_ph_outer"]  # λ^r_{j+1/2} at outer
+        dr_outer = outer_dr(self.r)
 
-        inv_dt = 1.0 / dt_local
-        dz2 = dz * dz
+        inv_Delta_t = 1.0 / dt_local  # 1/Δt
+        Delta_z_sq = self.dz * self.dz  # (Δz)^2
 
         for i in range(i0, i1 + 1):
             base_row = (i - i0) * Nr
             rows = base_row + np.arange(Nr)
 
             if marshak_boundary and i == 0:
-                alpha_vec = 2.0 * Dz_face[0, :] / (self.c * dz)
+                alpha_vec = 2.0 * D_z_face[0, :] / (self.c * self.dz)
                 data[pos_self[rows]] = 1.0 + alpha_vec
                 data[pos_ip[rows]] = -alpha_vec
                 b[rows] = self.E_left_drive(t + dt_local)
                 continue
 
-            diag = inv_dt + coupling[i, :]
-            rhs = E_old[i, :] * inv_dt + coupling[i, :] * UR_old[i, :]
+            A_diag = inv_Delta_t + C_n[i, :]  # Diagonal coefficient
+            RHS = E_n[i, :] * inv_Delta_t + C_n[i, :] * U_n[i, :]  # RHS vector
 
-            # z diffusion
-            D_imh = Dz_face[i - 1, :]
-            D_iph = Dz_face[i, :]
-            diag += (D_imh + D_iph) / dz2
+            # z-diffusion: ∂E/∂z with finite volume discretization
+            D_z_imh = D_z_face[i - 1, :]  # D^n at z-face (i-1/2)
+            D_z_iph = D_z_face[i, :]  # D^n at z-face (i+1/2)
+            A_diag += (D_z_imh + D_z_iph) / Delta_z_sq
 
             if i < i1:
-                data[pos_ip[rows]] = -D_iph / dz2
+                data[pos_ip[rows]] = -D_z_iph / Delta_z_sq
             else:
-                rhs += (D_iph / dz2) * E_right
+                RHS += (D_z_iph / Delta_z_sq) * E_right
 
             if i > i0:
-                data[pos_im[rows]] = -D_imh / dz2
+                data[pos_im[rows]] = -D_z_imh / Delta_z_sq
             else:
                 if not marshak_boundary:
-                    rhs += (D_imh / dz2) * E_left
+                    RHS += (D_z_imh / Delta_z_sq) * E_left
 
-            # r diffusion (nonuniform cylindrical)
+            # r-diffusion: cylindrical geometry, 1/r d/dr(r dE/dr)
             if Nr > 1:
-                Dr_i = Dr_face[i, :]
+                D_r_i = D_r_face[i, :]  # D^n at all r-faces for row i
 
-                # axis j=0
-                coeff0 = w_axis * Dr_i[0]
-                diag[0] += coeff0
-                data[pos_jp[rows[0]]] = -coeff0
+                # axis j=0: λ^r_{j+1/2} contribution
+                lambda_r_axis_n = lambda_r_axis * D_r_i[0]
+                A_diag[0] += lambda_r_axis_n
+                data[pos_jp[rows[0]]] = -lambda_r_axis_n
 
-                # interior j=1..Nr-2
+                # interior j=1..Nr-2: λ^r_{j-1/2} and λ^r_{j+1/2}
                 if Nr > 2:
                     j = np.arange(1, Nr - 1)
-                    coeff_mh = w_mh[j] * Dr_i[j - 1]
-                    coeff_ph = w_ph[j] * Dr_i[j]
-                    diag[j] += coeff_mh + coeff_ph
-                    data[pos_jm[rows[j]]] = -coeff_mh
-                    data[pos_jp[rows[j]]] = -coeff_ph
+                    lambda_r_mh_n = lambda_r_mh[j] * D_r_i[j - 1]  # λ^r_{j-1/2}
+                    lambda_r_ph_n = lambda_r_ph[j] * D_r_i[j]  # λ^r_{j+1/2}
+                    A_diag[j] += lambda_r_mh_n + lambda_r_ph_n
+                    data[pos_jm[rows[j]]] = -lambda_r_mh_n
+                    data[pos_jp[rows[j]]] = -lambda_r_ph_n
 
-                # outer j=Nr-1
-                coeff_mh_o = w_mh_outer * Dr_i[-1]
-                diag[-1] += coeff_mh_o
-                data[pos_jm[rows[-1]]] = -coeff_mh_o
+                # outer j=Nr-1: λ^r_{j-1/2} contribution
+                lambda_r_mh_outer_n = lambda_r_mh_outer * D_r_i[-1]
+                A_diag[-1] += lambda_r_mh_outer_n
+                data[pos_jm[rows[-1]]] = -lambda_r_mh_outer_n
                 if bc_r_outer == "dirichlet_bath":
-                    coeff_ph_o = w_ph_outer * Dr_i[-1]
-                    diag[-1] += coeff_ph_o
-                    rhs[-1] += coeff_ph_o * E_right
+                    lambda_r_ph_outer_n = lambda_r_ph_outer * D_r_i[-1]
+                    A_diag[-1] += lambda_r_ph_outer_n
+                    RHS[-1] += lambda_r_ph_outer_n * E_right
                 elif bc_r_outer == "neumann0":
                     pass
+                elif bc_r_outer == "marshak_wall":
+                    # Marshak boundary at r=R: (1+α)E_{Nr-1} - α E_{Nr-2} = E_wall
+                    alpha_r_marshak = 2.0 * D_r_i[-1] / (self.c * dr_outer + 1e-300)
+                    outer_row = rows[-1]
+                    if pos_im[outer_row] >= 0:
+                        data[pos_im[outer_row]] = 0.0
+                    if pos_ip[outer_row] >= 0:
+                        data[pos_ip[outer_row]] = 0.0
+                    if pos_jp[outer_row] >= 0:
+                        data[pos_jp[outer_row]] = 0.0
+                    data[pos_jm[outer_row]] = -alpha_r_marshak
+                    A_diag[-1] = 1.0 + alpha_r_marshak
+                    RHS[-1] = E_right
                 else:
-                    raise ValueError("bc_r_outer must be 'neumann0' or 'dirichlet_bath'.")
+                    raise ValueError("bc_r_outer must be 'neumann0', 'dirichlet_bath', or 'marshak_wall'.")
 
-            data[pos_self[rows]] = diag
-            b[rows] = rhs
+            data[pos_self[rows]] = A_diag
+            b[rows] = RHS
 
-        A_mat = csr_matrix((data, indices, indptr), shape=(n_unknown, n_unknown))
+        matrix_A = csr_matrix((data, indices, indptr), shape=(n_unknown, n_unknown))
 
-        # Warm start (helps iterative solvers a lot in time loops)
-        x0 = E_old[i0 : i1 + 1, :].reshape(n_unknown)
+        # Warm start for iterative solver (using E^n as initial guess)
+        x0_warm_start = E_n[i0 : i1 + 1, :].reshape(n_unknown)
 
-        # Solve
+        # Solve linear system: matrix_A * E_np1_inner = b_rhs
         if self.linear_solver == "direct":
-            E_inner = spsolve(A_mat, b)
+            E_np1_inner = spsolve(matrix_A, b)
         else:
-            # diagonal (Jacobi) preconditioner: cheap and surprisingly effective here
+            # Jacobi preconditioner: M = diag(matrix_A)^{-1}
             diag_entries = data[pos_self]
             inv_diag = 1.0 / (diag_entries + 1e-300)
 
@@ -533,11 +558,11 @@ class SelfSimilarDiffusion2D:
 
             M = LinearOperator((n_unknown, n_unknown), matvec=precond, dtype=np.float64)
             try:
-                # SciPy >= 1.8 typically uses rtol/atol
-                E_inner, info = bicgstab(
-                    A_mat,
+                # SciPy >= 1.8 uses rtol/atol
+                E_np1_inner, info = bicgstab(
+                    matrix_A,
                     b,
-                    x0=x0,
+                    x0=x0_warm_start,
                     rtol=self.linear_tol,
                     atol=0.0,
                     maxiter=self.linear_maxiter,
@@ -545,41 +570,42 @@ class SelfSimilarDiffusion2D:
                 )
             except TypeError:
                 # Older SciPy uses tol
-                E_inner, info = bicgstab(
-                    A_mat,
+                E_np1_inner, info = bicgstab(
+                    matrix_A,
                     b,
-                    x0=x0,
+                    x0=x0_warm_start,
                     tol=self.linear_tol,
                     maxiter=self.linear_maxiter,
                     M=M,
                 )
-            need_fallback = (info != 0) or (not np.all(np.isfinite(E_inner)))
+            need_fallback = (info != 0) or (not np.all(np.isfinite(E_np1_inner)))
             if (not need_fallback) and self.linear_check_residual:
-                # Guard against "converged" but inaccurate solutions
-                resid = A_mat @ E_inner - b
-                rel_resid = np.linalg.norm(resid) / (np.linalg.norm(b) + 1e-30)
-                if rel_resid > self.linear_residual_factor * self.linear_tol:
+                # Check residual: ||A*x - b|| / ||b||
+                residual = matrix_A @ E_np1_inner - b
+                rel_residual = np.linalg.norm(residual) / (np.linalg.norm(b) + 1e-30)
+                if rel_residual > self.linear_residual_factor * self.linear_tol:
                     need_fallback = True
 
             if need_fallback:
-                E_inner = spsolve(A_mat, b)
+                E_np1_inner = spsolve(matrix_A, b)
 
-        # reconstruct full E^{n+1} without Python loops
-        E_new = E_old.copy()
-        E_new[i0 : i1 + 1, :] = E_inner.reshape((nzi, Nr))
+        # Reconstruct E^{n+1} on full domain from interior solution
+        E_np1 = E_n.copy()
+        E_np1[i0 : i1 + 1, :] = E_np1_inner.reshape((nzi, Nr))
         if not marshak_boundary:
-            E_new[0, :] = E_left
-        E_new[-1, :] = E_right
+            E_np1[0, :] = E_left  # z=0 boundary (Dirichlet drive)
+        E_np1[-1, :] = E_right  # z=Lz boundary (Dirichlet bath)
 
-        # enforce r-axis symmetry explicitly (helps numeric noise)
+        # Enforce r-axis symmetry explicitly (r=0, dE/dr=0)
         if Nr > 1:
-            E_new[:, 0] = E_new[:, 1]
+            E_np1[:, 0] = E_np1[:, 1]
 
-        # update UR implicitly (local)
-        UR_new = (A * E_new + UR_old) / (1.0 + A)
+        # Update U^{n+1} implicitly (local material energy)
+        # U^{n+1} = (A^n * E^{n+1} + U^n) / (1 + A^n)
+        U_np1 = (A_n * E_np1 + U_n) / (1.0 + A_n)
 
-        self.E = E_new
-        self.UR = UR_new
+        self.E = E_np1
+        self.UR = U_np1
 
     # ============================================================
     # Time loop with storage
@@ -606,20 +632,34 @@ class SelfSimilarDiffusion2D:
                 if t < t_target <= t + dt_local:
                     dt_local = t_target - t
 
-            Eold = self.E.copy()
-            URold = self.UR.copy()
+            Eold = self.E.copy()  # E^n at start of step
+            URold = self.UR.copy()  # U^n at start of step
 
             self.implicit_step(t=t, dt_local=dt_local, bc_r_outer=bc_r_outer, marshak_boundary=marshak_boundary)
+            
+            # Check for NaN after implicit step
+            if not np.all(np.isfinite(self.E)) or not np.all(np.isfinite(self.UR)):
+                print(f"\n[FATAL] NaN detected after implicit_step at t={t}")
+                print(f"  E finite: {np.all(np.isfinite(self.E))}, UR finite: {np.all(np.isfinite(self.UR))}")
+                if not np.all(np.isfinite(self.E)):
+                    nan_count = np.sum(~np.isfinite(self.E))
+                    print(f"  E has {nan_count} non-finite values")
+                if not np.all(np.isfinite(self.UR)):
+                    nan_count = np.sum(~np.isfinite(self.UR))
+                    print(f"  UR has {nan_count} non-finite values")
+                pbar.close()
+                raise RuntimeError(f"Simulation diverged at t={t} with NaN values")
+            
             t_next = t + dt_local
 
-            Um = self.U_m_of_UR(self.UR)
-            Tm = (self.UR / self.a) ** 0.25
-            TR = (self.E / self.a) ** 0.25
+            U_m = self.U_m_of_UR(self.UR)  # Material internal energy
+            T_m = (self.UR / self.a) ** 0.25  # Material temperature
+            T_R = (self.E / self.a) ** 0.25  # Radiation temperature
             if store_idx < len(times_to_store) and abs(t_next - times_to_store[store_idx]) < 0.5*dt_local:
                 stored_t.append(t_next)
-                stored_Um.append(Um.copy())
-                stored_Tm.append(Tm.copy())
-                stored_TR.append(TR.copy())
+                stored_Um.append(U_m.copy())
+                stored_Tm.append(T_m.copy())
+                stored_TR.append(T_R.copy())
                 store_idx += 1
 
             dt_new, dE, dU = update_dt_relchange(dt_local, self.E, Eold, self.UR, URold, dtfac=dtfac, dtmax=dtmax)

@@ -712,7 +712,7 @@ def compare_with_article_2_exp5_15b(times_to_store):
 
     plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
                     Ts_marshak, times_to_store, times_ns=[1.5, 2.50, 3.72],
-                    ablation=True, title_suffix="(varying rho)", color_option = "paper")
+                    ablation=True, title_suffix="(varying rho)", color_option = "paper", show_shock=False)
     plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
                     Ts_marshak, times_to_store, times_ns=[1.0, 2.0, 3.72],
                     ablation=True, title_suffix="(lam_eff)", color_option = "visit")
@@ -1103,8 +1103,8 @@ if __name__ == "__main__":
     #compare_with_article_2_exp2_Xu(times_to_store)
     #compare_with_article_2_exp3_13a(times_to_store)
     #compare_with_article_2_exp4_14(times_to_store)
-    compare_with_article_2_exp5_15a(times_to_store)
-    #compare_with_article_2_exp5_15b(times_to_store)
+    #compare_with_article_2_exp5_15a(times_to_store)
+    compare_with_article_2_exp5_15b(times_to_store)
     #compare_with_article_2_exp6_16(times_to_store)
     #compare_with_article_2_exp7_17(times_to_store)
     #compare_with_french_gold(times_to_store)
