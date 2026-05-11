@@ -25,8 +25,8 @@ def _resolve_colormap_settings(
     style_presets = {
         "default": {
             "cmap": "Spectral_r",
-            "vmin": None,
-            "vmax": None,
+            "vmin": 0.00,
+            "vmax": 1.75,
             "cbar_ticks": None,
         },
         # Visit-style appearance: blue -> cyan -> green -> yellow -> red.
@@ -214,6 +214,39 @@ def _compute_wall_heyney_horizontal_profile(
 
     return T_wall
 
+
+def _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_closest, r_mesh_foam=None):
+    """Save front shape and temperature mesh data to CSV files."""
+    from pathlib import Path
+    
+    output_data_dir = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape"
+    output_data_dir.mkdir(parents=True, exist_ok=True)
+    
+    # If z_F_radial is on a different grid (foam grid), interpolate to r_mesh
+    if r_mesh_foam is not None and len(r_mesh_foam) == len(z_F_radial):
+        z_F_radial_interp = np.interp(r_mesh, r_mesh_foam, z_F_radial, left=z_F_radial[0], right=z_F_radial[-1])
+    else:
+        z_F_radial_interp = z_F_radial
+    
+    # Save front shape (z_F as function of r)
+    front_shape_df = pd.DataFrame({
+        'r_cm': r_mesh,
+        'z_F_radial_cm': z_F_radial_interp,
+    })
+    front_shape_df.to_csv(output_data_dir / f"front_shape_t{t_closest:.2f}ns.csv", index=False)
+    
+    # Save temperature mesh
+    T_mesh_df = pd.DataFrame(T_mesh_plot)
+    T_mesh_df.to_csv(output_data_dir / f"T_mesh_t{t_closest:.2f}ns.csv", index=False, header=False)
+    
+    # Save coordinate grids for reference
+    coords_df = pd.DataFrame({
+        'z_axis_cm': z_mesh,
+    })
+    coords_df.to_csv(output_data_dir / f"z_coordinates.csv", index=False)
+    
+    r_coords_df = pd.DataFrame({'r_axis_cm': r_mesh})
+    r_coords_df.to_csv(output_data_dir / f"r_coordinates.csv", index=False)
 
 
 def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.0, 2.5]):
@@ -497,6 +530,9 @@ def plot_temperature_heatmap_2D(
                 for i_z, shock_r in enumerate(shock_profile):
                     if np.isfinite(shock_r):
                         T_mesh_plot[i_z, r_mesh > shock_r] = np.nan
+
+        # Save front shape and temperature mesh data before plotting
+        _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_closest, r_mesh_foam=r_mesh_foam)
 
         ax = axes[idx]
 

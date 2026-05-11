@@ -1,79 +1,11 @@
 from parameters import *
 from model_main import *
-from simulation import *
-from scipy.interpolate import interp1d
-from scipy import special
 from csv_helpers import *
 from plot_helpers import *
 from shape_2D_analytical_model import plot_2D_front_spatial, plot_temperature_heatmap_2D, plot_temperature_heatmap_2D_series_model
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
 print(f"Data directory: {DATA_DIR}")
-FIGURES_OUTPUT_DIR = BASE_DIR / "figures"
-# -----------------------------
-# Plotting helpers
-# -----------------------------
-# plot temperature profiles, front positions, total energies for all ts in stored_t - in 3 different functions.
-
-def plot_front_positions(stored_t, front_positions, analytic_positions=None, marshak_boundary=False, energy_lost_to_gold=False):
-    plt.figure(figsize=(8, 6))
-    # fit data to analytical
-    plt.plot(stored_t, front_positions, color='black', linestyle="-", label="Simulated Front Position")
-    if analytic_positions is not None and not energy_lost_to_gold:
-        plt.plot(
-            stored_t, analytic_positions,
-            linestyle="--",
-            label="Analytic x_F(t) (T_s = T_bath(t))" if not marshak_boundary else "Analytic x_F(t) (Marshak BC)"
-        )
-    if energy_lost_to_gold:
-        plt.plot(
-            stored_t, analytic_positions,
-            linestyle="--",
-            label="Analytic x_F(t) with energy lost to Gold wall"
-        )
-
-        plot_csv_series(
-            article_front_path("gold_wall.csv"),
-            y_scale=10,
-            linestyle="-.",
-            label="article 1 x_F(t) with energy lost to Gold wall",
-        )
-        plot_csv_series(
-            article_front_path("ablation_block.csv"),
-            y_scale=10,
-            linestyle="-.",
-            label="article 2 x_F(t) wall lost ablation block",
-        )
-        plot_csv_series(
-            article_front_path("2D_Heyney.csv"),
-            y_scale=10,
-            linestyle="-.",
-            label="2D_Heyney",
-        )
-
-    plt.xlabel("Time (ns)", fontname='serif')
-    plt.ylabel("Wave Front Position (cm)", fontname='serif')
-    plt.title(f"Wave Front Position vs Time  - Material: {Material}", fontname='serif')
-    plt.grid(True)
-    plt.legend(prop={'family': 'serif'})
-    plt.tight_layout()
-
-    # # annotate the std on the plot, make it look good with a box
-    # plt.annotate(f"Std Dev from analytical: {stdev_percent:.2f} %", xy=(0.05, 0.95), xycoords='axes fraction',
-    #                 fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-    save_figure("front_position.png")
-
-def plot_temperature_profiles(stored_t, stored_Tm):
-    colors = plt.cm.viridis(np.linspace(0, 1, len(stored_t)))
-    plt.figure(figsize=(8, 6))
-    for Ti, ti, color in zip(stored_Tm, stored_t, colors):
-        plt.plot(z, Ti, label=f"t={ti:.1e} ns", color=color)
-    plt.xlabel("z (cm)")
-    plt.ylabel(r"$T(z,t)/T_{\mathrm{bath}}$")
-    plt.grid(True)
-    plt.legend()
-    plt.title(f"Temperature profiles over time - Material: {Material}")
-    plt.tight_layout()
-    save_figure("temperature_profiles.png")
+FIGURES_OUTPUT_DIR = BASE_DIR / "Figures_new" / Experiment / Material 
 
 def plot_energies(stored_t, total_energies, marshak_boundary=False, energy_lost_to_gold=False, ablation=False, vary_rho=False):
     # analytical_points = [analytical_total_energy(ti, rho, T_bath_hev  ) for ti in stored_t]
@@ -121,99 +53,6 @@ def plot_energies(stored_t, total_energies, marshak_boundary=False, energy_lost_
     #     fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
     save_figure("total_energy.png")
-
-
-# -----------------------------
-# One-call case runner (removes repeated code)
-# -----------------------------
-def run_case(*,   times_to_store, reset_initial_conditions = True, marshak_boundary=False):
-    """
-    Runs:
-      1) init state
-      2) time loop
-      3) front/energy extraction
-      4) plots
-    """
-    E, UR = init_state()
-    stored_t, stored_Um, stored_Tm, stored_TR = run_time_loop(E, UR, times_to_store=times_to_store, marshak_boundary=marshak_boundary)
-    # store values in csv files
-    # use pandas to save 2D arrays
-    os.makedirs(DATA_DIR, exist_ok=True)
-    # sorted_T is a 2D array where each row is a stored_T at a time step. 
-    # Create a csv file where each column is a time step and each row is the temperature profile (for positions) at that time step.
-    # make sure that this is saved correctly.
-    if marshak_boundary:
-        df_sorted_Tm_marshak = pd.DataFrame(stored_Tm)
-        df_sorted_Tm_marshak.to_csv(DATA_DIR / "stored_Tm_marshak.csv", header=False, index=False)
-        df_sorted_TR_marshak = pd.DataFrame(stored_TR)
-        df_sorted_TR_marshak.to_csv(DATA_DIR / "stored_TR_marshak.csv", header=False, index=False)
-        df_sorted_Um_marshak = pd.DataFrame(stored_Um)
-        df_sorted_Um_marshak.to_csv(DATA_DIR / "stored_Um_marshak.csv", header=False, index=False)
-        df_stored_t_marshak = pd.DataFrame(stored_t)
-        df_stored_t_marshak.to_csv(DATA_DIR / "stored_time_marshak.csv", header=False, index=False)
-        return {
-            "stored_t_marshak": np.array(stored_t),
-            "stored_Tm_marshak": stored_Tm,
-            "stored_TR_marshak": stored_TR,
-            "stored_Um_marshak": stored_Um,
-        }
-    else:
-        df_sorted_Tm = pd.DataFrame(stored_Tm)
-        df_sorted_Tm.to_csv(DATA_DIR / "stored_Tm.csv", header=False, index=False)
-        df_sorted_TR = pd.DataFrame(stored_TR)
-        df_sorted_TR.to_csv(DATA_DIR / "stored_TR.csv", header=False, index=False)
-        df_sorted_Um = pd.DataFrame(stored_Um)
-        df_sorted_Um.to_csv(DATA_DIR / "stored_Um.csv", header=False, index=False)
-        df_stored_t = pd.DataFrame(stored_t)
-        df_stored_t.to_csv(DATA_DIR / "stored_time.csv", header=False, index=False)
-        return {
-            "stored_t": np.array(stored_t),
-            "stored_Tm": stored_Tm,
-            "stored_TR": stored_TR,
-            "stored_Um": stored_Um,
-        }
-    
-def plot_front_positions_and_energies(show_plots=True, marshak_boundary=False, energy_lost_to_gold=False, ablation=False, vary_rho=False):
-    """Reads back stored csv files and plots front positions and total energies."""
-    # read back the stored values from csv files using pandas
-    if marshak_boundary:
-        stored_Tm = pd.read_csv(DATA_DIR / "stored_Tm_marshak.csv", header=None).to_numpy() #convert to numpy array
-        stored_TR = pd.read_csv(DATA_DIR / "stored_TR_marshak.csv", header=None).to_numpy() #convert to numpy array
-        stored_Um = pd.read_csv(DATA_DIR / "stored_Um_marshak.csv", header=None).to_numpy() #convert to numpy array
-        stored_t = pd.read_csv(DATA_DIR / "stored_time_marshak.csv", header=None).to_numpy().flatten() #convert to 1D numpy array
-        front_positions, total_energies = compute_front_and_energy(stored_Um, stored_Tm)
-    else:
-        stored_Tm = pd.read_csv(DATA_DIR / "stored_Tm.csv", header=None).to_numpy() #convert to numpy array
-        stored_TR = pd.read_csv(DATA_DIR / "stored_TR.csv", header=None).to_numpy() #convert to numpy array
-        stored_Um = pd.read_csv(DATA_DIR / "stored_Um.csv", header=None).to_numpy() #convert to numpy array
-        stored_t = pd.read_csv(DATA_DIR / "stored_time.csv", header=None).to_numpy().flatten() #convert to 1D numpy array
-        front_positions, total_energies = compute_front_and_energy(stored_Um, stored_Tm)
-
-    # ---- analytic on the same stored times ----
-    if energy_lost_to_gold:
-        if ablation:
-            chosen_mode = "marshak_ablation"
-        else:
-            chosen_mode = "marshak_wall_loss"
-    else:
-        chosen_mode = "marshak" if marshak_boundary else "no_marshak"
-    if marshak_boundary:
-        dispatch_out = analytic_wave_front_dispatch(stored_t, use_seconds=True, mode=chosen_mode, vary_rho=vary_rho)
-        analytic_positions = extract_front_positions(dispatch_out)
-    else:
-        dispatch_out = analytic_wave_front_dispatch(stored_t, use_seconds=True, mode="no_marshak", vary_rho=False)
-        analytic_positions = extract_front_positions(dispatch_out)
-
-    ensure_figures_dir()
-    plot_temperature_profiles(stored_t, stored_Tm)
-    plot_front_positions(stored_t, front_positions, analytic_positions=analytic_positions, marshak_boundary=marshak_boundary, energy_lost_to_gold=energy_lost_to_gold)
-    plot_energies(stored_t, total_energies, marshak_boundary=marshak_boundary, energy_lost_to_gold=energy_lost_to_gold, ablation=ablation, vary_rho=False)
-    if show_plots:
-        plt.show()
-    else:
-        plt.close('all')
-
-    #return front_positions, total_energies
 
 
 #I want to plot the surface temperature (at z=0) where there is marshak boundary condition vs when there is not marshak boundary conditiondef plot_surface_temperature_comparison(stored_t_m, stored_Tm_m, stored_t_nm, stored_Tm_nm):
@@ -756,23 +595,26 @@ def compare_with_article_2_exp7_17(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Vacuum", lam_eff_power=1)
     analytic_positions_no_marshak = front_series["analytic_positions_no_marshak"]
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
-    analytic_positions_2D = front_series["analytic_positions_2D"]
+    analytic_positions_gold = front_series["analytic_positions_gold_loss"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     Ts_1D = front_series["Ts_1D"]
     Ts_2D = front_series["Ts_2D"]
+    bessel_data_2D = front_series["bessel_data_gold_loss"]
 
-    plt.figure(figsize=(8, 6))
-    power_law = (4 + alpha - beta) / 4
-    analytic_positions_vacuum_lost = analytic_positions_vacuum_lost * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    analytic_positions_marshak = analytic_positions_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    analytic_positions_no_marshak = analytic_positions_no_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    analytic_positions_2D = analytic_positions_2D * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    analytic_positions_2D_lam_eff = analytic_positions_2D_lam_eff * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+
+
+    plt.figure(figsize = (8, 6))
+    # power_law = (4 + alpha - beta) / 4
+    # analytic_positions_vacuum_lost = analytic_positions_vacuum_lost * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    # analytic_positions_marshak = analytic_positions_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    # analytic_positions_no_marshak = analytic_positions_no_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    # analytic_positions_2D = analytic_positions_2D * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    # analytic_positions_2D_lam_eff = analytic_positions_2D_lam_eff * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
     
     plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
-        analytic_positions_2D=analytic_positions_2D,
+        analytic_positions_2D=analytic_positions_gold,
         analytic_positions_no_marshak=analytic_positions_no_marshak,
         analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
     )
@@ -808,9 +650,19 @@ def compare_with_article_2_exp7_17(times_to_store):
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    plt.show()
 
     save_figure("front_position - compare Ji-Yan.png", model1_5=True)
+    #save the analytic positions to a csv for later use
+    export_analytic_positions_csv(
+        times_to_store,
+        {
+            "front_position": {
+                "Marshak": analytic_positions_marshak,
+                "Vacuum Loss": analytic_positions_gold,
+            }
+        },
+        DATA_DIR / "1.5 model" / "analytic_positions_ji_yan.csv",
+    )
 
     plt.figure(figsize=(8, 6))
     plot_standard_surface_temperature_models(times_to_store, Ts_1D=Ts_1D, Ts_2D=Ts_2D)
@@ -831,6 +683,11 @@ def compare_with_article_2_exp7_17(times_to_store):
     plt.tight_layout()
 
     save_figure("Temperatures - compare Ji-Yan.png", model1_5=True)
+
+    plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_gold,
+                    Ts_1D, times_to_store, times_ns=[0.5, 1, 1.3],
+                    ablation=False, title_suffix="(vacuum)")
+    
 
 def compare_with_french_gold(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=1)
@@ -871,7 +728,7 @@ def compare_with_french_gold(times_to_store):
             "ablation_varying_rho": analytic_positions_ablation_varying_rho,
             "ablation_varying_rho_lam_eff": analytic_positions_ablation_varying_rho_lam_eff,
         },
-        FIGURES_OUTPUT_DIR / "analytic_positions_french_gold.csv",
+        DATA_DIR / "1.5 model" / "analytic_positions_french_gold.csv",
     )
 
 def compare_with_french_copper(times_to_store):
@@ -1039,6 +896,101 @@ def plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=Tru
 
     save_figure("albedo_z0_vs_time.png", model2_D=True, dpi=150, bbox_inches='tight')
 
+
+def plot_model_shock_wave_at_z0_all_times(times_to_store, *, wall_material='Gold', lam_eff_power=1.5):
+    """Plot model shock-front and gold-front radius at z=0 over all times and export CSV.
+
+    Uses analytical model outputs only (no 2D numerical simulation fields).
+    The shock radius is extracted from ``shock_penetration_radius_profile`` at z=0.
+    The gold front radius is extracted from ``wall_penetration_radius_profile`` at z=0.
+    """
+    times_in = np.asarray(times_to_store, dtype=float)
+    if times_in.size == 0:
+        raise ValueError("times_to_store is empty.")
+
+    front_series = compute_standard_analytic_front_series(
+        times_in,
+        wall_material=wall_material,
+        lam_eff_power=lam_eff_power,
+    )
+    bessel_data_2D = front_series.get("bessel_data_2D", {})
+    if not bessel_data_2D:
+        raise ValueError("Model did not return bessel_data_2D; cannot extract shock profile.")
+
+    t_ns_arr = []
+    shock_radius_cm_arr = []
+    gold_radius_cm_arr = []
+
+    # Accept both second-based and ns-based time arrays.
+    if float(np.nanmax(times_in)) > 1e-5:
+        target_times_ns = times_in
+    else:
+        target_times_ns = times_in * 1e9
+
+    for t_ns_target in target_times_ns:
+        t_ns_target = float(t_ns_target)
+        closest_t_ns = min(bessel_data_2D.keys(), key=lambda k: abs(k - t_ns_target))
+        snapshot = bessel_data_2D[closest_t_ns]
+
+        # Extract foam shock radius at z=0
+        if "shock_penetration_radius_profile" in snapshot:
+            shock_radius_cm = float(np.asarray(snapshot["shock_penetration_radius_profile"], dtype=float)[0])
+        else:
+            shock_radius_cm = np.nan
+
+        # Extract gold front radius at z=0
+        if "wall_penetration_radius_profile" in snapshot:
+            gold_radius_cm = float(np.asarray(snapshot["wall_penetration_radius_profile"], dtype=float)[0])
+        else:
+            gold_radius_cm = np.nan
+
+        t_ns_arr.append(float(closest_t_ns))
+        shock_radius_cm_arr.append(shock_radius_cm)
+        gold_radius_cm_arr.append(gold_radius_cm)
+
+    t_ns_arr = np.asarray(t_ns_arr, dtype=float)
+    shock_radius_cm_arr = np.asarray(shock_radius_cm_arr, dtype=float)
+    gold_radius_cm_arr = np.asarray(gold_radius_cm_arr, dtype=float)
+    shock_radius_mm_arr = shock_radius_cm_arr * 10.0
+    gold_radius_mm_arr = gold_radius_cm_arr * 10.0
+
+    valid = np.isfinite(t_ns_arr) & np.isfinite(shock_radius_mm_arr)
+    t_ns_arr = t_ns_arr[valid]
+    shock_radius_cm_arr = shock_radius_cm_arr[valid]
+    shock_radius_mm_arr = shock_radius_mm_arr[valid]
+    gold_radius_cm_arr = gold_radius_cm_arr[valid]
+    gold_radius_mm_arr = gold_radius_mm_arr[valid]
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(t_ns_arr, shock_radius_mm_arr - 0.8, color='darkred', linewidth=2.5, label='Foam shock front', marker='o', markersize=3, alpha=0.7)
+    plt.plot(t_ns_arr, gold_radius_mm_arr - 0.8, color='gold', linewidth=2.5, label='Gold front (foam-gold interface)', marker='s', markersize=3, alpha=0.7)
+    plt.xlabel("Time (ns)", fontsize=12)
+    plt.ylabel("Radius at z=0 (mm)", fontsize=12)
+    plt.title("Shock Wave and Gold Front at z=0 for All Times (Analytical Model)", fontsize=13)
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=11, loc='best')
+    plt.tight_layout()
+    save_figure("shock_wave_at_z0_all_times_MODEL.png", model2_D=True, dpi=250, bbox_inches='tight')
+
+    save_series_csv(
+        DATA_DIR / "1.5 model" / "shock_wave_at_z0_all_times_MODEL.csv",
+        {
+            "time_ns": t_ns_arr,
+            "shock_radius_mm": shock_radius_mm_arr,
+            "shock_radius_cm": shock_radius_cm_arr,
+            "gold_radius_mm": gold_radius_mm_arr,
+            "gold_radius_cm": gold_radius_cm_arr,
+        },
+    )
+
+    return {
+        "time_ns": t_ns_arr,
+        "shock_radius_mm": shock_radius_mm_arr,
+        "shock_radius_cm": shock_radius_cm_arr,
+        "gold_radius_mm": gold_radius_mm_arr,
+        "gold_radius_cm": gold_radius_cm_arr,
+    }
+
 def compare_n_1(times_to_store):
     analytic_positions_ablation_varying_rho_1, Ts_2D_ablation_varyingrho_1, _, _, *_ = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_ablation",vary_rho=True, lam_eff=True, power=1)  # stored_t is ns
     plt.figure(figsize=(8, 6))
@@ -1061,54 +1013,52 @@ def compare_n_1(times_to_store):
     plt.legend()
     plt.show()
 
-def simulate():
-    times_to_store = t_final * np.linspace(0.01**0.3, 1.0, 150) ** (1/0.3)
-    times_to_store = t_final * np.linspace(0.01, 1, 150)
-
-    show_plots = False
-    marshak_boundary1 = True
-    energy_lost_to_gold1 = True
-    ablation1 = True
-    vary_rho1 = False
-    results_tau0 = run_case(times_to_store=times_to_store, reset_initial_conditions=True, marshak_boundary=marshak_boundary1)
-    plot_front_positions_and_energies(show_plots=show_plots, marshak_boundary=marshak_boundary1, energy_lost_to_gold=energy_lost_to_gold1, ablation=ablation1, vary_rho=vary_rho1)
-    # results_tau0 = run_case(times_to_store=times_to_store, reset_initial_conditions=True, marshak_boundary=False)
-    # plot_front_positions_and_energies(show_plots=show_plots, marshak_boundary=False)
-
 # Let's create a function that by getting a material name, it will run the appropriate comparison function for that material. This way we can easily switch between materials and their corresponding comparisons.
-def compare_for_material(times_to_store):
+def compare_for_material():
     if Material == "SiO2":
+        times_to_store = np.linspace(0.01, 3, 1000)
         Back_SiO2(times_to_store)
-        compare_with_french_gold(times_to_store)
+    elif Material == "C11H16Pb0.3852":
+        times_to_store = np.linspace(0.01, 1, 1000)
+        compare_with_article_2_exp1_Massen(times_to_store)
+    elif Material == "C6H12" or Material == "C6H12Cu0.394":
+        times_to_store = np.linspace(0.01, 2, 1000)
+        compare_with_article_2_exp2_Xu(times_to_store)
+    elif Material == "Ta2O5":
+        times_to_store = np.linspace(0.01, 3, 1000)
+        compare_with_article_2_exp3_13a(times_to_store)
+    elif Material == "SiO2_low_energy":
+        times_to_store = np.linspace(0.01, 15, 1000)
+        compare_with_article_2_exp4_14(times_to_store)
     elif Material == "SiO2_Moore":
+        times_to_store = np.linspace(0.01, 4, 1000)
         compare_with_article_2_exp5_15a(times_to_store)
     elif Material == "C8H7Cl":
+        times_to_store = np.linspace(0.01, 4, 1000)
         compare_with_article_2_exp5_15b(times_to_store)
-    elif Material == "Ta2O5":
-        Back_SiO2(times_to_store)
-    elif Material == "Gold":
+    elif Material == "C15H20O6" or Material == "C15H20O6Au0.172":
+        times_to_store = np.linspace(0.01, 3, 1000)
+        compare_with_article_2_exp6_16(times_to_store)
+    elif Material == "C8H8":
+        times_to_store = np.linspace(0.01, 1.5, 1000)
+        compare_with_article_2_exp7_17(times_to_store)
+    elif Material == "french_gold":
+        times_to_store = np.linspace(0.01, 4, 1000)
         compare_with_french_gold(times_to_store)
-    elif Material == "Copper":
+    elif Material == "french_cupper":
+        times_to_store = np.linspace(0.01, 4, 1000)
         compare_with_french_copper(times_to_store)
     else:
         print(f"No comparison function defined for material: {Material}")
+        return None
+    return times_to_store
 
 if __name__ == "__main__":
     #simulate()
-    times_to_store = np.linspace(0.01, 4, 1000)
-    #Back_SiO2(times_to_store)
+    times_to_store = compare_for_material()  # times_to_store will be set inside the function based on the material
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)
-    #compare_with_article_2_exp1_Massen(times_to_store)
-    #compare_with_article_2_exp2_Xu(times_to_store)
-    #compare_with_article_2_exp3_13a(times_to_store)
-    #compare_with_article_2_exp4_14(times_to_store)
-    #compare_with_article_2_exp5_15a(times_to_store)
-    compare_with_article_2_exp5_15b(times_to_store)
-    #compare_with_article_2_exp6_16(times_to_store)
-    #compare_with_article_2_exp7_17(times_to_store)
-    #compare_with_french_gold(times_to_store)
     #compare_n_1(times_to_store)
-    #compare_with_french_copper(times_to_store)
     # plot_surface_temperature_comparison(times_to_store)
     plot_albedo_z0_vs_time(times_to_store)
+    plot_model_shock_wave_at_z0_all_times(times_to_store)

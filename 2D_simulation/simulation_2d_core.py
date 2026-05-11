@@ -26,8 +26,8 @@ import csv
 import bisect
 import numpy as np
 import tqdm
-from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import spsolve, bicgstab, LinearOperator
+from scipy.sparse import csr_matrix  # type: ignore[import-untyped]
+from scipy.sparse.linalg import spsolve, bicgstab, LinearOperator  # type: ignore[import-untyped]
 
 # -----------------------------
 # Constants & unit conversions
@@ -431,8 +431,25 @@ class SelfSimilarDiffusion2D:
         elif self.kind_of_D_face == "geometric":
             D_z_face = np.sqrt(D_n[:-1, :] * D_n[1:, :])
             D_r_face = np.sqrt(D_n[:, :-1] * D_n[:, 1:])
+        elif self.kind_of_D_face == "interface_harmonic":
+            # Use arithmetic averaging everywhere, but harmonic only at foam-gold interface
+            D_z_face = 0.5 * (D_n[:-1, :] + D_n[1:, :])
+            D_r_face = 0.5 * (D_n[:, :-1] + D_n[:, 1:])
+            
+            # Detect r-faces that cross the foam-gold interface
+            # A face at j crosses the interface if one node is foam and one is gold
+            r_mask_foam = self.r < self.R_foam
+            interface_faces = r_mask_foam[:-1] != r_mask_foam[1:]  # True where material changes
+            
+            if np.any(interface_faces):
+                # Apply harmonic averaging at interface faces
+                face_indices = np.where(interface_faces)[0]
+                D_r_face[:, face_indices] = (
+                    2 * D_n[:, face_indices] * D_n[:, face_indices + 1] 
+                    / (D_n[:, face_indices] + D_n[:, face_indices + 1] + 1e-30)
+                )
         else:
-            raise ValueError("kind_of_D_face must be harmonic/arithmetic/geometric")
+            raise ValueError("kind_of_D_face must be harmonic/arithmetic/geometric/interface_harmonic")
 
         # Build CSR matrix values efficiently (structure is cached)
         self._ensure_csr_template(marshak_boundary)
@@ -453,7 +470,7 @@ class SelfSimilarDiffusion2D:
         E_right = self.E_right_bath()
 
         # Radial geometry weight factors (λ^r weights, precomputed)
-        lambda_r_mh = self._r_weights["w_mh"]  # λ^r_{j-1/2}
+        lambda_r_mh = self._r_weights["w_mh"]   # λ^r_{j-1/2}
         lambda_r_ph = self._r_weights["w_ph"]  # λ^r_{j+1/2}
         lambda_r_axis = self._r_weights["w_axis"]  # λ^r axis (j=0)
         lambda_r_mh_outer = self._r_weights["w_mh_outer"]  # λ^r_{j-1/2} at outer

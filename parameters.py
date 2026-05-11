@@ -51,7 +51,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = "C8H7Cl"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = "C8H8"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 
 if Material == "SiO2":
     Experiment = "Back"
@@ -414,7 +414,6 @@ Nr_gold = 100
 w_Au = 50e-4
 dr0_gold = w_Au / 4000
 r_gold, r_gold_info = make_r_two_block(R_cm, w_Au, Nr, Nr_gold, dr0=dr0_gold)
-
 
 t_final_sec = 3.73e-9 
 dt_sec = 5e-15

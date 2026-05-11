@@ -70,7 +70,7 @@ def plot_temperature_maps_gouraud(
     figure_data_dir = Path(figure_data_dir)
     ensure_dir(out_dir)
     ensure_dir(figure_data_dir / "temperature_maps_gouraud")
-
+    print(times_s)
     for t_plot in times_s:
         idx_plot = int(np.argmin(np.abs(stored_t - t_plot)))
         T_cell = stored_Tm[idx_plot] / K_per_Hev  # (Nz, Nr) in HeV

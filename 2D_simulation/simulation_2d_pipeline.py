@@ -18,10 +18,13 @@ from simulation_2d_plots import (
     plot_temperature_maps_gouraud,
     plot_temperature_maps_simple,
 )
-
-Material = "SiO2"
-Experiment = "Back"
-
+global heatmap_times
+heatmap_times = (1e-9, 2e-9, 2.5e-9)
+Material = "C8H8"
+if Material == "SiO2":
+    Experiment = "Back"
+elif Material == "C8H8":
+    Experiment = "Ji-Yan"
 BASE_DIR = PROJECT_ROOT
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
 FIGURES_DIR = BASE_DIR / "Figures_new" / Experiment / Material
@@ -41,9 +44,9 @@ mpl.rcParams["mathtext.default"] = "regular"
 
 def create_simulation(
     *,
-    material: str = "SiO2",
-    Nz: int = 50,
-    Nr_foam: int = 50,
+    material: str = Material,
+    Nz: int = 200,
+    Nr_foam: int = 200,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -69,6 +72,28 @@ def create_simulation(
         t_final = 3e-9
         dt_init = 5e-15
 
+ 
+    if material == "C8H8":
+        # Foam self-similarity parameters
+        f = 21.17 * 10**13          # fudge factor for sigma (new model) [erg/g]
+        g = 1 / 2818.1      
+        alpha = 2.79       # opacity exponent
+        beta_exp = 1.06    # beta exponent
+        lambda_param = 0.81
+        mu = 0.06
+        rho = 0.16     # initial density (g/cm^3)
+        R_foam = 0.01
+        global heatmap_times
+        heatmap_times = (0.5e-9, 1e-9, 1.3e-9)
+        Lz = 0.03
+        gold_width = 0
+
+        csv_path = BASE_DIR / "Data_new" / Experiment / Material / "article" / "Temperatures" / "T_drive.csv"
+        t_drive_ns, T_drive_eV = load_time_temp(csv_path)
+        print(csv_path)
+
+        t_final = 1.5e-9
+        dt_init = 5e-15
     else:
         raise ValueError(f"{material} is not supported in this function for now.")
 
@@ -186,13 +211,16 @@ def run_default_pipeline(*, material: str = "SiO2"):
         sim,
         stored_t,
         stored_Tm,
+        times_s=heatmap_times,
         out_dir=FIGURES_DIR_2D,
         figure_data_dir=FIGURE_DATA_DIR_2D,
     )
+    print(heatmap_times)
     plot_temperature_maps_simple(
         sim,
         stored_t,
         stored_Tm,
+        times_s=heatmap_times,
         out_dir=FIGURES_DIR_2D,
         figure_data_dir=FIGURE_DATA_DIR_2D,
     )
