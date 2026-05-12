@@ -78,7 +78,7 @@ def save_run_data(file_path, stored_t, stored_Um=None, stored_Tm=None, stored_TR
     return file_path
 
 
-def plot_run_outputs(sim, stored_t, stored_Tm, front_positions, total_energies):
+def plot_run_outputs(sim, stored_t, stored_Tm, front_positions, total_energies, material=None):
     """Save a compact set of standard 1D run plots."""
     ensure_dir(FIGURES_DIR)
 
@@ -112,7 +112,20 @@ def plot_run_outputs(sim, stored_t, stored_Tm, front_positions, total_energies):
 
     # 3) Total material energy vs time
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(stored_t, total_energies)
+    
+    if material == "SiO2":
+        ax.plot(stored_t, total_energies, label="Simulation")
+        csv_path = BASE_DIR / "Data_new" / "Back" / "SiO2" / "article" / "energies" / "total_energy_1D.csv"
+        if csv_path.exists():
+            try:
+                data = np.genfromtxt(csv_path, delimiter=',', names=True)
+                ax.plot(data['x'], data['y'], '--', label="Article")
+                ax.legend()
+            except Exception as e:
+                print(f"Could not load article data: {e}")
+    else:
+        ax.plot(stored_t, total_energies)
+        
     ax.set_xlabel("Time (ns)")
     ax.set_ylabel("Energy (hJ/mm^2)")
     ax.set_title("Total Material Energy vs Time")
@@ -133,7 +146,7 @@ def run_default_pipeline(*, material: str = Material):
     sim.save_outputs(stored_t, stored_Um, stored_Tm, stored_TR, marshak_boundary=True)
 
     front_positions, total_energies = sim.compute_front_and_energy(stored_Um, stored_Tm)
-    plot_run_outputs(sim, stored_t, stored_Tm, front_positions, total_energies)
+    plot_run_outputs(sim, stored_t, stored_Tm, front_positions, total_energies, material=material)
 
     return {
         "sim": sim,

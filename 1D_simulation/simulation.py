@@ -6,6 +6,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from parameters import *
+from tqdm import tqdm
 
 # find q such that dr0 + dr0*q + dr0*q^2 + ... + dr0*q^(N-1) =~ gold_width
 def solve_q_from_dz0(gold_width, N, dz0):
@@ -267,7 +268,7 @@ class GoldFoam1DSimulation:
         stored_t, stored_Um, stored_Tm, stored_TR = [], [], [], []
         t = 0.0
         dt_local = self.dt
-        pbar = tqdm.tqdm(total=self.t_final, desc="Simulating", unit="s", ncols=100)
+        pbar = tqdm(total=self.t_final, desc="Simulating", unit="s", ncols=100)
 
         while t < self.t_final - 1e-30:
             dt_local = min(dt_local, self.t_final - t)
