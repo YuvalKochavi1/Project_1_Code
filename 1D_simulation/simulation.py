@@ -95,19 +95,20 @@ class GoldFoam1DSimulation:
         self.simulation_unit_system = simulation_unit_system if simulation_unit_system_override is None else simulation_unit_system_override
         self.kind_of_D_face = kind_of_D_face if kind_of_D_face_override is None else kind_of_D_face_override
 
-        self.Lz = float(L if lz is None else lz)
+        self.Lz = float(L/6 if lz is None else lz)
         self.gold_width = float(w_Au if gold_block_width is None else gold_block_width)
-        self.Nz_foam = int(500 if nz is None else nz)
+        self.Nz_foam = int(100 if nz is None else nz)
         if self.Nz_foam < 2:
             raise ValueError("nz must be >= 2")
 
-        self.Nr_gold = 30
+        self.Nr_gold = 50
         dz0 = self.gold_width / 3000 if self.gold_width > 0 else None
         self.z, self.z_info = self.make_z_two_block(self.Lz, self.gold_width, self.Nz_foam, self.Nr_gold, dz0=dz0)
         self.L_total = float(self.z_info["L_total"])
         self.Nz = self.z.size
         self.z_foam: np.ndarray = np.linspace(0.0, self.Lz, self.Nz_foam)
         self.dz = float(self.z_foam[1] - self.z_foam[0])
+        self.cell_widths = np.diff(self.z)
         self.mask_foam = self.z < self.Lz
 
         self.f_profile = np.where(self.mask_foam, f, f_gold)
@@ -135,6 +136,20 @@ class GoldFoam1DSimulation:
 
         self.data_dir = os.path.join(os.path.dirname(__file__), "Data_new", "Experiment", "Material", "1D_simulation")
         self.E, self.UR = self.init_state()
+    
+    def get_info(self):
+        return {
+            "simulation_unit_system": self.simulation_unit_system,
+            "kind_of_D_face": self.kind_of_D_face,
+            "Lz": self.Lz,
+            "gold_block_width": self.gold_width,
+            "Nz_foam": self.Nz_foam,
+            "Nr_gold": self.Nr_gold,
+            "z_info": self.z_info,
+            "chi": self.chi,
+            "dt": self.dt,
+            "t_final": self.t_final,
+        }
 
     def init_state(self):
         E0 = self.a * self.T_material_0**4 * np.ones(self.Nz)
@@ -185,6 +200,7 @@ class GoldFoam1DSimulation:
         Dn = self.D_of_T(Tn)
         betan = self.beta_of_T(Tn)
         sigman = self.sigma_of_T(Tn)
+        widths = self.cell_widths
 
         if self.kind_of_D_face == "harmonic":
             D_face = 2.0 * Dn[:-1] * Dn[1:] / (Dn[:-1] + Dn[1:] + 1e-20)
@@ -204,18 +220,22 @@ class GoldFoam1DSimulation:
         rhs = np.zeros(n_int)
 
         if marshak_boundary:
-            diag[0] = 1.0 + 2.0 * D_face[0] / (self.c * self.dz)
+            left_width = widths[0]
+            diag[0] = 1.0 + 2.0 * D_face[0] / (self.c * left_width)
             if upper.size:
-                upper[0] = -2.0 * D_face[0] / (self.c * self.dz)
+                upper[0] = -2.0 * D_face[0] / (self.c * left_width)
             rhs[0] = self.a * (E_left / self.a)
 
             for k in range(1, n_int):
                 i = k
                 D_imh = D_face[i - 1]
                 D_iph = D_face[i]
-                a_i = -D_imh / self.dz**2
-                c_i = -D_iph / self.dz**2
-                b_i = (1.0 / dt_local) + (D_imh + D_iph) / self.dz**2 + coupling[i]
+                h_w = widths[i - 1]
+                h_e = widths[i]
+                denom = h_w + h_e
+                a_i = -2.0 * D_imh / (denom * h_w)
+                c_i = -2.0 * D_iph / (denom * h_e)
+                b_i = (1.0 / dt_local) + 2.0 * D_imh / (denom * h_w) + 2.0 * D_iph / (denom * h_e) + coupling[i]
                 d_i = (E[i] / dt_local) + coupling[i] * UR[i]
                 diag[k] = b_i
                 rhs[k] = d_i
@@ -227,9 +247,12 @@ class GoldFoam1DSimulation:
                 i = k + 1
                 D_imh = D_face[i - 1]
                 D_iph = D_face[i]
-                a_i = -D_imh / self.dz**2
-                c_i = -D_iph / self.dz**2
-                b_i = (1.0 / dt_local) + (D_imh + D_iph) / self.dz**2 + coupling[i]
+                h_w = widths[i - 1]
+                h_e = widths[i]
+                denom = h_w + h_e
+                a_i = -2.0 * D_imh / (denom * h_w)
+                c_i = -2.0 * D_iph / (denom * h_e)
+                b_i = (1.0 / dt_local) + 2.0 * D_imh / (denom * h_w) + 2.0 * D_iph / (denom * h_e) + coupling[i]
                 d_i = (E[i] / dt_local) + coupling[i] * UR[i]
                 diag[k] = b_i
                 rhs[k] = d_i
@@ -238,9 +261,13 @@ class GoldFoam1DSimulation:
                 if k < n_int - 1:
                     upper[k] = c_i
 
-            rhs[0] -= (-D_face[0] / self.dz**2) * E_left
+            h_w = widths[0]
+            h_e = widths[1]
+            rhs[0] -= (-2.0 * D_face[0] / ((h_w + h_e) * h_w)) * E_left
 
-        rhs[-1] -= (-D_face[-1] / self.dz**2) * E_right
+        h_w = widths[-2]
+        h_e = widths[-1]
+        rhs[-1] -= (-2.0 * D_face[-1] / ((h_w + h_e) * h_e)) * E_right
 
         for i in range(1, n_int):
             w = lower[i - 1] / diag[i - 1]
@@ -312,17 +339,27 @@ class GoldFoam1DSimulation:
     def compute_front_and_energy(self, stored_Um, stored_Tm):
         front_positions = []
         total_energies = []
+        foam_energies = []
+        gold_energies = []
+        cross_section_area = np.pi * R_cm**2
+        energy_scale = 1e-9 * cross_section_area
         for Ti, Ui in zip(stored_Tm, stored_Um):
             front_idx = np.argmax(np.abs(np.diff(Ti)))
             front_positions.append(self.z[front_idx])
-            total_energy = np.trapezoid(Ui, self.z)
-            # hJ = 10^2 J
-            # erg = 10^-7 J = 10^-9 hJ
-            # 1 / cm^2 = 10^-2 / mm^2
-            # => erg/cm^2 = 10^-11 hJ/mm^2
-            # => integrate Um (erg/cm^3) over z (cm) gives erg/cm^2 = 10^-11 hJ/mm^2
-            total_energies.append(total_energy * 1e-11)
-        return np.array(front_positions), np.array(total_energies)
+            #I want the Foam energy and gold energy to be seperated
+            foam_energy = np.trapezoid(Ui[self.mask_foam], self.z[self.mask_foam])
+            gold_energy = np.trapezoid(Ui[~self.mask_foam], self.z[~self.mask_foam])
+            #total_energy = foam_energy + gold_energy
+            #total_energy = np.trapezoid(Ui, self.z)
+            # integrate Um (erg/cm^3) over z (cm) -> erg/cm^2
+            # multiply by the cylinder cross-sectional area to get erg,
+            # then convert erg to hJ using 1 erg = 1e-9 hJ.
+            # total energy is therefore reported in hJ.
+            #total_energies.append(total_energy * energy_scale)
+            foam_energies.append(foam_energy * energy_scale)
+            gold_energies.append(gold_energy * energy_scale)
+            print(f"Foam energy: {foam_energies[-1]:.6g} hJ, Gold energy: {gold_energies[-1]:.6g} hJ")
+        return np.array(front_positions), np.array(foam_energies), np.array(gold_energies)
 
     def save_outputs(self, stored_t, stored_Um, stored_Tm, stored_TR, *, marshak_boundary=True):
         os.makedirs(self.data_dir, exist_ok=True)

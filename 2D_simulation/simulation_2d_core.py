@@ -844,6 +844,41 @@ class SelfSimilarDiffusion2D:
                 return np.zeros(Um.shape[0], dtype=float)
         return self._compute_energy_region(stored_Um, mask_r=mask_gold)
 
+    def compute_heated_gold_cells_by_z(self, stored_Tm, *, threshold: float = 5, T_cold=None):
+        """Count how many radial gold cells are heated above a threshold for each z slice.
+
+        Returns
+        -------
+        counts_by_z : np.ndarray
+            Number of gold-region radial cells above threshold for each z index.
+        """
+        Tm = np.asarray(stored_Tm)
+        if Tm.ndim == 2:
+            Tm = Tm[None, :, :]
+        if Tm.ndim != 3:
+            raise ValueError("stored_Tm must have shape (Nt, Nz, Nr) or (Nz, Nr).")
+        if Tm.shape[1] != self.Nz or Tm.shape[2] != self.Nr:
+            raise ValueError(
+                f"Expected (Nt, Nz, Nr)=(*, {self.Nz}, {self.Nr}) but got {Tm.shape}."
+            )
+
+        if T_cold is None:
+            if self.simulation_unit_system == "cgs":
+                T_cold = 300.0
+            else:
+                T_cold = 300.0 / K_per_Hev
+
+        threshold = float(threshold)
+        T_cold = float(T_cold)
+
+        mask_gold = np.asarray(self.r, dtype=float) >= float(self.R_foam)
+        if np.count_nonzero(mask_gold) == 0:
+            return np.zeros(self.Nz, dtype=int)
+
+        T_last = Tm[-1]
+        heated = T_last[:, mask_gold] > (threshold * T_cold)
+        return np.count_nonzero(heated, axis=1)
+
     def compute_front_surface(
         self,
         stored_Tm,

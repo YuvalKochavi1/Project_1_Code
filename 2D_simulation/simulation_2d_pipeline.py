@@ -20,7 +20,7 @@ from simulation_2d_plots import (
 )
 global heatmap_times
 heatmap_times = (1e-9, 2e-9, 2.5e-9)
-Material = "C8H8"
+Material = "SiO2"
 if Material == "SiO2":
     Experiment = "Back"
 elif Material == "C8H8":
@@ -45,8 +45,8 @@ mpl.rcParams["mathtext.default"] = "regular"
 def create_simulation(
     *,
     material: str = Material,
-    Nz: int = 200,
-    Nr_foam: int = 200,
+    Nz: int = 50,
+    Nr_foam: int = 50,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -71,9 +71,8 @@ def create_simulation(
 
         t_final = 3e-9
         dt_init = 5e-15
-
  
-    if material == "C8H8":
+    elif material == "C8H8":
         # Foam self-similarity parameters
         f = 21.17 * 10**13          # fudge factor for sigma (new model) [erg/g]
         g = 1 / 2818.1      
@@ -108,7 +107,7 @@ def create_simulation(
     }
     gold_params = {
         "f": 3.4e13,
-        "g": 1e-10, #1/7200,
+        "g": 1/7200 / 1000,
         "alpha": 1.5,
         "beta_exp": 1.6,
         "lambda_param": 0.2,
@@ -249,5 +248,11 @@ def run_default_pipeline(*, material: str = "SiO2"):
         material=Material,
         experiment=Experiment,
     )
+
+    heated_gold_cells_by_z = sim.compute_heated_gold_cells_by_z(stored_Tm)
+    print("Heated gold cells by z (last stored snapshot):")
+    for z_cm, count in zip(sim.z, heated_gold_cells_by_z):
+        if count > 0:
+            print(f"  z={z_cm:.6g} cm: {int(count)} gold cells")
 
     return sim, stored_t, stored_Um, stored_Tm, stored_TR

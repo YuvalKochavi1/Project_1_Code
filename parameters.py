@@ -415,7 +415,7 @@ w_Au = 50e-4
 dr0_gold = w_Au / 4000
 r_gold, r_gold_info = make_r_two_block(R_cm, w_Au, Nr, Nr_gold, dr0=dr0_gold)
 
-t_final_sec = 3.73e-9 
+t_final_sec = 3e-9 
 dt_sec = 5e-15
 t_final_ns = t_final_sec * 10**9
 dt_ns = dt_sec * 10**9

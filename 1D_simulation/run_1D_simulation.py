@@ -19,7 +19,3 @@ if __name__ == "__main__":
         f"Front position range: {results['front_positions'].min():.6g} "
         f"to {results['front_positions'].max():.6g} cm"
     )
-    print(
-        f"Total energy range: {results['total_energies'].min():.6g} "
-        f"to {results['total_energies'].max():.6g} hJ/mm^2"
-    )
