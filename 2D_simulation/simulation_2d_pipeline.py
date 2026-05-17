@@ -20,8 +20,8 @@ from simulation_2d_plots import (
 )
 global heatmap_times
 heatmap_times = (1e-9, 2e-9, 2.5e-9)
-Material = "SiO2"
-if Material == "SiO2":
+Material = "Ta2O5"
+if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
 elif Material == "C8H8":
     Experiment = "Ji-Yan"
@@ -45,8 +45,8 @@ mpl.rcParams["mathtext.default"] = "regular"
 def create_simulation(
     *,
     material: str = Material,
-    Nz: int = 50,
-    Nr_foam: int = 50,
+    Nz: int = 100,
+    Nr_foam: int = 100,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -86,12 +86,24 @@ def create_simulation(
         heatmap_times = (0.5e-9, 1e-9, 1.3e-9)
         Lz = 0.03
         gold_width = 0
+    
+    elif material == "Ta2O5":
+        f = 4.78 * 10**13          # fudge factor for sigma (new model) [erg/g]
+        g = 1 / 8433.3      
+        alpha = 1.78       # opacity exponent
+        beta_exp = 1.37     # beta exponent
+        lambda_param = 0.24
+        mu = 0.12
+        rho = 0.04      # initial density (g/cm^3)
+        Lz = 0.3
+        R_foam = 0.08
+        gold_width = 5e-3
 
         csv_path = BASE_DIR / "Data_new" / Experiment / Material / "article" / "Temperatures" / "T_drive.csv"
         t_drive_ns, T_drive_eV = load_time_temp(csv_path)
         print(csv_path)
 
-        t_final = 1.5e-9
+        t_final = 3e-9
         dt_init = 5e-15
     else:
         raise ValueError(f"{material} is not supported in this function for now.")
@@ -107,12 +119,21 @@ def create_simulation(
     }
     gold_params = {
         "f": 3.4e13,
-        "g": 1/7200 / 1000,
+        "g": 1/7200,
         "alpha": 1.5,
         "beta_exp": 1.6,
         "lambda_param": 0.2,
         "mu": 0.14,
         "rho": 19.32,
+    }
+    be_params = {
+        "f": 8.81 * 10**13,
+        "g": 1 / 402.8,
+        "alpha": 4.893,
+        "beta_exp": 1.0902,
+        "lambda_param": 0.6726,
+        "mu": 0.0701,
+        "rho": 1.85,
     }
 
     return SelfSimilarDiffusion2D(
@@ -126,6 +147,7 @@ def create_simulation(
         simulation_unit_system="cgs",
         foam_params=foam_params,
         gold_params=gold_params,
+        be_params=be_params,
         chi=float(chi),
         t_drive_ns=t_drive_ns,
         T_drive_eV=T_drive_eV,
@@ -153,7 +175,7 @@ def run_simulation(
         dtfac=float(dtfac),
         dtmin=dtmin,
         dtmax=dtmax,
-        bc_r_outer=str(bc_r_outer),
+        bc_r_outer = str(bc_r_outer), #"dirichlet_bath", "neumann0", or "marshak_wall",
         marshak_boundary=bool(marshak_boundary),
     )
     return stored_t, stored_Um, stored_Tm, stored_TR

@@ -92,11 +92,24 @@ def model_front_shape_load():
       "files": dict mapping original filename -> loaded profile dict
   """
   data_dir = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape"
-  expected_files = [
-    "front_shape_t0.50ns.csv",
-    "front_shape_t1.00ns.csv",
-    "front_shape_t1.30ns.csv",
-  ]
+  if Material == "C8H8":
+    expected_files = [
+      "front_shape_t0.50ns.csv",
+      "front_shape_t1.00ns.csv",
+      "front_shape_t1.30ns.csv",
+    ]
+  elif Material == "SiO2":
+    expected_files = [
+      "front_shape_t1.00ns.csv",
+      "front_shape_t2.00ns.csv",
+      "front_shape_t2.50ns.csv",
+    ]
+  elif Material == "Ta2O5":
+    expected_files = [
+      "front_shape_t1.00ns.csv",
+      "front_shape_t2.00ns.csv",
+      "front_shape_t2.50ns.csv",
+    ]
 
   profiles = {}
   files = {}
@@ -252,24 +265,55 @@ def model_front_position_load():
       "front_position_marshak_cm": numpy array of Marshak front positions in cm
       "front_position_vacuum_cm": numpy array of vacuum-loss front positions in cm
   """
-  csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "1.5 model" / "analytic_positions_ji_yan.csv"
+  if Material == "C8H8":
+    csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "1.5 model" / "analytic_positions_ji_yan.csv"
 
-  if not csv_path.exists():
-    raise FileNotFoundError(f"Model front-position CSV not found: {csv_path}")
+    if not csv_path.exists():
+      raise FileNotFoundError(f"Model front-position CSV not found: {csv_path}")
 
-  df = pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path)
 
-  required_columns = {"time_ns", "front_position (Marshak)", "front_position (Vacuum Loss)"}
-  missing_columns = required_columns.difference(df.columns)
-  if missing_columns:
-    raise ValueError(f"CSV must contain columns: {sorted(required_columns)}")
+    required_columns = {"time_ns", "front_position (Marshak)", "front_position (Vacuum Loss)"}
+    missing_columns = required_columns.difference(df.columns)
+    if missing_columns:
+      raise ValueError(f"CSV must contain columns: {sorted(required_columns)}")
 
-  return {
-    "time_ns": df["time_ns"].to_numpy(dtype=float),
-    "front_position_marshak_cm": df["front_position (Marshak)"].to_numpy(dtype=float),
-    "front_position_vacuum_cm": df["front_position (Vacuum Loss)"].to_numpy(dtype=float),
-  }
-
+    return {
+      "time_ns": df["time_ns"].to_numpy(dtype=float),
+      "front_position_marshak_cm": df["front_position (Marshak)"].to_numpy(dtype=float),
+      "front_position_vacuum_cm": df["front_position (Vacuum Loss)"].to_numpy(dtype=float),
+    }
+  elif Material == "SiO2":
+    csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "1.5 model" / "analytic_positions.csv"
+    if not csv_path.exists():
+      raise FileNotFoundError(f"Model front-position CSV not found: {csv_path}")
+    df = pd.read_csv(csv_path)
+    required_columns = {"time_ns", "front_position (Marshak)", "front_position (Gold Loss)"}
+    missing_columns = required_columns.difference(df.columns)
+    if missing_columns:
+      raise ValueError(f"CSV must contain columns: {sorted(required_columns)}")
+    return {
+      "time_ns": df["time_ns"].to_numpy(dtype=float),
+      "front_position_marshak_cm": df["front_position (Marshak)"].to_numpy(dtype=float),
+      "front_position_gold_cm": df["front_position (Gold Loss)"].to_numpy(dtype=float),
+    }
+  elif Material == "Ta2O5":
+    csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "1.5 model" / "analytic_positions.csv"
+    if not csv_path.exists():
+      raise FileNotFoundError(f"Model front-position CSV not found: {csv_path}")
+    df = pd.read_csv(csv_path)
+    required_columns = {"time_ns", "front_position (Marshak)", "front_position (2D effects)", "front_position (2D effects + lam_eff)", "front_position (Be Loss)"}
+    missing_columns = required_columns.difference(df.columns)
+    if missing_columns:
+      raise ValueError(f"CSV must contain columns: {sorted(required_columns)}")
+    return {
+      "time_ns": df["time_ns"].to_numpy(dtype=float),
+      "front_position_marshak_cm": df["front_position (Marshak)"].to_numpy(dtype=float),
+      "front_position_2D_cm": df["front_position (2D effects)"].to_numpy(dtype=float),
+      "front_position_2D_lam_eff_cm": df["front_position (2D effects + lam_eff)"].to_numpy(dtype=float),
+      "front_position_be_loss_cm": df["front_position (Be Loss)"].to_numpy(dtype=float),
+    }
+    
 
 def plot_simulation_vs_model_front_position(sim_data, model_data):
   """Create a front-position-vs-time comparison for the Ji-Yan case."""
@@ -291,18 +335,53 @@ def plot_simulation_vs_model_front_position(sim_data, model_data):
     linewidth=2.4,
     label="Analytic model (Marshak)",
   )
-  plt.plot(
-    model_data["time_ns"],
-    model_data["front_position_vacuum_cm"],
-    color="tab:green",
-    linestyle="-.",
-    linewidth=2.2,
-    label="Analytic model (Vacuum Loss)",
-  )
+  if Material == "SiO2":
+    plt.plot(
+      model_data["time_ns"],
+      model_data["front_position_gold_cm"],
+      color="tab:green",
+      linestyle="-.",
+      linewidth=2.2,
+      label="Analytic model (Gold Loss)",
+    )
+  elif Material == "C8H8":
+    plt.plot(
+      model_data["time_ns"],
+      model_data["front_position_vacuum_cm"],
+      color="tab:green",
+      linestyle="-.",
+      linewidth=2.2,
+      label="Analytic model (Vacuum Loss)",
+    )
+  elif Material == "Ta2O5":
+    plt.plot(
+      model_data["time_ns"],
+      model_data["front_position_2D_cm"],
+      color="tab:orange",
+      linestyle="-.",
+      linewidth=2.2,
+      label="Analytic model (2D effects)",
+    )
+    plt.plot(
+      model_data["time_ns"],
+      model_data["front_position_2D_lam_eff_cm"],
+      color="tab:purple",
+      linestyle=":",
+      linewidth=2.2,
+      label="Analytic model (2D effects + lam_eff)",
+    )
+    plt.plot(
+      model_data["time_ns"],
+      model_data["front_position_be_loss_cm"],
+      color="tab:green",
+      linestyle="-.",
+      linewidth=2.2,
+      label="Analytic model (Be Loss)",
+    )
 
   plt.xlabel("Time (ns)")
   plt.ylabel("Front position (cm)")
-  plt.title(f"Ji-Yan Front Position vs Time ({Experiment} - {Material})")
+  plt.title(f"Front Position vs Time ({Experiment} - {Material})")
   plt.grid(True, alpha=0.3)
   plt.legend(loc="best")
   plt.tight_layout()

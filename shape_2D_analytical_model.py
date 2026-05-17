@@ -26,8 +26,8 @@ def _resolve_colormap_settings(
         "default": {
             "cmap": "Spectral_r",
             "vmin": 0.00,
-            "vmax": 1.75,
-            "cbar_ticks": None,
+            "vmax": 2.00,
+            "cbar_ticks": (0.00, 0.25, 0.5, 0.75, 1.00, 1.25, 1.5, 1.75),
         },
         # Visit-style appearance: blue -> cyan -> green -> yellow -> red.
         "visit": {

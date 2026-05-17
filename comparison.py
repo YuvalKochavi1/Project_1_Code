@@ -107,6 +107,9 @@ def Back_SiO2(times_to_store):
     Ts_gold_loss = front_series["Ts_marshak_gold_loss"]
     Ts_lam_eff = front_series["Ts_2D_lam_eff"]
     Ts_1D = front_series["Ts_1D"]
+    E_gold_loss = front_series["E_gold_loss"]
+    E_marshak = front_series["E_marshak"]
+    E_wall_gold_loss = front_series["E_W_gold_loss"]
     bessel_data_2D = front_series["bessel_data_2D"]
     bessel_data_ablation_const_rho = front_series["bessel_data_ablation_const_rho"]
     bessel_data_2D_lam_eff = front_series["bessel_data_2D_lam_eff"]
@@ -147,6 +150,42 @@ def Back_SiO2(times_to_store):
     #                 fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     # save_figure("front_position - marshak_vs_nonmarshak.png", model1_5=True)
     save_figure("front_position - ablation varying rho (n=1.5).png", model1_5=True)
+    
+    # Plot energies
+    plt.figure(figsize=(8, 6))
+    plt.plot(times_to_store, E_marshak, label="E - Marshak BC", linestyle="-", color='blue')
+    plt.plot(times_to_store, E_gold_loss, label="E - Gold Loss", linestyle="-", color='green')
+    plt.plot(times_to_store, E_wall_gold_loss, label="E - Gold Wall Loss", linestyle="-", color='red')
+    
+    #add the energy from the article as a series
+    plot_csv_series(
+        article_energy_path("gold_wall_flattop.csv"),
+        linestyle="-.",
+        label="gold wall energy - article 1",
+        color='red',
+    )
+    plot_csv_series(
+        article_energy_path("total_energy_2D.csv"),
+        linestyle="-.",
+        label="total_energy_2D - article 1",
+        color='green',
+    )
+    plot_csv_series(
+        article_energy_path("total_energy_1D.csv"),
+        linestyle="-.",
+        label="total_energy_1D - article 1",
+        color='blue',
+    )
+    print(article_energy_path("total_energy_1D.csv"))
+    
+    plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
+    plt.ylabel("Total Energy (hJ)", fontsize=18, fontname='serif')
+    plt.title(f"Total Energy vs Time  - Material: {Material}", fontsize=18, fontname='serif')
+    plt.grid(True)
+    plt.legend(prop={'family': 'serif'})
+    plt.tight_layout()
+    save_figure("total_energy - Back_SiO2.png", model1_5=True)
+    
     export_analytic_positions_csv(
         times_to_store,
         {
@@ -206,10 +245,10 @@ def Back_SiO2(times_to_store):
                     ablation=True, title_suffix="(const rho)", color_option = "prr_back")
     plot_temperature_heatmap_2D(bessel_data_gold_loss, analytic_positions_energy_lost_gold,
                     Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=False, title_suffix="(gold wall loss)", color_option = "prr_back")
-    plot_temperature_heatmap_2D(bessel_data_marshak, analytic_positions_marshak,
-                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=False, title_suffix="(Marshak BC)", color_option = "prr_back")
+                    ablation=False, title_suffix="(gold wall loss)", color_option = "default")
+    # plot_temperature_heatmap_2D(bessel_data_marshak, analytic_positions_marshak,
+    #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+    #                 ablation=False, title_suffix="(Marshak BC)", color_option = "prr_back")
 
 
 
@@ -217,13 +256,11 @@ def compare_with_article_2_exp1_Massen(times_to_store):
     stored_Tm_marshak = pd.read_csv(DATA_DIR / "stored_Tm_marshak.csv", header=None).to_numpy() #convert to numpy array
     stored_Um_marshak = pd.read_csv(DATA_DIR / "stored_Um_marshak.csv", header=None).to_numpy() #convert to numpy array
     stored_t_marshak = pd.read_csv(DATA_DIR / "stored_time_marshak.csv", header=None).to_numpy().flatten() #convert to 1D numpy array
-    front_positions_marshak, total_energies_marshak = compute_front_and_energy(stored_Um_marshak, stored_Tm_marshak)
     analytic_positions_marshak, Ts,_,_,*_ = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak",vary_rho=False)  # stored_t is ns
 
     plt.figure(figsize=(8, 6))
     # fit data to analytical
     plot_analytic_if_available(times_to_store, analytic_positions_marshak, label="Analytic x_F(t) (Marshak BC)", linestyle="--", color='green')
-    plt.plot(stored_t_marshak, front_positions_marshak, color='red', linestyle="-.", label="Simulated Front Position")
 
     plot_csv_curves([
         {"path": article_front_path("150.csv"), "y_scale": 10, "linestyle": "-", "label": "HR Pure", "color": "blue"},
@@ -350,13 +387,13 @@ def compare_with_article_2_exp2_Xu(times_to_store):
                         ablation=True)
         
 
-
 def compare_with_article_2_exp3_13a(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=1)
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
     analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
-    analytic_position_Be_lost, _, _, _, *_ = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be')  # stored_t is ns
+    Ts_marshak = front_series["Ts_1D"]
+    analytic_position_Be_lost, Ts_out, E_out, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be')  # stored_t is ns
     plt.figure(figsize=(8, 6))
     # fit data to analytical
     plot_standard_front_analytic_models(
@@ -395,6 +432,34 @@ def compare_with_article_2_exp3_13a(times_to_store):
     #                 fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     # make directory if not exists
     save_figure("front_position - compare Back Ta2O5.png", model1_5=True)
+    #save the analytic positions to csv
+    export_analytic_positions_csv(
+        times_to_store,
+        {
+            "front_position": {
+                "Marshak": analytic_positions_marshak,
+                "2D effects": analytic_positions_2D,
+                "2D effects + lam_eff": analytic_positions_2D_lam_eff,
+                "Be Loss": analytic_position_Be_lost,
+            }
+        },
+        output_csv_path=DATA_DIR / "1.5 model" / "analytic_positions.csv",
+    )
+    z_grid_for_plots = None
+    if Be_bessel_data and len(Be_bessel_data) > 0:
+        first_snapshot = list(Be_bessel_data.values())[0]
+        if 'z_grid' in first_snapshot:
+            z_grid_for_plots = first_snapshot['z_grid']
+    
+    # Plot albedo arrays for different models (only for specific times)
+    plot_albedo_arrays(Be_bessel_data, z_grid=z_grid_for_plots, 
+                       title="Albedo Profiles - Be lost", times_ns=[1.0, 2.0, 2.5])
+    save_figure("albedo_profiles_Be_Coated.png", model1_5=True)
+
+    plot_temperature_heatmap_2D(Be_bessel_data, analytic_position_Be_lost,
+                    Ts_marshak, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=False, title_suffix="(Be wall loss)", color_option = "default", 
+                    show_shock=False, wall="Be")
 
 def compare_with_article_2_exp4_14(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=1)
@@ -812,7 +877,7 @@ def R_of_t_z(times_to_store=None, show_plot=True, verbose=True):
 
     return data_of_R
 
-def plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5):
+def plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold"):
     """
     Plot albedo at z=0 (surface/wall) as a function of time.
     Albedo values are taken from bessel_data generated in wall-loss/ablation modes.
@@ -824,6 +889,7 @@ def plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=Tru
         vary_rho=vary_rho,
         lam_eff=lam_eff,
         power=power,
+        wall_material=wall_material
     )
 
     if not isinstance(dispatch_out, tuple) or len(dispatch_out) < 6:
@@ -1060,5 +1126,5 @@ if __name__ == "__main__":
     #R_of_t_z(times_to_store=times_to_store)
     #compare_n_1(times_to_store)
     # plot_surface_temperature_comparison(times_to_store)
-    plot_albedo_z0_vs_time(times_to_store)
+    plot_albedo_z0_vs_time(times_to_store, mode="marshak_wall_loss", vary_rho=False, lam_eff=False, power=1.5, wall_material="Be")
     plot_model_shock_wave_at_z0_all_times(times_to_store)

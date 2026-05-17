@@ -51,7 +51,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = "SiO2"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = "Ta2O5"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 
 if Material == "SiO2":
     Experiment = "Back"
@@ -309,14 +309,15 @@ elif Material == "french_cupper":
 
 # self similarity model fudge factors - gold
 f_gold = 3.4 * 10**13          # fudge factor for sigma (new model) [erg/g]
-g_gold = 1 / 7200      
+g_gold = 1 / 7200
 alpha_gold = 1.5       # opacity exponent
 beta_gold = 1.6       # beta exponent
 lambda_param_gold = 0.2
 mu_gold = 0.14
 rho_gold = 19.32      # initial density (g/cm^3)
 
-# self similarity model fudge factors - Be     
+f_be = 8.81 * 10**13          # fudge factor for sigma (new model) [erg/g]
+g_be = 1 / 402.8
 alpha_be = 4.893       # opacity exponent
 beta_be = 1.0902      # beta exponent
 lambda_param_be = 0.6726
@@ -412,7 +413,7 @@ def make_r_two_block(R_foam, gold_width, Nr_foam, Nr_gold, dr0=None):
 # Radial grid for 2D cylindrical (Gold extension)
 Nr_gold = 100
 w_Au = 50e-4
-dr0_gold = w_Au / 4000
+dr0_gold = w_Au / 3000
 r_gold, r_gold_info = make_r_two_block(R_cm, w_Au, Nr, Nr_gold, dr0=dr0_gold)
 
 t_final_sec = 3e-9 

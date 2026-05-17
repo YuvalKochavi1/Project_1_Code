@@ -110,7 +110,7 @@ class SelfSimilarDiffusion2D:
         # unit system
         simulation_unit_system="cgs",  # "cgs" or "hev|ns"
         # material params (your self-similar)
-        foam_params, gold_params,
+        foam_params, gold_params, be_params,
         chi=1000.0,
         # drive
         t_drive_ns=None, T_drive_eV=None,
@@ -129,7 +129,7 @@ class SelfSimilarDiffusion2D:
         self.R_foam = float(R_foam)
         self.Nz, self.Nr_foam = int(Nz), int(Nr_foam)
         self.z = np.linspace(0.0, self.Lz, self.Nz)
-        self.r, self.r_info = make_r_two_block(self.R_foam, self.gold_width, self.Nr_foam, Nr_gold=30, dr0= self.gold_width/3000)
+        self.r, self.r_info = make_r_two_block(self.R_foam, self.gold_width, self.Nr_foam, Nr_gold=35, dr0= self.gold_width/3000)
         self.Nr = self.r.size
         print(self.r)
         self.dz = self.z[1] - self.z[0]
@@ -138,14 +138,22 @@ class SelfSimilarDiffusion2D:
         self.kind_of_D_face = kind_of_D_face
 
         # Radial material maps (shape: (Nr,)). These broadcast naturally against (Nz, Nr) fields.
-        mask_foam = (self.r < self.R_foam)
-        self.f_map       = np.where(mask_foam, foam_params["f"],       gold_params["f"])
-        self.g_map       = np.where(mask_foam, foam_params["g"],       gold_params["g"])
-        self.alpha_map   = np.where(mask_foam, foam_params["alpha"],   gold_params["alpha"])
-        self.betaexp_map = np.where(mask_foam, foam_params["beta_exp"],gold_params["beta_exp"])
-        self.lam_map     = np.where(mask_foam, foam_params["lambda_param"], gold_params["lambda_param"])
-        self.mu_map      = np.where(mask_foam, foam_params["mu"],      gold_params["mu"])
-        self.rho_map     = np.where(mask_foam, foam_params["rho"],     gold_params["rho"])
+        mask_foam = (self.r <= self.R_foam)
+        # self.f_map       = np.where(mask_foam, foam_params["f"],       gold_params["f"])
+        # self.g_map       = np.where(mask_foam, foam_params["g"],       gold_params["g"])
+        # self.alpha_map   = np.where(mask_foam, foam_params["alpha"],   gold_params["alpha"])
+        # self.betaexp_map = np.where(mask_foam, foam_params["beta_exp"],gold_params["beta_exp"])
+        # self.lam_map     = np.where(mask_foam, foam_params["lambda_param"], gold_params["lambda_param"])
+        # self.mu_map      = np.where(mask_foam, foam_params["mu"],      gold_params["mu"])
+        # self.rho_map     = np.where(mask_foam, foam_params["rho"],     gold_params["rho"])
+        
+        self.f_map       = np.where(mask_foam, foam_params["f"],       be_params["f"])
+        self.g_map       = np.where(mask_foam, foam_params["g"],       be_params["g"])
+        self.alpha_map   = np.where(mask_foam, foam_params["alpha"],   be_params["alpha"])
+        self.betaexp_map = np.where(mask_foam, foam_params["beta_exp"],be_params["beta_exp"])
+        self.lam_map     = np.where(mask_foam, foam_params["lambda_param"], be_params["lambda_param"])
+        self.mu_map      = np.where(mask_foam, foam_params["mu"],      be_params["mu"])
+        self.rho_map     = np.where(mask_foam, foam_params["rho"],     be_params["rho"])
         self.chi = float(chi)
 
         self.dt_init = float(dt_init)
@@ -392,6 +400,177 @@ class SelfSimilarDiffusion2D:
         return self.a * (T ** 4)
 
     # ============================================================
+    # NEW: Helper methods for face-based diffusion calculation
+    # ============================================================
+    def _compute_T_face_z(self, T):
+        """
+        Compute face temperatures at z-interfaces (between z-layers).
+        
+        For each pair of adjacent cells (i, i+1), compute:
+        T_face = ((T_i^4 + T_{i+1}^4) / 2)^(1/4)
+        
+        Parameters
+        ----------
+        T : ndarray, shape (Nz, Nr)
+            Temperature field at cell centers.
+        
+        Returns
+        -------
+        T_z_face : ndarray, shape (Nz-1, Nr)
+            Temperature at z-faces (between cells i and i+1).
+        """
+        T = np.asarray(T, dtype=float)
+        if T.shape != (self.Nz, self.Nr):
+            raise ValueError(
+                f"Expected T shape ({self.Nz}, {self.Nr}) for z-face temperature, got {T.shape}."
+            )
+
+        # Adjacent z cells: (i, j) and (i+1, j)
+        T_i = T[:-1, :]
+        T_ip1 = T[1:, :]
+        T_z_face = ((T_i ** 4 + T_ip1 ** 4) / 2.0) ** 0.25
+        return T_z_face
+    
+    def _compute_T_face_r(self, T):
+        """
+        Compute face temperatures at r-interfaces (between r-layers).
+        
+        For each pair of adjacent cells (j, j+1), compute:
+        T_face = ((T_j^4 + T_{j+1}^4) / 2)^(1/4)
+        
+        Parameters
+        ----------
+        T : ndarray, shape (Nz, Nr)
+            Temperature field at cell centers.
+        
+        Returns
+        -------
+        T_r_face : ndarray, shape (Nz, Nr-1)
+            Temperature at r-faces (between cells j and j+1).
+        """
+        T = np.asarray(T, dtype=float)
+        if T.shape != (self.Nz, self.Nr):
+            raise ValueError(
+                f"Expected T shape ({self.Nz}, {self.Nr}) for r-face temperature, got {T.shape}."
+            )
+
+        # Adjacent r cells: (i, j) and (i, j+1)
+        T_j = T[:, :-1]
+        T_jp1 = T[:, 1:]
+        T_r_face = ((T_j ** 4 + T_jp1 ** 4) / 2.0) ** 0.25
+        return T_r_face
+    
+    def _is_material_interface_r(self):
+        """
+        Detect r-faces that lie at material boundaries (foam-gold interface).
+        
+        Returns
+        -------
+        interface_faces : ndarray, shape (Nr-1,), dtype=bool
+            True where a face is at the material interface (foam <-> gold).
+        """
+        r_mask_foam = self.r < self.R_foam
+        interface_faces = r_mask_foam[:-1] != r_mask_foam[1:]
+        return interface_faces
+    
+    def _compute_D_at_face_with_material_interface(self, T_r_face, interface_faces_r):
+        """
+        Compute D at r-faces, accounting for material interfaces.
+        
+        For internal faces (same material on both sides):
+            D = D(T_face)
+        
+        For interface faces (foam-gold boundary):
+            D_foam = D(T_face; foam_params)
+            D_gold = D(T_face; gold_params)
+            D_interface = 2 / (1/D_foam + 1/D_gold)  [harmonic mean]
+        
+        Parameters
+        ----------
+        T_r_face : ndarray, shape (Nz, Nr-1)
+            Temperature at r-faces.
+        interface_faces_r : ndarray, shape (Nr-1,), dtype=bool
+            True where a face is at the material interface (foam <-> gold).
+        
+        Returns
+        -------
+        D_r_face : ndarray, shape (Nz, Nr-1)
+            Diffusion coefficient at r-faces.
+        """
+        Nz = T_r_face.shape[0]
+        Nr_minus_1 = T_r_face.shape[1]
+        D_r_face = np.zeros_like(T_r_face, dtype=float)
+        
+        # Loop over r-face indices
+        for j in range(Nr_minus_1):
+            T_face_j = T_r_face[:, j]  # Temperature at r-face j, shape (Nz,)
+            
+            if not interface_faces_r[j]:
+                # Internal face: use material properties of cell j (or j+1, same material)
+                # Compute D using the material map values for this r-index
+                if self.simulation_unit_system == "cgs":
+                    T_Hev = T_face_j / K_per_Hev
+                    g_j = self.g_map[j]
+                    alpha_j = self.alpha_map[j]
+                    lam_j = self.lam_map[j]
+                    rho_j = self.rho_map[j]
+                    sigma_j = 1.0 / (g_j * (T_Hev ** alpha_j) * (rho_j ** (-lam_j - 1)))
+                    D_r_face[:, j] = self.c / (3.0 * sigma_j)
+                else:  # hev|ns
+                    T_hev = T_face_j
+                    g_j = self.g_map[j]
+                    alpha_j = self.alpha_map[j]
+                    lam_j = self.lam_map[j]
+                    rho_j = self.rho_map[j]
+                    sigma_j = 1.0 / (g_j * (T_hev ** alpha_j) * (rho_j ** (-lam_j - 1)))
+                    D_r_face[:, j] = self.c / (3.0 * sigma_j)
+            else:
+                # Interface face: compute D for both materials and take harmonic mean
+                # Cell j is foam, cell j+1 is gold (based on interface detection)
+                if self.simulation_unit_system == "cgs":
+                    T_Hev = T_face_j / K_per_Hev
+                    
+                    # Foam side (cell j)
+                    g_foam = self.g_map[j]
+                    alpha_foam = self.alpha_map[j]
+                    lam_foam = self.lam_map[j]
+                    rho_foam = self.rho_map[j]
+                    sigma_foam = 1.0 / (g_foam * (T_Hev ** alpha_foam) * (rho_foam ** (-lam_foam - 1)))
+                    D_foam = self.c / (3.0 * sigma_foam)
+                    
+                    # Gold side (cell j+1)
+                    g_gold = self.g_map[j + 1]
+                    alpha_gold = self.alpha_map[j + 1]
+                    lam_gold = self.lam_map[j + 1]
+                    rho_gold = self.rho_map[j + 1]
+                    sigma_gold = 1.0 / (g_gold * (T_Hev ** alpha_gold) * (rho_gold ** (-lam_gold - 1)))
+                    D_gold = self.c / (3.0 * sigma_gold)
+                else:  # hev|ns
+                    T_hev = T_face_j
+                    
+                    # Foam side (cell j)
+                    g_foam = self.g_map[j]
+                    alpha_foam = self.alpha_map[j]
+                    lam_foam = self.lam_map[j]
+                    rho_foam = self.rho_map[j]
+                    sigma_foam = 1.0 / (g_foam * (T_hev ** alpha_foam) * (rho_foam ** (-lam_foam - 1)))
+                    D_foam = self.c / (3.0 * sigma_foam)
+                    
+                    # Gold side (cell j+1)
+                    g_gold = self.g_map[j + 1]
+                    alpha_gold = self.alpha_map[j + 1]
+                    lam_gold = self.lam_map[j + 1]
+                    rho_gold = self.rho_map[j + 1]
+                    sigma_gold = 1.0 / (g_gold * (T_hev ** alpha_gold) * (rho_gold ** (-lam_gold - 1)))
+                    D_gold = self.c / (3.0 * sigma_gold)
+                # Harmonic mean: D_interface = 2 / (1/D_foam + 1/D_gold)
+                eps = 1e-30
+                #D_r_face[:, j] = 2 / (1.0 / (D_foam + eps) + 1.0 / (D_gold + eps) + eps)
+                D_r_face[:, j] = 0.5 * (D_foam + D_gold)  # Alternatively, use arithmetic mean at interface for testing
+        
+        return D_r_face
+
+    # ============================================================
     # Implicit step: build and solve sparse system for E^{n+1}
     # ============================================================
     def implicit_step(self, *, t, dt_local, bc_r_outer="marshak_wall", marshak_boundary=False):
@@ -408,20 +587,27 @@ class SelfSimilarDiffusion2D:
 
         # lagged coefficients from U^n
         T_n = (U_n / self.a) ** 0.25  # T^n: temperature at time n
-        D_n = self.D_of_T(T_n)  # D^n: diffusion coefficient at time n
-        beta_n = self.beta_of_T(T_n)  # β^n
-        sigma_n = self.sigma_of_T(T_n)  # σ^n: opacity at time n
-
-
-        # A^n = β^n Δt χ c σ^n: absorption characteristic
-        A_n = beta_n * dt_local * self.chi * self.c * sigma_n
-        # C^n = χ c σ^n / (1 + A^n): effective coupling coefficient
-        C_n = self.chi * self.c * sigma_n / (1.0 + A_n)
-
-
-        # Face diffusion at time n: D^n_{faces}
-        # D_z_face: diffusion coeff at z-faces, shape (Nz-1, Nr)
-        # D_r_face: diffusion coeff at r-faces, shape (Nz, Nr-1)
+        
+        # # --- OLD IMPLEMENTATION (kept for reference) ---
+        D_n = self.D_of_T(T_n)  # D^n at cell centers: diffusion coefficient at time n
+        
+        # # --- NEW IMPLEMENTATION: Direct calculation of D at faces ---
+        # # Calculate face temperatures using T_face = ((T_i^4 + T_{i+1}^4) / 2)^(1/4)
+        # T_z_face = self._compute_T_face_z(T_n)  # Face temperatures at z-interfaces
+        # T_r_face = self._compute_T_face_r(T_n)  # Face temperatures at r-interfaces
+        
+        # # For z-faces: no material interface (same material on both sides at each r-location)
+        # # Calculate D directly at face using face temperature
+        # D_z_face = self.D_of_T(T_z_face)
+        
+        # # For r-faces: detect material interfaces and apply special logic
+        # interface_faces_r = self._is_material_interface_r()  # Shape (Nr-1,), True at interfaces
+        
+        # # Compute D at all r-faces using face temperatures and material interface logic
+        # D_r_face = self._compute_D_at_face_with_material_interface(T_r_face, interface_faces_r)
+        
+        # --- OPTIONAL: Store the old averaging method for backward compatibility ---
+        # This is commented out but available if needed for testing/comparison
         if self.kind_of_D_face == "harmonic":
             D_z_face = 2.0 * D_n[:-1, :] * D_n[1:, :] / (D_n[:-1, :] + D_n[1:, :] + 1e-30)
             D_r_face = 2.0 * D_n[:, :-1] * D_n[:, 1:] / (D_n[:, :-1] + D_n[:, 1:] + 1e-30)
@@ -431,25 +617,14 @@ class SelfSimilarDiffusion2D:
         elif self.kind_of_D_face == "geometric":
             D_z_face = np.sqrt(D_n[:-1, :] * D_n[1:, :])
             D_r_face = np.sqrt(D_n[:, :-1] * D_n[:, 1:])
-        elif self.kind_of_D_face == "interface_harmonic":
-            # Use arithmetic averaging everywhere, but harmonic only at foam-gold interface
-            D_z_face = 0.5 * (D_n[:-1, :] + D_n[1:, :])
-            D_r_face = 0.5 * (D_n[:, :-1] + D_n[:, 1:])
-            
-            # Detect r-faces that cross the foam-gold interface
-            # A face at j crosses the interface if one node is foam and one is gold
-            r_mask_foam = self.r < self.R_foam
-            interface_faces = r_mask_foam[:-1] != r_mask_foam[1:]  # True where material changes
-            
-            if np.any(interface_faces):
-                # Apply harmonic averaging at interface faces
-                face_indices = np.where(interface_faces)[0]
-                D_r_face[:, face_indices] = (
-                    2 * D_n[:, face_indices] * D_n[:, face_indices + 1] 
-                    / (D_n[:, face_indices] + D_n[:, face_indices + 1] + 1e-30)
-                )
-        else:
-            raise ValueError("kind_of_D_face must be harmonic/arithmetic/geometric/interface_harmonic")
+        
+        beta_n = self.beta_of_T(T_n)  # β^n
+        sigma_n = self.sigma_of_T(T_n)  # σ^n: opacity at time n
+
+        # A^n = β^n Δt χ c σ^n: absorption characteristic
+        A_n = beta_n * dt_local * self.chi * self.c * sigma_n
+        # C^n = χ c σ^n / (1 + A^n): effective coupling coefficient
+        C_n = self.chi * self.c * sigma_n / (1.0 + A_n)
 
         # Build CSR matrix values efficiently (structure is cached)
         self._ensure_csr_template(marshak_boundary)
@@ -485,10 +660,19 @@ class SelfSimilarDiffusion2D:
             rows = base_row + np.arange(Nr)
 
             if marshak_boundary and i == 0:
+                # Apply Marshak boundary: foam with drive, gold with vacuum
+                mask_foam = self.r < self.R_foam
                 alpha_vec = 2.0 * D_z_face[0, :] / (self.c * self.dz)
-                data[pos_self[rows]] = 1.0 + alpha_vec
-                data[pos_ip[rows]] = -alpha_vec
-                b[rows] = self.E_left_drive(t + dt_local)
+                
+                # Foam region: apply Marshak boundary with E_left_drive
+                data[pos_self[rows[mask_foam]]] = 1.0 + alpha_vec[mask_foam]
+                data[pos_ip[rows[mask_foam]]] = -alpha_vec[mask_foam]
+                b[rows[mask_foam]] = self.E_left_drive(t + dt_local)
+                
+                # Gold region: apply Marshak boundary with vacuum (E_vac = 0)
+                data[pos_self[rows[~mask_foam]]] = 1.0 + alpha_vec[~mask_foam]
+                data[pos_ip[rows[~mask_foam]]] = -alpha_vec[~mask_foam]
+                b[rows[~mask_foam]] = 0.0  # Vacuum boundary: E_vac = 0
                 continue
 
             A_diag = inv_Delta_t + C_n[i, :]  # Diagonal coefficient
@@ -884,7 +1068,7 @@ class SelfSimilarDiffusion2D:
         stored_Tm,
         *,
         front_method: str = "maxgrad",
-        threshold: float = 5,
+        threshold: float = 10,
         T_cold=None,
     ):
         """Compute the front surface z_F(r,t) from stored 2D material temperature.

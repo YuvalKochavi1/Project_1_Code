@@ -9,7 +9,7 @@ def plot_analytic_if_available(x_vals, y_vals, *, label, linestyle="--", color=N
     if y_vals is not None:
         plt.plot(x_vals, y_vals, linestyle=linestyle, label=label, color=color)
 
-def plot_csv_series(path, *, y_scale=10, label=None, **plot_kwargs):
+def plot_csv_series(path, *, y_scale=1, label=None, **plot_kwargs):
     x_vals, y_vals = read_xy_csv(path)
     plt.plot(x_vals, y_vals / y_scale, label=label, **plot_kwargs)
 
@@ -134,7 +134,7 @@ def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'G
         wall_material=wall_material,
         mode="no_marshak",
     )
-    analytic_positions_marshak, Ts_1D, _, _, data_of_R_marshak, bessel_data = analytic_wave_front_dispatch(
+    analytic_positions_marshak, Ts_1D, E_marshak, _, data_of_R_marshak, bessel_data = analytic_wave_front_dispatch(
         times_to_store,
         use_seconds=True,
         wall_material=wall_material,
@@ -183,6 +183,12 @@ def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'G
         "Ts_2D_lam_eff": Ts_2D_lam_eff,
         "Ts_marshak_gold_loss": Ts_marshak_gold_loss,
         "Ts_ablation_const_rho": Ts_ablation_const_rho,
+        "E_2D": E_out_2D,
+        "E_2D_lam_eff": E_out_2D_lam_eff,
+        "E_gold_loss": E_out_gold_loss,
+        "E_marshak": E_marshak,
+        "E_W_gold_loss": Ew_out_gold_loss,
+        "E_ablation_const_rho": E_out_ablation_const_rho,
         "data_of_R_marshak": data_of_R_marshak,
         "bessel_data_marshak": bessel_data,
         "data_of_R_2D": data_of_R_2D,

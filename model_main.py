@@ -345,6 +345,8 @@ def _store_bessel_snapshot(
     shock_penetration_depth_cm_profile=None,
     shock_penetration_radius_profile=None,
     shock_penetration_cell_idx_profile=None,
+    wall_material='Gold',
+    ablation=False,
 ):
     dE_wall = E_wall_array_erg[i] - E_wall_array_erg[i - 1]
     if i <= 2:
@@ -362,7 +364,7 @@ def _store_bessel_snapshot(
     
     # Compute z_F at r=R_cm (edge of foam) using kappa_0
     z_F_at_rcm = xF_i * special.j0(kappa_0 * R_cm)
-    albedo_array, avg_albedo = AlbedoModel.compute_albedo_profile(t_sec[i], dt_i, t_heat, Ts_i, z_F_at_rcm, wall_material='Gold')
+    albedo_array, avg_albedo = AlbedoModel.compute_albedo_profile(t_sec[i], dt_i, t_heat, Ts_i, z_F_at_rcm, wall_material= wall_material)
     J0_profile = special.j0(kappa_0 * r_grid)
     J0_profile_approx = special.j0(kappa_0_approx * r_grid)
     z_F_radial = _compute_z_front_radial_snapshot(xF_i, J0_profile)
@@ -390,7 +392,7 @@ def _store_bessel_snapshot(
     snapshot['avg_albedo'] = avg_albedo
 
     # Classify foam vs wall cells once in solver and store for plotting.
-    if data_of_R is not None and t_ref_sec is not None and len(data_of_R) > 0:
+    if data_of_R is not None and t_ref_sec is not None and len(data_of_R) > 0 and ablation:
         z_mesh = z
         r_mesh = r_grid
         R_mesh, _ = np.meshgrid(r_mesh, z_mesh)
@@ -464,7 +466,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
     F  = np.zeros_like(t_sec)
     E  = np.zeros_like(t_sec)  # "energy-like" integral over flux (per area-ish, matching your current usage)
     z_F_rcm = np.zeros_like(t_sec)  # z_F at r=R_cm (edge of foam)
-
+    
     new_rho = np.full_like(t_sec, rho, dtype=float)
     C_changing_rho = np.full_like(t_sec, 0, dtype=float)
     Z1_changing_rho = np.full_like(t_sec, 0, dtype=float)
@@ -579,7 +581,8 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
             i, t_sec, dt_i, t_heat, Ts[i], z_F_rcm[i-1], wall_material, wall_penetration_radius_profile,)
         if wall_loss and i > 1:
             #calcultates the bessel function profiles and parameters for the current time step and stores them in bessel_data for later retrieval and plotting
-            _store_bessel_snapshot(i, t_sec, Ts[i], dt_i, xF[i], E_wall_array_erg, bessel_data, data_of_R=data_of_R if ablation else None, t_ref_sec=t_sec[i] if ablation else None, t_heat=t_heat, wall_penetration_depth_cm_profile=wall_penetration_depth_cm_profile, wall_penetration_radius_profile=wall_penetration_radius_profile, wall_penetration_cell_idx_profile=wall_penetration_cell_idx_profile, shock_penetration_depth_cm_profile=shock_penetration_depth_cm_profile, shock_penetration_radius_profile=shock_penetration_radius_profile, shock_penetration_cell_idx_profile=shock_penetration_cell_idx_profile,)
+            _store_bessel_snapshot(i, t_sec, Ts[i], dt_i, xF[i], E_wall_array_erg, bessel_data, data_of_R=data_of_R if ablation else None, t_ref_sec=t_sec[i] if ablation else None, t_heat=t_heat, wall_penetration_depth_cm_profile=wall_penetration_depth_cm_profile, wall_penetration_radius_profile=wall_penetration_radius_profile, wall_penetration_cell_idx_profile=wall_penetration_cell_idx_profile, shock_penetration_depth_cm_profile=shock_penetration_depth_cm_profile, shock_penetration_radius_profile=shock_penetration_radius_profile, shock_penetration_cell_idx_profile=shock_penetration_cell_idx_profile,
+                                   wall_material=wall_material, ablation=ablation,)
 
             # Extract z_F at r=R_cm from the current time snapshot.
             t_key = t_sec[i] * 1e9
