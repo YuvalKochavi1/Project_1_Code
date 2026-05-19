@@ -170,7 +170,8 @@ class WallLossModel:
         """Wall energy loss for beryllium in hJ/mm^2 (Eq. 11 parameterization)."""
         if t_exposed <= 0:
             return 0.0
-        return 1.27 * T0**4.99 * (t_exposed * 1e9) ** 0.5
+        g0be = 1/402.8
+        return 1.27 * ((g_be/g0be) ** 0.5) * T0**4.99 * (t_exposed * 1e9) ** 0.5
     
     @staticmethod
     def gold_areal_loading_g_per_cm2(t_exposed, T0):

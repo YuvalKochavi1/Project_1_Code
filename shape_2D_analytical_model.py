@@ -87,7 +87,6 @@ def _normalize_color_option(color_option=None, color_style="default"):
 
 def _closest_time_data(bessel_data, target_time):
     available_times = np.array(list(bessel_data.keys()))
-    print(available_times)
     t_closest = available_times[np.argmin(np.abs(available_times - target_time))]
     return t_closest, bessel_data[t_closest]
 

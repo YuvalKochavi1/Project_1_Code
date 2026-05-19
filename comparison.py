@@ -393,7 +393,8 @@ def compare_with_article_2_exp3_13a(times_to_store):
     analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     Ts_marshak = front_series["Ts_1D"]
-    analytic_position_Be_lost, Ts_out, E_out, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be')  # stored_t is ns
+    E_marshak = front_series["E_marshak"]
+    analytic_position_Be_lost, Ts_out, E_out, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = True, power=1)  # stored_t is ns
     plt.figure(figsize=(8, 6))
     # fit data to analytical
     plot_standard_front_analytic_models(
@@ -432,6 +433,21 @@ def compare_with_article_2_exp3_13a(times_to_store):
     #                 fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     # make directory if not exists
     save_figure("front_position - compare Back Ta2O5.png", model1_5=True)
+
+    # Plot energies
+    plt.figure(figsize=(8, 6))
+    plt.plot(times_to_store, E_marshak, label="E - Marshak BC", linestyle="-", color='blue')
+    plt.plot(times_to_store, E_out, label="E - Foam with Be Loss", linestyle="-", color='green')
+    plt.plot(times_to_store, Ew_be_out, label="E - Be Wall Loss", linestyle="-", color='red')
+    
+    plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
+    plt.ylabel("Total Energy (hJ)", fontsize=18, fontname='serif')
+    plt.title(f"Total Energy vs Time  - Material: {Material}", fontsize=18, fontname='serif')
+    plt.grid(True)
+    plt.legend(prop={'family': 'serif'})
+    plt.tight_layout()
+    save_figure("total_energy - Ta2O5 Be.png", model1_5=True)
+
     #save the analytic positions to csv
     export_analytic_positions_csv(
         times_to_store,
@@ -453,7 +469,7 @@ def compare_with_article_2_exp3_13a(times_to_store):
     
     # Plot albedo arrays for different models (only for specific times)
     plot_albedo_arrays(Be_bessel_data, z_grid=z_grid_for_plots, 
-                       title="Albedo Profiles - Be lost", times_ns=[1.0, 2.0, 2.5])
+                       title="Albedo Profiles - Be lost", times_ns=[0.5, 1.0, 2])
     save_figure("albedo_profiles_Be_Coated.png", model1_5=True)
 
     plot_temperature_heatmap_2D(Be_bessel_data, analytic_position_Be_lost,
@@ -1120,11 +1136,12 @@ def compare_for_material():
     return times_to_store
 
 if __name__ == "__main__":
-    #simulate()
+    times_to_store = np.linspace(0.01, 3, 1000)
+    plot_albedo_z0_vs_time(times_to_store, mode="marshak_wall_loss", vary_rho=False, lam_eff=False, power=1.5, wall_material="Be")
     times_to_store = compare_for_material()  # times_to_store will be set inside the function based on the material
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)
     #compare_n_1(times_to_store)
     # plot_surface_temperature_comparison(times_to_store)
-    plot_albedo_z0_vs_time(times_to_store, mode="marshak_wall_loss", vary_rho=False, lam_eff=False, power=1.5, wall_material="Be")
+    # plot_albedo_z0_vs_time(times_to_store, mode="varying_rho", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold")
     plot_model_shock_wave_at_z0_all_times(times_to_store)

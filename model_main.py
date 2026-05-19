@@ -230,6 +230,8 @@ def _update_wall_penetration_profiles(i, t_sec, dt_i, t_heat, Ts_i, xF_i, wall_m
         wall_penetration_depth_cm_profile += np.clip(delta_penetration_depth_cm, 0.0, None)
         wall_penetration_depth_cm_profile = np.clip(wall_penetration_depth_cm_profile, 0.0, w_Au)
 
+        # print(f"wall material: {wall_material}, Total penetration depth (cm) = {wall_penetration_depth_cm_profile[1]:.3e}")
+
         # Enforce physically consistent shape for z <= xF_i:
         # penetration should be non-increasing with depth.
         heated_end = int(np.searchsorted(z, xF_i, side='right'))
@@ -430,7 +432,7 @@ def _restore_marshak_outputs(xF, Ts, E_total_hJ, E_wall_hJ_array, order, t_sec_i
     return xF_out, Ts_out, E_out, Ew_out, data_of_R_ns
 
 def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False, ablation=False,
- vary_rho=False, flat_top_profile=False, wall_material='Gold', lam_eff=False, power=2, R_average_for_lambda_geom=True,):
+ vary_rho=False, flat_top_profile=True, wall_material='Gold', lam_eff=False, power=2, R_average_for_lambda_geom=True,):
     """
     Shared engine for Marshak boundary iteration (Appendix A).
     March in time:
@@ -548,7 +550,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
         if ablation:
             R_array, A[i], dE_wall_hJ = _compute_ablation_step(i, t_sec, dt_i, t_heat, Ts_prev, z_F_rcm[i-1], wall_material, rho, data_of_R,)
         elif wall_loss:
-            dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, z_F_rcm[i-1], flat_top_profile=True, wall=wall_material,)
+            dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, z_F_rcm[i-1], flat_top_profile=False, wall=wall_material,)
 
         E_wall_erg = _update_flux_and_energy(i, dt_i,base_flux, area,ablation, wall_loss, A, F, E, E_wall_erg, E_wall_array_erg, dE_wall_hJ,)
 
@@ -588,6 +590,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
             t_key = t_sec[i] * 1e9
             if t_key in bessel_data and 'z_F_at_rcm' in bessel_data[t_key]:
                 z_F_rcm[i] = bessel_data[t_key]['z_F_at_rcm']
+                # z_F_rcm[i] = xF[i]
         _update_t_heat(z_F_rcm[i], t_heat, t_sec[i])
 
         #calculating t_heat - according to the definition of t_heat, we want to find the time at which each spatial zone z is first reached by the heat front. The heat front position at r=R_cm is given by z_F_rcm[i], so we check for each spatial zone z[j] whether it has been reached by the heat front (z[j] <= z_F_rcm[i]) and if it hasn't been reached before (t_heat[j] == np.inf). If both conditions are true, we update t_heat[j] to the current time t_sec[i].            

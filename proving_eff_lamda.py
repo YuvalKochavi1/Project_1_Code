@@ -22,8 +22,8 @@ plt.plot(x, y, marker='o')
 
 # Labels
 plt.xlabel("D (mm)")
-plt.ylabel("Y values")
-plt.title("Y vs D")
+plt.ylabel("location at t = 3 ns (mm)")
+plt.title("front position (t = 3 ns) vs Diameter")
 
 # Grid
 plt.grid(True)

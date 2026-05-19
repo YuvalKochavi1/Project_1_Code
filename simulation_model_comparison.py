@@ -16,6 +16,7 @@ import re
 from parameters import Experiment, Material, R_cm, L
 from model_main import BASE_DIR
 
+print(f"Experiment: {Experiment}, Material: {Material}")
 
 # Set up figures output directory
 FIGURES_OUTPUT_DIR = Path(BASE_DIR) / "Figures_new" / Experiment / Material / "comparison_model_simulation"
@@ -173,7 +174,7 @@ def plot_simulation_vs_model_each_time(sim_data, model_data):
   fig, axes = plt.subplots(1, n_times, figsize=(5 * n_times, 4.8), sharey=True)
   if n_times == 1:
     axes = [axes]
-
+  mult = [1, 1, 1]  # Adjust as needed to better align model and simulation fronts
   for idx, t_model in enumerate(model_times):
     ax = axes[idx]
     model_entry = model_profiles[t_model]
@@ -189,7 +190,8 @@ def plot_simulation_vs_model_each_time(sim_data, model_data):
       t_sim = float(available_sim_times[np.argmin(np.abs(available_sim_times - t_model))])
     z_sim = sim_profiles[t_sim]
 
-    ax.plot(r_model, z_model, color="tab:red", linewidth=2.5, label=f"Model t={t_model:.2f} ns")
+    
+    ax.plot(r_model, mult[idx] *z_model, color="tab:red", linewidth=2.5, label=f"Model t={t_model:.2f} ns")
     ax.plot(sim_r, z_sim, color="tab:blue", linestyle="--", linewidth=2.2, label=f"Simulation t={t_sim:.2f} ns")
 
     ax.set_xlim([0, R_cm])

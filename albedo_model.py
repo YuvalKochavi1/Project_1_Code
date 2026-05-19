@@ -57,7 +57,7 @@ class AlbedoModel:
         if T_s <= 0 or dt_sec <= 0:
             return 0.0
 
-        dE_wall_array = WallLossModel.E_wall_array_dt(t_sec, dt_sec, t_heat, T_s, xF, flat_top_profile=True, wall=wall_material)
+        dE_wall_array = WallLossModel.E_wall_array_dt(t_sec, dt_sec, t_heat, T_s, xF, flat_top_profile=False, wall=wall_material)
         sigma_SB_hev = a_hev * 3e10 / 4.0
         wall_flux_rate = dE_wall_array / dt_sec
         T_s_array = np.full_like(wall_flux_rate, T_s)
@@ -75,7 +75,38 @@ class AlbedoModel:
         if x_front_index <= 0:
             avg_albedo = float(albedo[0]) if albedo.size > 0 else 0.0
         else:
-            avg_albedo = float(np.mean(albedo[:x_front_index]))
+            # make negative and inf values zero before averaging, and clip to [0,1]
+            albedo[albedo < 0] = 0.0
+            albedo[albedo > 1] = 1.0
+            #average without the zeroed values to avoid biasing the average when the front is near z=0
+            albedo_nonzero = albedo[:x_front_index][albedo[:x_front_index] > 0]
+            # if t_sec < 0.1e-9:
+            #     avg_albedo = np.mean(albedo[:x_front_index])
+            # else:
+            #     avg_albedo = np.mean(albedo_nonzero) if albedo_nonzero.size > 0 else 0.0
+            rellevent_z = z[:x_front_index]
+            if wall_material == 'Gold':
+                exponent = 1.0 / (4.0 + alpha - beta)
+                weight_function = T_s * (1 - rellevent_z / xF) ** exponent
+                sum_weights = np.sum(weight_function)
+                avg_albedo = np.sum(albedo[:x_front_index] * weight_function) / sum_weights
+            elif wall_material == 'Be':
+                exponent = 1.0 / (4.0 + alpha - beta)
+                weight_function = T_s * (1 - rellevent_z / xF) ** exponent
+                sum_weights = np.sum(weight_function)
+                avg_albedo = np.sum(albedo[:x_front_index] * weight_function) / sum_weights
+            elif wall_material == 'Copper':
+                exponent = 1.0 / (4.0 + alpha - beta)
+                weight_function = T_s * (1 - rellevent_z / xF) ** exponent
+                sum_weights = np.sum(weight_function)
+                avg_albedo = np.sum(albedo[:x_front_index] * weight_function) / sum_weights
+            elif wall_material == 'Vacuum':
+                exponent = 1.0 / (4.0 + alpha - beta)
+                weight_function = T_s * (1 - rellevent_z / xF) ** exponent
+                sum_weights = np.sum(weight_function)
+                avg_albedo = np.sum(albedo[:x_front_index] * weight_function) / sum_weights
+            else:
+                delta_e_i = 0.0
 
         avg_albedo = float(np.clip(np.nan_to_num(avg_albedo, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0))
         return albedo, avg_albedo
