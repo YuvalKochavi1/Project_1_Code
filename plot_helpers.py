@@ -184,6 +184,7 @@ def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'G
         "Ts_marshak_gold_loss": Ts_marshak_gold_loss,
         "Ts_ablation_const_rho": Ts_ablation_const_rho,
         "E_2D": E_out_2D,
+        "E_wall_out_2D": Ew_out_2D,
         "E_2D_lam_eff": E_out_2D_lam_eff,
         "E_gold_loss": E_out_gold_loss,
         "E_marshak": E_marshak,

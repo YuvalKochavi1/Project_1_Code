@@ -57,7 +57,7 @@ class AlbedoModel:
         if T_s <= 0 or dt_sec <= 0:
             return 0.0
 
-        dE_wall_array = WallLossModel.E_wall_array_dt(t_sec, dt_sec, t_heat, T_s, xF, flat_top_profile=False, wall=wall_material)
+        dE_wall_array = WallLossModel.E_wall_array_dt(t_sec, dt_sec, t_heat, T_s, xF, flat_top_profile=Flattop_condition, wall=wall_material)
         sigma_SB_hev = a_hev * 3e10 / 4.0
         wall_flux_rate = dE_wall_array / dt_sec
         T_s_array = np.full_like(wall_flux_rate, T_s)

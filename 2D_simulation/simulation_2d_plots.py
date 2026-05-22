@@ -15,11 +15,10 @@ from simulation_2d_core import K_per_Hev, cell_to_vertices, edges_from_nodes_wit
 
 
 def _get_gold_label(sim):
-    """Return 'gold' or 'vacuum' suffix based on whether sim has a gold layer."""
-    if sim.gold_width > 0:
-        return "gold"
-    else:
-        return "vacuum"
+    """Return a filename suffix for the selected outer coat."""
+    if getattr(sim, "gold_width", 0) > 0:
+        return str(getattr(sim, "outer_material", "gold")).strip().lower()
+    return "vacuum"
 
 
 def _save_temperature_cell_csv(csv_path, r_edges, z_edges, T_cell):
@@ -75,7 +74,7 @@ def plot_temperature_maps_gouraud(
         idx_plot = int(np.argmin(np.abs(stored_t - t_plot)))
         T_cell = stored_Tm[idx_plot] / K_per_Hev  # (Nz, Nr) in HeV
 
-        R_total = sim.R_foam + sim.gold_width
+        R_total = sim.R_foam + getattr(sim, "coat_width", sim.gold_width)
         r_edges = edges_from_nodes_with_bounds(sim.r, 0.0, R_total)
         z_edges = edges_from_nodes_with_bounds(sim.z, 0.0, sim.Lz)
         T_vert = cell_to_vertices(T_cell)
@@ -131,7 +130,7 @@ def plot_temperature_maps_simple(
 
     for t_plot in times_s:
         idx_plot = int(np.argmin(np.abs(stored_t - t_plot)))
-        R_total = sim.R_foam + sim.gold_width
+        R_total = sim.R_foam + getattr(sim, "coat_width", sim.gold_width)
         r_edges = edges_from_nodes_with_bounds(sim.r, 0.0, R_total)
         z_edges = edges_from_nodes_with_bounds(sim.z, 0.0, sim.Lz)
         Tm = stored_Tm[idx_plot]
@@ -174,7 +173,7 @@ def plot_front_vs_time(
     figure_data_dir = Path(figure_data_dir)
     ensure_dir(out_path.parent)
     
-    # Insert gold/vacuum label into filename
+    # Insert coat label into filename
     gold_label = _get_gold_label(sim)
     stem = out_path.stem
     suffix = out_path.suffix
@@ -183,19 +182,20 @@ def plot_front_vs_time(
     plt.figure(figsize=(8, 6))
     plt.plot(stored_t * 1e9, np.asarray(front_z_cm) * 1e1)
 
-    overlays = [
-        (figure_data_dir / "gold_supersonic_comparison" / "shay_model_first_sent.csv", "Gold wall - Supersonic (shay's model)", "--", "blue", 1.0),
-        (figure_data_dir / "gold_supersonic_comparison" / "shay_simulation.csv", "Gold wall - Supersonic (Avner's simulation)", "-", "blue", 1.0),
-        (figure_data_dir / "gold_supersonic_comparison" / "gold_wall_subsonic.csv", "Gold wall - Subsonic (my 1.5 model)", "-", "red", 1.0),
-        (figure_data_dir / "gold_supersonic_comparison" / "my1_5_model_supersonic.csv", "Gold wall - Supersonic (my 1.5 model)", "--", "red", 10.0),
-    ]
+    if str(getattr(sim, "outer_material", "gold")).strip().lower() == "gold":
+        overlays = [
+            (figure_data_dir / "gold_supersonic_comparison" / "shay_model_first_sent.csv", "Gold wall - Supersonic (shay's model)", "--", "blue", 1.0),
+            (figure_data_dir / "gold_supersonic_comparison" / "shay_simulation.csv", "Gold wall - Supersonic (Avner's simulation)", "-", "blue", 1.0),
+            (figure_data_dir / "gold_supersonic_comparison" / "gold_wall_subsonic.csv", "Gold wall - Subsonic (my 1.5 model)", "-", "red", 1.0),
+            (figure_data_dir / "gold_supersonic_comparison" / "my1_5_model_supersonic.csv", "Gold wall - Supersonic (my 1.5 model)", "--", "red", 10.0),
+        ]
 
-    for path, label, ls, color, yscale in overlays:
-        if path.exists():
-            df = pd.read_csv(path)
-            t_csv = df["x"].to_numpy()
-            x_csv = df["y"].to_numpy()
-            plt.plot(t_csv, yscale * x_csv, linestyle=ls, label=label, color=color)
+        for path, label, ls, color, yscale in overlays:
+            if path.exists():
+                df = pd.read_csv(path)
+                t_csv = df["x"].to_numpy()
+                x_csv = df["y"].to_numpy()
+                plt.plot(t_csv, yscale * x_csv, linestyle=ls, label=label, color=color)
 
     plt.xlabel("Time (ns)", fontname="serif")
     plt.ylabel("Front Position (millimeters)", fontname="serif")
@@ -208,7 +208,8 @@ def plot_front_vs_time(
 
     ensure_dir(figure_data_dir / "front_vs_time")
     save_series_csv(
-        figure_data_dir / "front_vs_time" / "front_position_vs_time_r0.csv",
+        #put the coat material in the filename
+        figure_data_dir / "front_vs_time" / f"front_position_vs_time_{sim.outer_material}_r0.csv",
         {
             "time_ns": np.asarray(stored_t) * 1e9,
             "front_position_mm": np.asarray(front_z_cm) * 1e1,
@@ -229,7 +230,7 @@ def plot_front_surface(
     out_path = Path(out_path)
     figure_data_dir = Path(figure_data_dir)
     ensure_dir(out_path.parent)
-    R_total = sim.R_foam + sim.gold_width
+    R_total = sim.R_foam + getattr(sim, "coat_width", sim.gold_width)
 
     zF = sim.compute_front_surface(stored_Tm, front_method="maxgrad")
     plt.figure(figsize=(7.0, 4.2), constrained_layout=True)
@@ -237,7 +238,7 @@ def plot_front_surface(
         idx_plot = int(np.argmin(np.abs(stored_t - t_plot)))
         plt.plot(sim.r, zF[idx_plot], label=f"t={t_plot*1e9:.1f} ns")
 
-    plt.axvline(sim.R_foam, color="k", linestyle="--", linewidth=1, label="Foam-Gold Interface")
+    plt.axvline(sim.R_foam, color="k", linestyle="--", linewidth=1, label=f"Foam-{getattr(sim, 'outer_material', 'Coat')} Interface")
     plt.xlabel("r (cm)", fontname="serif")
     plt.ylabel("Front Position z_F (cm)", fontname="serif")
     plt.title("Front Surface z_F(r) at Different Times", fontname="serif")
@@ -246,7 +247,7 @@ def plot_front_surface(
     plt.grid()
     plt.legend(prop={"family": "serif"})
     
-    # Insert gold/vacuum label into filename
+    # Insert coat label into filename
     gold_label = _get_gold_label(sim)
     stem = out_path.stem
     suffix = out_path.suffix
@@ -260,7 +261,7 @@ def plot_front_surface(
     for t_plot in times_s:
         idx_plot = int(np.argmin(np.abs(stored_t - t_plot)))
         export_dict[f"zF_cm_t{t_plot*1e9:.1f}ns"] = zF[idx_plot]
-    save_series_csv(figure_data_dir / "front_surface" / "front_surface_profiles.csv", export_dict)
+    save_series_csv(figure_data_dir / "front_surface" / f"front_surface_profiles_{gold_label}.csv", export_dict)
 
 
 def plot_energy_comparison(
@@ -279,24 +280,26 @@ def plot_energy_comparison(
     figure_data_dir = Path(figure_data_dir)
     ensure_dir(out_path.parent)
     
-    # Insert gold/vacuum label into filename
-    gold_label = _get_gold_label(sim)
+    # Insert coat label into filename
+    coat_label = _get_gold_label(sim)
     stem = out_path.stem
     suffix = out_path.suffix
-    out_path = out_path.parent / f"{stem}_{gold_label}{suffix}"
+    out_path = out_path.parent / f"{stem}_{coat_label}{suffix}"
 
     energy_foam = sim.compute_energy_foam(stored_Um) * 1e-9
-    energy_gold = sim.compute_energy_gold(stored_Um) * 1e-9
+    energy_coat = sim.compute_energy_gold(stored_Um) * 1e-9
 
     plt.figure(figsize=(7.0, 4.2), constrained_layout=True)
     plt.plot(stored_t * 1e9, energy_foam, label="Simulated Foam Energy (hJ)", color="blue")
-    plt.plot(stored_t * 1e9, energy_gold, label="Simulated Gold Energy (hJ)", color="green")
+    plt.plot(stored_t * 1e9, energy_coat, label=f"Simulated {getattr(sim, 'outer_material', 'Coat')} Energy (hJ)", color="green")
 
     overlay_paths = [
-        (figure_data_dir / "gold_supersonic_comparison" / "supersonic_gold_lost_energy.csv", "Estimated Lost Energy", "--", "red"),
         (base_dir/ "Data_new" / experiment / material / "article" / "energies" / "total_energy_1D.csv", "Total Energy 1D", "-.", "orange"),
         (base_dir / "Data_new" / experiment / material / "article" / "energies" / "total_energy_2D.csv", "Total Energy 2D", "--", "purple"),
     ]
+
+    if str(getattr(sim, "outer_material", "gold")).strip().lower() == "gold":
+        overlay_paths.insert(0, (figure_data_dir / "gold_supersonic_comparison" / "supersonic_gold_lost_energy.csv", "Estimated Lost Energy", "--", "red"))
 
     for path, label, ls, color in overlay_paths:
         if path.exists():
@@ -315,10 +318,10 @@ def plot_energy_comparison(
 
     ensure_dir(figure_data_dir / "energy_comparison")
     save_series_csv(
-        figure_data_dir / "energy_comparison" / "simulated_energy_vs_time.csv",
+        figure_data_dir / "energy_comparison" / f"simulated_energy_vs_time_{coat_label}.csv",
         {
             "time_ns": np.asarray(stored_t) * 1e9,
             "foam_energy_hJ": energy_foam,
-            "gold_energy_hJ": energy_gold,
+            "gold_energy_hJ": energy_coat,
         },
     )

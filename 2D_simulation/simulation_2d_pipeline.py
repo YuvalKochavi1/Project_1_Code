@@ -19,12 +19,16 @@ from simulation_2d_plots import (
     plot_temperature_maps_simple,
 )
 global heatmap_times
-heatmap_times = (1e-9, 2e-9, 2.5e-9)
-Material = "SiO2"
+
+Material = "Ta2O5"
+CoatingMaterial = "Be"
 if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
+    heatmap_times = (1e-9, 2e-9, 2.5e-9)
 elif Material == "C8H8":
     Experiment = "Ji-Yan"
+    heatmap_times = (0.5e-9, 1e-9, 1.3e-9)
+
 BASE_DIR = PROJECT_ROOT
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
 FIGURES_DIR = BASE_DIR / "Figures_new" / Experiment / Material
@@ -45,6 +49,7 @@ mpl.rcParams["mathtext.default"] = "regular"
 def create_simulation(
     *,
     material: str = Material,
+    coating_material: str = "Gold",
     R_foam: float | None = None,
     Nz: int = 120,
     Nr_foam: int = 120,
@@ -54,6 +59,7 @@ def create_simulation(
     gold_g_scale: float = 1.0,
 ):
     material = str(material)
+    coating_material = str(coating_material)
     if material == "SiO2":
         # Foam self-similarity parameters
         f = 8.77 * 10**13
@@ -66,7 +72,6 @@ def create_simulation(
 
         Lz = 0.3
         R_foam_default = 0.08
-        gold_width = 25 * 1e-4
 
         csv_path = BASE_DIR / "Data_new" / Experiment / Material / "article" / "Temperatures" / "T_drive.csv"
         t_drive_ns, T_drive_eV = load_time_temp(csv_path)
@@ -87,7 +92,6 @@ def create_simulation(
         global heatmap_times
         heatmap_times = (0.5e-9, 1e-9, 1.3e-9)
         Lz = 0.03
-        gold_width = 0
     
     elif material == "Ta2O5":
         f = 4.78 * 10**13          # fudge factor for sigma (new model) [erg/g]
@@ -99,7 +103,6 @@ def create_simulation(
         rho = 0.04      # initial density (g/cm^3)
         Lz = 0.3
         R_foam_default = 0.08
-        gold_width = 5e-3
 
         csv_path = BASE_DIR / "Data_new" / Experiment / Material / "article" / "Temperatures" / "T_drive.csv"
         t_drive_ns, T_drive_eV = load_time_temp(csv_path)
@@ -112,6 +115,17 @@ def create_simulation(
 
     if R_foam is None:
         R_foam = R_foam_default
+
+    coating_key = coating_material.strip().lower()
+    coating_width_map = {
+        "gold": 25 * 1e-4,
+        "copper": 25 * 1e-4,
+        "be": 4e-3,
+        "vacuum": 0.0,
+    }
+    coating_width = coating_width_map.get(coating_key)
+    if coating_width is None:
+        raise ValueError("coating_material must be one of 'Gold', 'Copper', 'Be', or 'Vacuum'.")
 
     foam_params = {
         "f": f,
@@ -140,10 +154,28 @@ def create_simulation(
         "mu": 0.0701,
         "rho": 1.85,
     }
+    copper_params = {
+        "f": 5.7e13,
+        "g": 4.47e-4,
+        "alpha": 2.21,       # opacity exponent
+        "beta_exp": 1.35,     # beta exponent
+        "lambda_param": 0.29,
+        "mu": 0.14,
+        "rho": 8.96,      # initial density (g/cm^3)
+    }
+
+    coating_params_map = {
+        "gold": gold_params,
+        "copper": copper_params,
+        "be": be_params,
+        "vacuum": foam_params,
+    }
+    coating_params = coating_params_map[coating_key]
+
 
     return SelfSimilarDiffusion2D(
         Lz=Lz,
-        gold_width=gold_width,
+        gold_width=coating_width,
         R_foam=R_foam,
         Nz=int(Nz),
         Nr_foam=int(Nr_foam),
@@ -153,6 +185,9 @@ def create_simulation(
         foam_params=foam_params,
         gold_params=gold_params,
         be_params=be_params,
+        copper_params=copper_params,
+        coating_params=coating_params,
+        outer_material=coating_material,
         chi=float(chi),
         t_drive_ns=t_drive_ns,
         T_drive_eV=T_drive_eV,
@@ -170,15 +205,29 @@ def _radius_tag(radius_cm: float) -> str:
 def run_eff_lam_radius_sweep(
     *,
     material: str = "SiO2",
+    coating_material: str = "Gold",
     radii_cm: tuple[float, ...] | list[float] = (
         0.0004,
         0.00055,
         0.0007,
         0.00085,
+        0.01,
+        0.001,
+        0.02,
+        0.003,
+        0.005,
+        0.04,
+        0.06,
+        0.006,
+        0.08,
+        0.008,
+        0.007,
+        0.0015,
+        0.0025,
     ),
     Nz: int = 160,
     Nr_foam: int = 160,
-    gold_g_scale: float = 0.01,
+    gold_g_scale: float = 1,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -211,6 +260,7 @@ def run_eff_lam_radius_sweep(
 
         sim = create_simulation(
             material=material,
+            coating_material=coating_material,
             R_foam=radius_cm,
             Nz=Nz,
             Nr_foam=Nr_foam,
@@ -344,8 +394,8 @@ def save_run_data(file_path, stored_t, stored_Um=None, stored_Tm=None, stored_TR
     return file_path
 
 
-def run_default_pipeline(*, material: str = "SiO2"):
-    sim = create_simulation(material=material)
+def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gold"):
+    sim = create_simulation(material=material, coating_material=coating_material)
     stored_t, stored_Um, stored_Tm, stored_TR = run_simulation(
         sim,
         n_store=50,
@@ -406,9 +456,9 @@ def run_default_pipeline(*, material: str = "SiO2"):
     )
 
     heated_gold_cells_by_z = sim.compute_heated_gold_cells_by_z(stored_Tm)
-    print("Heated gold cells by z (last stored snapshot):")
+    print("Heated outer-coat cells by z (last stored snapshot):")
     for z_cm, count in zip(sim.z, heated_gold_cells_by_z):
         if count > 0:
-            print(f"  z={z_cm:.6g} cm: {int(count)} gold cells")
+            print(f"  z={z_cm:.6g} cm: {int(count)} {sim.outer_material} cells")
 
     return sim, stored_t, stored_Um, stored_Tm, stored_TR

@@ -96,15 +96,20 @@ def gather_radius_sweep_results(data_root: Path = DATA_ROOT) -> tuple[np.ndarray
 def plot_front_time_vs_diameter(*, data_root: Path = DATA_ROOT, figure_root: Path = FIGURE_ROOT) -> Path:
     """Create and save the diameter vs. time plot."""
     diameters_mm, crossing_times_ns = gather_radius_sweep_results(data_root)
+    #add 100 to diameters_mm and 1.057 to crossing_times_ns for the 100 mm case
 
     ensure_dir(figure_root)
     figure_path = figure_root / "time_to_front_0p75mm_vs_diameter.png"
 
+    # use a serif font for all text in the figure
+    plt.rcParams["font.family"] = "serif"
     plt.figure(figsize=(8, 5))
     plt.plot(diameters_mm, crossing_times_ns, marker="o", linewidth=2.0, color="tab:blue")
+    # add a y line at y= 1.057 and call it mmarshak_1D result
+    plt.axhline(1.057, color="tab:orange", linestyle="--", label="Marshak 1D")
     plt.xlabel("Diameter (mm)")
     plt.ylabel("Time for front to reach 0.75 mm (ns)")
-    plt.title("Time to foam front at 0.75 mm vs Diameter")
+    # no title requested
     # plt.xscale("log")
     # plt.yscale("log")
     plt.grid(True, alpha=0.3)

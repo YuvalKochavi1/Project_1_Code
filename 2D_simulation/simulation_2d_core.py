@@ -96,6 +96,22 @@ def update_dt_relchange(dt, E, Eold, UR, URold, *, dtfac=0.05, dtmax=None, growt
         dt_new = min(dt_new, dtmax)
     return dt_new, dE, dU
 
+
+def _normalize_outer_material(material):
+    material = str(material).strip().lower()
+    aliases = {
+        "gold": "Gold",
+        "au": "Gold",
+        "copper": "Copper",
+        "cu": "Copper",
+        "be": "Be",
+        "beryllium": "Be",
+        "vacuum": "Vacuum",
+    }
+    if material not in aliases:
+        raise ValueError("outer_material must be one of 'Gold', 'Copper', 'Be', or 'Vacuum'.")
+    return aliases[material]
+
 # ============================================================
 # 2D Solver
 # ============================================================
@@ -110,7 +126,9 @@ class SelfSimilarDiffusion2D:
         # unit system
         simulation_unit_system="cgs",  # "cgs" or "hev|ns"
         # material params (your self-similar)
-        foam_params, gold_params, be_params,
+        foam_params, gold_params, be_params, copper_params=None,
+        coating_params=None,
+        outer_material="Gold",
         chi=1000.0,
         # drive
         t_drive_ns=None, T_drive_eV=None,
@@ -126,10 +144,12 @@ class SelfSimilarDiffusion2D:
         linear_residual_factor=50.0, # for iterative solver; ignored for direct: factor above which to fall back to direct solve (e.g. if linear_residual_factor=10, then if residual is >10 times initial residual, we consider it a failure and fall back to direct)
     ):
         self.Lz, self.gold_width = float(Lz), float(gold_width)
+        self.coat_width = float(gold_width)
+        self.outer_material = _normalize_outer_material(outer_material)
         self.R_foam = float(R_foam)
         self.Nz, self.Nr_foam = int(Nz), int(Nr_foam)
         self.z = np.linspace(0.0, self.Lz, self.Nz)
-        self.r, self.r_info = make_r_two_block(self.R_foam, self.gold_width, self.Nr_foam, Nr_gold=35, dr0= self.gold_width/3000)
+        self.r, self.r_info = make_r_two_block(self.R_foam, self.coat_width, self.Nr_foam, Nr_gold=35, dr0=self.coat_width / 3000)
         self.Nr = self.r.size
         print(self.r)
         self.dz = self.z[1] - self.z[0]
@@ -139,21 +159,24 @@ class SelfSimilarDiffusion2D:
 
         # Radial material maps (shape: (Nr,)). These broadcast naturally against (Nz, Nr) fields.
         mask_foam = (self.r <= self.R_foam)
-        self.f_map       = np.where(mask_foam, foam_params["f"],       gold_params["f"])
-        self.g_map       = np.where(mask_foam, foam_params["g"],       gold_params["g"])
-        self.alpha_map   = np.where(mask_foam, foam_params["alpha"],   gold_params["alpha"])
-        self.betaexp_map = np.where(mask_foam, foam_params["beta_exp"],gold_params["beta_exp"])
-        self.lam_map     = np.where(mask_foam, foam_params["lambda_param"], gold_params["lambda_param"])
-        self.mu_map      = np.where(mask_foam, foam_params["mu"],      gold_params["mu"])
-        self.rho_map     = np.where(mask_foam, foam_params["rho"],     gold_params["rho"])
-        
-        # self.f_map       = np.where(mask_foam, foam_params["f"],       be_params["f"])
-        # self.g_map       = np.where(mask_foam, foam_params["g"],       be_params["g"])
-        # self.alpha_map   = np.where(mask_foam, foam_params["alpha"],   be_params["alpha"])
-        # self.betaexp_map = np.where(mask_foam, foam_params["beta_exp"],be_params["beta_exp"])
-        # self.lam_map     = np.where(mask_foam, foam_params["lambda_param"], be_params["lambda_param"])
-        # self.mu_map      = np.where(mask_foam, foam_params["mu"],      be_params["mu"])
-        # self.rho_map     = np.where(mask_foam, foam_params["rho"],     be_params["rho"])
+        if coating_params is None:
+            coating_lookup = {
+                "Gold": gold_params,
+                "Copper": copper_params,
+                "Be": be_params,
+                "Vacuum": foam_params,
+            }
+            coating_params = coating_lookup[self.outer_material]
+        self.coating_params = dict(coating_params)
+        self.f_map       = np.where(mask_foam, foam_params["f"],       self.coating_params["f"])
+        self.g_map       = np.where(mask_foam, foam_params["g"],       self.coating_params["g"])
+        self.alpha_map   = np.where(mask_foam, foam_params["alpha"],   self.coating_params["alpha"])
+        self.betaexp_map = np.where(mask_foam, foam_params["beta_exp"],self.coating_params["beta_exp"])
+        self.lam_map     = np.where(mask_foam, foam_params["lambda_param"], self.coating_params["lambda_param"])
+        self.mu_map      = np.where(mask_foam, foam_params["mu"],      self.coating_params["mu"])
+        self.rho_map     = np.where(mask_foam, foam_params["rho"],     self.coating_params["rho"])
+
+        self.outer_mask = ~mask_foam
         self.chi = float(chi)
 
         self.dt_init = float(dt_init)
@@ -1002,14 +1025,14 @@ class SelfSimilarDiffusion2D:
         return self._compute_energy_region(stored_Um, mask_r=mask_foam)
 
     def compute_energy_gold(self, stored_Um):
-        """Total gold energy vs time (axisymmetric), in erg.
+        """Total outer-coat energy vs time (axisymmetric), in erg.
 
-        Gold region is defined consistently with the material mask: r >= R_foam.
+        Outer region is defined consistently with the material mask: r >= R_foam.
         Convert to hJ by multiplying by 1e-9 (since 1 erg = 1e-9 hJ).
         
-        Returns zero array if no gold region exists (vacuum mode).
+        Returns zero array if no outer region exists (vacuum mode).
         """
-        # In vacuum mode (gold_width=0), there's no gold region; return zeros
+        # In vacuum mode (coat_width=0), there's no outer region; return zeros
         if not self.r_info.get('has_gold', True):
             Um = np.asarray(stored_Um)
             if Um.ndim == 2:
@@ -1018,23 +1041,23 @@ class SelfSimilarDiffusion2D:
                 return np.zeros(Um.shape[0], dtype=float)
 
         r_nodes = np.asarray(self.r, dtype=float)
-        mask_gold = r_nodes >= float(self.R_foam)
-        if np.count_nonzero(mask_gold) < 2:
+        mask_outer = r_nodes >= float(self.R_foam)
+        if np.count_nonzero(mask_outer) < 2:
             # Fallback: return zeros if mask has < 2 nodes (shouldn't happen with proper grids, but safety)
             Um = np.asarray(stored_Um)
             if Um.ndim == 2:
                 return np.array([0.0])
             else:
                 return np.zeros(Um.shape[0], dtype=float)
-        return self._compute_energy_region(stored_Um, mask_r=mask_gold)
+        return self._compute_energy_region(stored_Um, mask_r=mask_outer)
 
     def compute_heated_gold_cells_by_z(self, stored_Tm, *, threshold: float = 5, T_cold=None):
-        """Count how many radial gold cells are heated above a threshold for each z slice.
+        """Count how many radial outer-coat cells are heated above a threshold for each z slice.
 
         Returns
         -------
         counts_by_z : np.ndarray
-            Number of gold-region radial cells above threshold for each z index.
+            Number of outer-region radial cells above threshold for each z index.
         """
         Tm = np.asarray(stored_Tm)
         if Tm.ndim == 2:
@@ -1055,12 +1078,12 @@ class SelfSimilarDiffusion2D:
         threshold = float(threshold)
         T_cold = float(T_cold)
 
-        mask_gold = np.asarray(self.r, dtype=float) >= float(self.R_foam)
-        if np.count_nonzero(mask_gold) == 0:
+        mask_outer = np.asarray(self.r, dtype=float) >= float(self.R_foam)
+        if np.count_nonzero(mask_outer) == 0:
             return np.zeros(self.Nz, dtype=int)
 
         T_last = Tm[-1]
-        heated = T_last[:, mask_gold] > (threshold * T_cold)
+        heated = T_last[:, mask_outer] > (threshold * T_cold)
         return np.count_nonzero(heated, axis=1)
 
     def compute_front_surface(

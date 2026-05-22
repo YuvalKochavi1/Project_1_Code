@@ -550,7 +550,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
         if ablation:
             R_array, A[i], dE_wall_hJ = _compute_ablation_step(i, t_sec, dt_i, t_heat, Ts_prev, z_F_rcm[i-1], wall_material, rho, data_of_R,)
         elif wall_loss:
-            dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, z_F_rcm[i-1], flat_top_profile=False, wall=wall_material,)
+            dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i], dt_i, t_heat, R_cm, Ts_prev, z_F_rcm[i-1], flat_top_profile=Flattop_condition, wall=wall_material,)
 
         E_wall_erg = _update_flux_and_energy(i, dt_i,base_flux, area,ablation, wall_loss, A, F, E, E_wall_erg, E_wall_array_erg, dE_wall_hJ,)
 

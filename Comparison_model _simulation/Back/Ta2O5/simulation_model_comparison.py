@@ -1,0 +1,350 @@
+"""Ta2O5 (Back) comparison plots for Be and Gold.
+
+This script writes one set of figures to `Be/` and one set to `Gold/`.
+"""
+
+import re
+import sys
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+# Ensure project root is importable when run from this folder
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import parameters as _parameters
+
+_parameters.Material = "Ta2O5"
+_parameters.Experiment = "Back"
+
+from model_main import BASE_DIR
+from parameters import Experiment, L, R_cm, Material
+
+print(f"Experiment: {Experiment}, Material: {Material}")
+
+FRONT_TIMES_NS = [1.0, 2.0, 2.5]
+
+
+def normalize_name(name):
+    return re.sub(r"[^a-z0-9]+", "", name.lower())
+
+
+def pick_column(df, *wanted_names):
+    normalized = {normalize_name(column): column for column in df.columns}
+    for wanted in wanted_names:
+        key = normalize_name(wanted)
+        if key in normalized:
+            return normalized[key]
+    raise ValueError(f"Could not find any of columns: {wanted_names}")
+
+
+def wall_configurations():
+    return [
+        {
+            "name": "Be",
+            "front_loss_column": "front_position (Be Loss)",
+            "simulation_front_position": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "Ta2O5"
+            / "2D_simulation"
+            / "front_vs_time"
+            / "front_position_vs_time_Be_r0.csv",
+            "simulation_front_surface": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "Ta2O5"
+            / "2D_simulation"
+            / "front_surface"
+            / "front_surface_profiles_be.csv",
+            "simulation_energy": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "Ta2O5"
+            / "2D_simulation"
+            / "energy_comparison"
+            / "simulated_energy_vs_time_be.csv",
+            "output_dir": Path(__file__).resolve().parent / "Be",
+        },
+        {
+            "name": "Gold",
+            "front_loss_column": "front_position (gold loss)",
+            "simulation_front_position": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "Ta2O5"
+            / "2D_simulation"
+            / "front_vs_time"
+            / "front_position_vs_time_Gold_r0.csv",
+            "simulation_front_surface": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "Ta2O5"
+            / "2D_simulation"
+            / "front_surface"
+            / "front_surface_profiles_gold.csv",
+            "simulation_energy": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "Ta2O5"
+            / "2D_simulation"
+            / "energy_comparison"
+            / "simulated_energy_vs_time_gold.csv",
+            "output_dir": Path(__file__).resolve().parent / "Gold",
+        },
+    ]
+
+
+def load_simulation_front_position(csv_path):
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Front-position CSV not found: {csv_path}")
+    df = pd.read_csv(csv_path)
+    required = {"time_ns", "front_position_mm", "front_position_cm"}
+    missing = required.difference(df.columns)
+    if missing:
+        raise ValueError(f"CSV must contain columns: {sorted(required)}")
+    return {
+        "time_ns": df["time_ns"].to_numpy(dtype=float),
+        "front_position_mm": df["front_position_mm"].to_numpy(dtype=float),
+        "front_position_cm": df["front_position_cm"].to_numpy(dtype=float),
+    }
+
+
+def load_model_front_position(wall_name, front_loss_column):
+    base_dir = Path(BASE_DIR) / "Data_new" / Experiment / Material / "1.5 model"
+    regular_path = base_dir / "analytic_positions.csv"
+    flattop_path = base_dir / "analytic_positions_flattop.csv"
+
+    if not regular_path.exists():
+        raise FileNotFoundError(f"Model front-position CSV not found: {regular_path}")
+    if not flattop_path.exists():
+        raise FileNotFoundError(f"Model front-position CSV not found: {flattop_path}")
+
+    regular = pd.read_csv(regular_path)
+    flattop = pd.read_csv(flattop_path)
+
+    marshak_regular = pick_column(regular, "front_position (Marshak)")
+    loss_regular = pick_column(regular, front_loss_column)
+    marshak_flattop = pick_column(flattop, "front_position (Marshak)")
+    loss_flattop = pick_column(flattop, front_loss_column)
+
+    return {
+        "time_ns": regular["time_ns"].to_numpy(dtype=float),
+        "marshak": regular[marshak_regular].to_numpy(dtype=float),
+        "loss_regular": regular[loss_regular].to_numpy(dtype=float),
+        "flattop_time_ns": flattop["time_ns"].to_numpy(dtype=float),
+        "marshak_flattop": flattop[marshak_flattop].to_numpy(dtype=float),
+        "loss_flattop": flattop[loss_flattop].to_numpy(dtype=float),
+        "wall_name": wall_name,
+    }
+
+
+def load_simulation_front_surface(csv_path):
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Front-surface CSV not found: {csv_path}")
+    df = pd.read_csv(csv_path)
+    if "r_cm" not in df.columns:
+        raise ValueError("CSV must contain 'r_cm' column")
+    r_cm = df["r_cm"].to_numpy(dtype=float)
+    profiles = {}
+    for col in df.columns:
+        if col == "r_cm":
+            continue
+        match = re.match(r"zF_cm_t([\d.]+)ns$", col)
+        if not match:
+            continue
+        profiles[float(match.group(1))] = df[col].to_numpy(dtype=float)
+    if not profiles:
+        raise ValueError("No front-surface profile columns found.")
+    return {"r_cm": r_cm, "profiles": profiles}
+
+
+def load_model_front_surface(wall_name):
+    data_dir = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape"
+    if not data_dir.exists():
+        raise FileNotFoundError(f"Model shape directory not found: {data_dir}")
+
+    regular_profiles = {}
+    flattop_profiles = {}
+    for time_ns in FRONT_TIMES_NS:
+        regular_path = data_dir / f"front_shape_{wall_name}_t{time_ns:.2f}ns.csv"
+        flattop_path = data_dir / f"front_shape_{wall_name}_flattop_t{time_ns:.2f}ns.csv"
+
+        if not regular_path.exists():
+            raise FileNotFoundError(f"Model front-shape CSV not found: {regular_path}")
+        if not flattop_path.exists():
+            raise FileNotFoundError(f"Model front-shape CSV not found: {flattop_path}")
+
+        regular_df = pd.read_csv(regular_path)
+        flattop_df = pd.read_csv(flattop_path)
+        required = {"r_cm", "z_F_radial_cm"}
+        if not required.issubset(regular_df.columns):
+            raise ValueError(f"CSV must contain columns: {sorted(required)}")
+        if not required.issubset(flattop_df.columns):
+            raise ValueError(f"CSV must contain columns: {sorted(required)}")
+
+        regular_profiles[time_ns] = {
+            "r_cm": regular_df["r_cm"].to_numpy(dtype=float),
+            "z_F_radial_cm": regular_df["z_F_radial_cm"].to_numpy(dtype=float),
+        }
+        flattop_profiles[time_ns] = {
+            "r_cm": flattop_df["r_cm"].to_numpy(dtype=float),
+            "z_F_radial_cm": flattop_df["z_F_radial_cm"].to_numpy(dtype=float),
+        }
+
+    return {"regular": regular_profiles, "flattop": flattop_profiles}
+
+
+def load_simulation_energy(csv_path):
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Energy CSV not found: {csv_path}")
+    df = pd.read_csv(csv_path)
+    required = {"time_ns", "foam_energy_hJ", "gold_energy_hJ"}
+    missing = required.difference(df.columns)
+    if missing:
+        raise ValueError(f"Energy CSV must contain columns: {sorted(required)}")
+    return {
+        "time_ns": df["time_ns"].to_numpy(dtype=float),
+        "foam_energy_hJ": df["foam_energy_hJ"].to_numpy(dtype=float),
+        "coating_energy_hJ": df["gold_energy_hJ"].to_numpy(dtype=float),
+    }
+
+
+def load_model_energy():
+    csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape" / "simulated_energy_vs_time_Ta2O5.csv"
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Model energy CSV not found: {csv_path}")
+    df = pd.read_csv(csv_path)
+    required = {"time_ns", "E_marshak", "E_Gold_loss", "E_Gold_wall_loss", "E_Be_loss", "E_Be_wall_loss"}
+    missing = required.difference(df.columns)
+    if missing:
+        raise ValueError(f"Model energy CSV must contain columns: {sorted(required)}")
+    return {
+        "time_ns": df["time_ns"].to_numpy(dtype=float),
+        "E_marshak": df["E_marshak"].to_numpy(dtype=float),
+        "E_Gold_loss": df["E_Gold_loss"].to_numpy(dtype=float),
+        "E_Gold_wall_loss": df["E_Gold_wall_loss"].to_numpy(dtype=float),
+        "E_Be_loss": df["E_Be_loss"].to_numpy(dtype=float),
+        "E_Be_wall_loss": df["E_Be_wall_loss"].to_numpy(dtype=float),
+    }
+
+
+def plot_front_position(output_dir, wall_name, simulation_data, model_data, loss_label):
+    plt.figure(figsize=(8.2, 6.1))
+    plt.plot(
+        simulation_data["time_ns"],
+        simulation_data["front_position_cm"],
+        color="tab:blue",
+        linestyle="--",
+        linewidth=2.3,
+        label="Simulation front (r=0)",
+    )
+    plt.plot(model_data["time_ns"], model_data["marshak"], color="tab:red", linewidth=2.3, label="Model front_position (Marshak) - heyney")
+    plt.plot(model_data["time_ns"], model_data["loss_regular"], color="tab:green", linewidth=2.2, label=f"Model {loss_label} - heyney")
+    plt.plot(
+        model_data["flattop_time_ns"],
+        model_data["loss_flattop"],
+        color="tab:purple",
+        linestyle=":",
+        linewidth=2.4,
+        label=f"Model {loss_label} - flattop",
+    )
+    plt.xlabel("Time (ns)")
+    plt.ylabel("Front position (cm)")
+    plt.title(f"Front Position vs Time ({Experiment} - Ta2O5 - {wall_name})")
+    plt.grid(True, alpha=0.3)
+    plt.legend(loc="best")
+    plt.tight_layout()
+    out_path = output_dir / "front_position.png"
+    plt.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close()
+    return out_path
+
+
+def plot_front_surface(output_dir, wall_name, simulation_data, model_data):
+    colors = {1.0: "tab:blue", 2.0: "tab:orange", 2.5: "tab:green"}
+    fig, axes = plt.subplots(1, len(FRONT_TIMES_NS), figsize=(5.4 * len(FRONT_TIMES_NS), 4.9), sharey=True)
+    if len(FRONT_TIMES_NS) == 1:
+        axes = [axes]
+
+    for index, time_ns in enumerate(FRONT_TIMES_NS):
+        ax = axes[index]
+        color = colors[time_ns]
+        ax.plot(simulation_data["r_cm"], simulation_data["profiles"][time_ns], color=color, linestyle="--", linewidth=2.2, label=f"Simulation t={time_ns:.1f} ns")
+        ax.plot(model_data["regular"][time_ns]["r_cm"], model_data["regular"][time_ns]["z_F_radial_cm"], color=color, linewidth=2.2, label=f"Heyney t={time_ns:.1f} ns")
+        ax.plot(model_data["flattop"][time_ns]["r_cm"], model_data["flattop"][time_ns]["z_F_radial_cm"], color=color, linestyle=":", linewidth=2.4, label=f"Flattop t={time_ns:.1f} ns")
+        ax.set_xlim([0, R_cm])
+        ax.set_ylim([0, L])
+        ax.set_aspect("equal", adjustable="box")
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f"Model {time_ns:.1f} ns")
+        ax.set_xlabel("r (cm)")
+        if index == 0:
+            ax.set_ylabel("z_F (cm)")
+            ax.legend(loc="best", fontsize=8)
+
+    fig.suptitle(f"Front Surface Comparison at Each Time\n({Experiment} - Ta2O5 - {wall_name})", fontsize=13)
+    fig.tight_layout()
+    out_path = output_dir / "front_surface.png"
+    fig.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    return out_path
+
+
+def plot_energy(output_dir, wall_name, simulation_data, model_data):
+    plt.figure(figsize=(8.2, 6.1))
+    plt.plot(simulation_data["time_ns"], simulation_data["foam_energy_hJ"], color="tab:blue", linestyle="--", linewidth=2.3, label="Simulation foam energy")
+    plt.plot(simulation_data["time_ns"], simulation_data["coating_energy_hJ"], color="tab:orange", linestyle="-.", linewidth=2.3, label="Simulation coating energy")
+    plt.plot(model_data["time_ns"], model_data["E_marshak"], color="tab:red", linewidth=2.3, label="Model E_marshak")
+
+    if wall_name == "Be":
+        plt.plot(model_data["time_ns"], model_data["E_Be_loss"], color="tab:green", linewidth=2.2, label="Model E_Be_loss")
+        plt.plot(model_data["time_ns"], model_data["E_Be_wall_loss"], color="tab:purple", linestyle=":", linewidth=2.3, label="Model E_Be_wall_loss")
+    else:
+        plt.plot(model_data["time_ns"], model_data["E_Gold_loss"], color="tab:green", linewidth=2.2, label="Model E_Gold_loss")
+        plt.plot(model_data["time_ns"], model_data["E_Gold_wall_loss"], color="tab:purple", linestyle=":", linewidth=2.3, label="Model E_Gold_wall_loss")
+
+    plt.xlabel("Time (ns)")
+    plt.ylabel("Energy (hJ)")
+    plt.title(f"Energy Comparison ({Experiment} - Ta2O5 - {wall_name})")
+    plt.grid(True, alpha=0.3)
+    plt.legend(loc="best")
+    plt.tight_layout()
+    out_path = output_dir / "energy.png"
+    plt.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close()
+    return out_path
+
+
+def run_wall_comparison(config):
+    output_dir = config["output_dir"]
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    front_position_sim = load_simulation_front_position(config["simulation_front_position"])
+    front_position_model = load_model_front_position(config["name"], config["front_loss_column"])
+    front_position_out = plot_front_position(output_dir, config["name"], front_position_sim, front_position_model, config["front_loss_column"])
+
+    front_surface_sim = load_simulation_front_surface(config["simulation_front_surface"])
+    front_surface_model = load_model_front_surface(config["name"])
+    front_surface_out = plot_front_surface(output_dir, config["name"], front_surface_sim, front_surface_model)
+
+    energy_sim = load_simulation_energy(config["simulation_energy"])
+    energy_model = load_model_energy()
+    energy_out = plot_energy(output_dir, config["name"], energy_sim, energy_model)
+
+    print(f"[{config['name']}] saved: {front_position_out}")
+    print(f"[{config['name']}] saved: {front_surface_out}")
+    print(f"[{config['name']}] saved: {energy_out}")
+
+
+def main():
+    for config in wall_configurations():
+        run_wall_comparison(config)
+
+
+if __name__ == "__main__":
+    main()
