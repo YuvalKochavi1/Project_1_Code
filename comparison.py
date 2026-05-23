@@ -1218,5 +1218,5 @@ if __name__ == "__main__":
     #R_of_t_z(times_to_store=times_to_store)
     #compare_n_1(times_to_store)
     # plot_surface_temperature_comparison(times_to_store)
-    plot_albedo_z0_vs_time(times_to_store, mode="varying_rho", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold")
-    plot_model_shock_wave_at_z0_all_times(times_to_store)
+    plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold")
+    #plot_model_shock_wave_at_z0_all_times(times_to_store)

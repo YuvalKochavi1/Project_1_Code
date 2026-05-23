@@ -16,9 +16,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import importlib
 import parameters as _parameters
 _parameters.Material = "C8H8"
 _parameters.Experiment = "Ji-Yan"
+importlib.reload(_parameters)
 
 from parameters import Experiment, Material, R_cm, L
 from model_main import BASE_DIR
@@ -26,7 +28,7 @@ from model_main import BASE_DIR
 print(f"Experiment: {Experiment}, Material: {Material}")
 
 # Output directory for figures of this comparison
-FIGURES_OUTPUT_DIR = Path(BASE_DIR) / "Figures_new" / Experiment / Material / "comparison_model_simulation"
+FIGURES_OUTPUT_DIR = Path(__file__).resolve().parent
 FIGURES_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -246,16 +248,29 @@ def main():
         else:
             sim_energy = {"time_ns": np.array([]), "foam_energy_hJ": np.array([]), "coating_energy_hJ": np.array([])}
 
-    # model energy: expect analytic positions file to include vacuum loss column already
-    # reuse model_front_position_load and any existing model energy loaders
-    # If a model energy CSV is present, you can extend this section accordingly.
-    # For now, save sim energy to file for inspection and skip plotting if empty.
+    # Load analytical model energy data if present
+    model_energy_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape" / f"simulated_energy_vs_time_{Material}_vacuum_loss.csv"
+    model_energy = None
+    if model_energy_path.exists():
+        df_me = pd.read_csv(model_energy_path)
+        if "time_ns" in df_me.columns and "E_marshak" in df_me.columns and "E_vacuum_loss" in df_me.columns:
+            model_energy = {
+                "time_ns": df_me["time_ns"].to_numpy(),
+                "E_marshak": df_me["E_marshak"].to_numpy(),
+                "E_vacuum_loss": df_me["E_vacuum_loss"].to_numpy()
+            }
+
     if sim_energy["time_ns"].size > 0:
-        # simple energy plot: foam only for vacuum
+        # energy plot comparing simulation and analytic model
         import matplotlib.pyplot as _plt
 
         _plt.figure(figsize=(8, 6))
-        _plt.plot(sim_energy["time_ns"], sim_energy["foam_energy_hJ"], color="tab:blue", linestyle="--", linewidth=2.2, label="Simulation foam energy")
+        _plt.plot(sim_energy["time_ns"], sim_energy["foam_energy_hJ"], color="tab:blue", linestyle="--", linewidth=2.2, label="2D simulation foam energy")
+        
+        if model_energy is not None:
+            _plt.plot(model_energy["time_ns"], model_energy["E_marshak"], color="tab:red", linestyle="-", linewidth=2.4, label="Analytic model (Marshak)")
+            _plt.plot(model_energy["time_ns"], model_energy["E_vacuum_loss"], color="tab:green", linestyle="-.", linewidth=2.2, label="Analytic model (Vacuum Loss)")
+
         _plt.xlabel("Time (ns)")
         _plt.ylabel("Energy (hJ)")
         _plt.title(f"Energy (Vacuum) ({Experiment} - {Material})")

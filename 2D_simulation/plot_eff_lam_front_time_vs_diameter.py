@@ -25,12 +25,12 @@ from csv_helpers import ensure_dir
 BASE_DIR = PROJECT_ROOT
 DATA_ROOT = BASE_DIR / "Data_new" / "Back" / "SiO2" / "2D_simulation" / "eff_lam"
 FIGURE_ROOT = BASE_DIR / "Figures_new" / "Back" / "SiO2" / "2D_simulation" / "eff_lam"
-TARGET_FRONT_MM = 0.75
+TARGET_FRONT_MM = 0.5
 
 
 def _radius_from_folder_name(folder_name: str) -> float:
-    """Parse a folder name like `R_0p01` into a radius in cm."""
-    match = re.fullmatch(r"R_(\d+p\d+|\d+)", folder_name)
+    """Parse a folder name like `R_0p01` or `R_0p01_g1` into a radius in cm."""
+    match = re.search(r"R_(\d+p\d+|\d+)", folder_name)
     if not match:
         raise ValueError(f"Cannot parse radius from folder name: {folder_name}")
     return float(match.group(1).replace("p", "."))
@@ -73,19 +73,29 @@ def _load_crossing_time(csv_path: Path, target_front_mm: float = TARGET_FRONT_MM
     return t0 + frac * (t1 - t0)
 
 
-def gather_radius_sweep_results(data_root: Path = DATA_ROOT) -> tuple[np.ndarray, np.ndarray]:
+def gather_radius_sweep_results(data_root: Path = DATA_ROOT, g_val: int | None = None) -> tuple[np.ndarray, np.ndarray]:
     """Collect diameters and crossing times from the eff_lam sweep folders."""
     rows: list[tuple[float, float]] = []
 
-    for folder in sorted(data_root.glob("R_*/front_vs_time/front_position_vs_time_r0.csv")):
-        radius_folder = folder.parent.parent.name
+    for folder_dir in sorted(data_root.glob("R_*")):
+        csv_files = list(folder_dir.glob("front_vs_time/front_position_vs_time*r0.csv"))
+        if not csv_files:
+            continue
+        folder = csv_files[0]
+        radius_folder = folder_dir.name
+        is_g1 = "_g1" in radius_folder
+        if g_val == 1 and not is_g1:
+            continue
+        elif g_val is None and is_g1:
+            continue
+
         radius_cm = _radius_from_folder_name(radius_folder)
         diameter_mm = 2.0 * radius_cm * 10.0
         crossing_time_ns = _load_crossing_time(folder, TARGET_FRONT_MM)
         rows.append((diameter_mm, crossing_time_ns))
 
     if not rows:
-        raise FileNotFoundError(f"No sweep CSVs found under {data_root}")
+        return np.array([]), np.array([])
 
     rows.sort(key=lambda item: item[0])
     diameters_mm = np.array([item[0] for item in rows], dtype=float)
@@ -96,6 +106,7 @@ def gather_radius_sweep_results(data_root: Path = DATA_ROOT) -> tuple[np.ndarray
 def plot_front_time_vs_diameter(*, data_root: Path = DATA_ROOT, figure_root: Path = FIGURE_ROOT) -> Path:
     """Create and save the diameter vs. time plot."""
     diameters_mm, crossing_times_ns = gather_radius_sweep_results(data_root)
+    diameters_mm_g1, crossing_times_ns_g1 = gather_radius_sweep_results(data_root, g_val=1)
     #add 100 to diameters_mm and 1.057 to crossing_times_ns for the 100 mm case
 
     ensure_dir(figure_root)
@@ -104,22 +115,28 @@ def plot_front_time_vs_diameter(*, data_root: Path = DATA_ROOT, figure_root: Pat
     # use a serif font for all text in the figure
     plt.rcParams["font.family"] = "serif"
     plt.figure(figsize=(8, 5))
-    plt.plot(diameters_mm, crossing_times_ns, marker="o", linewidth=2.0, color="tab:blue")
+    plt.plot(diameters_mm, crossing_times_ns, marker="o", linewidth=2.0, color="tab:blue", label="Original")
+    if len(diameters_mm_g1) > 0:
+        plt.plot(diameters_mm_g1, crossing_times_ns_g1, marker="s", linewidth=2.0, color="tab:green", label="g=1")
     # add a y line at y= 1.057 and call it mmarshak_1D result
-    plt.axhline(1.057, color="tab:orange", linestyle="--", label="Marshak 1D")
+    plt.axhline(0.773, color="tab:orange", linestyle="--", label="Marshak 1D")
     plt.xlabel("Diameter (mm)")
-    plt.ylabel("Time for front to reach 0.75 mm (ns)")
+    plt.ylabel("Time for front to reach 0.5 mm (ns)")
     # no title requested
     # plt.xscale("log")
     # plt.yscale("log")
     plt.grid(True, alpha=0.3)
+    plt.legend()
     plt.tight_layout()
     plt.savefig(figure_path, dpi=150, bbox_inches="tight")
     plt.close()
 
     print(f"Saved figure: {figure_path}")
-    print("Diameter_mm, time_ns")
+    print("Original: Diameter_mm, time_ns")
     for d_mm, t_ns in zip(diameters_mm, crossing_times_ns):
+        print(f"{d_mm:.6g}, {t_ns:.6g}")
+    print("g=1: Diameter_mm, time_ns")
+    for d_mm, t_ns in zip(diameters_mm_g1, crossing_times_ns_g1):
         print(f"{d_mm:.6g}, {t_ns:.6g}")
 
     return figure_path

@@ -21,6 +21,7 @@ import parameters as _parameters
 _parameters.Material = "Ta2O5"
 _parameters.Experiment = "Back"
 
+
 from model_main import BASE_DIR
 from parameters import Experiment, L, R_cm, Material
 
@@ -115,7 +116,7 @@ def load_simulation_front_position(csv_path):
 
 
 def load_model_front_position(wall_name, front_loss_column):
-    base_dir = Path(BASE_DIR) / "Data_new" / Experiment / Material / "1.5 model"
+    base_dir = Path(BASE_DIR) / "Data_new" / "Back" / "Ta2O5" / "1.5 model"
     regular_path = base_dir / "analytic_positions.csv"
     flattop_path = base_dir / "analytic_positions_flattop.csv"
 
@@ -164,7 +165,7 @@ def load_simulation_front_surface(csv_path):
 
 
 def load_model_front_surface(wall_name):
-    data_dir = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape"
+    data_dir = Path(BASE_DIR) / "Data_new" / "Back" / "Ta2O5" / "2D_shape"
     if not data_dir.exists():
         raise FileNotFoundError(f"Model shape directory not found: {data_dir}")
 
@@ -215,7 +216,7 @@ def load_simulation_energy(csv_path):
 
 
 def load_model_energy():
-    csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape" / "simulated_energy_vs_time_Ta2O5.csv"
+    csv_path = Path(BASE_DIR) / "Data_new" / "Back" / "Ta2O5" / "2D_shape" / "simulated_energy_vs_time_Ta2O5.csv"
     if not csv_path.exists():
         raise FileNotFoundError(f"Model energy CSV not found: {csv_path}")
     df = pd.read_csv(csv_path)
@@ -223,6 +224,15 @@ def load_model_energy():
     missing = required.difference(df.columns)
     if missing:
         raise ValueError(f"Model energy CSV must contain columns: {sorted(required)}")
+
+    flat_path = Path(BASE_DIR) / "Data_new" / "Back" / "Ta2O5" / "2D_shape" / "simulated_energy_vs_time_Ta2O5_flattop.csv"
+    if not flat_path.exists():
+        raise FileNotFoundError(f"Model energy flattop CSV not found: {flat_path}")
+    fdf = pd.read_csv(flat_path)
+    missing_flat = required.difference(fdf.columns)
+    if missing_flat:
+        raise ValueError(f"Model energy flattop CSV must contain columns: {sorted(required)}")
+
     return {
         "time_ns": df["time_ns"].to_numpy(dtype=float),
         "E_marshak": df["E_marshak"].to_numpy(dtype=float),
@@ -230,6 +240,11 @@ def load_model_energy():
         "E_Gold_wall_loss": df["E_Gold_wall_loss"].to_numpy(dtype=float),
         "E_Be_loss": df["E_Be_loss"].to_numpy(dtype=float),
         "E_Be_wall_loss": df["E_Be_wall_loss"].to_numpy(dtype=float),
+        "flattop_time_ns": fdf["time_ns"].to_numpy(dtype=float),
+        "E_Gold_loss_flattop": fdf["E_Gold_loss"].to_numpy(dtype=float),
+        "E_Gold_wall_loss_flattop": fdf["E_Gold_wall_loss"].to_numpy(dtype=float),
+        "E_Be_loss_flattop": fdf["E_Be_loss"].to_numpy(dtype=float),
+        "E_Be_wall_loss_flattop": fdf["E_Be_wall_loss"].to_numpy(dtype=float),
     }
 
 
@@ -299,14 +314,26 @@ def plot_energy(output_dir, wall_name, simulation_data, model_data):
     plt.figure(figsize=(8.2, 6.1))
     plt.plot(simulation_data["time_ns"], simulation_data["foam_energy_hJ"], color="tab:blue", linestyle="--", linewidth=2.3, label="Simulation foam energy")
     plt.plot(simulation_data["time_ns"], simulation_data["coating_energy_hJ"], color="tab:orange", linestyle="-.", linewidth=2.3, label="Simulation coating energy")
+    
+    # Model - Regular (Heyney)
     plt.plot(model_data["time_ns"], model_data["E_marshak"], color="tab:red", linewidth=2.3, label="Model E_marshak")
 
+    # Model - Flattop Marshak
+
     if wall_name == "Be":
+        # Regular
         plt.plot(model_data["time_ns"], model_data["E_Be_loss"], color="tab:green", linewidth=2.2, label="Model E_Be_loss")
-        plt.plot(model_data["time_ns"], model_data["E_Be_wall_loss"], color="tab:purple", linestyle=":", linewidth=2.3, label="Model E_Be_wall_loss")
+        plt.plot(model_data["time_ns"], model_data["E_Be_wall_loss"], color="tab:purple", linewidth=2.2, label="Model E_Be_wall_loss")
+        # Flattop
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_loss_flattop"], color="tab:green", linestyle=":", linewidth=2.4, label="Model E_Be_loss - flattop")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_wall_loss_flattop"], color="tab:purple", linestyle=":", linewidth=2.4, label="Model E_Be_wall_loss - flattop")
     else:
+        # Regular
         plt.plot(model_data["time_ns"], model_data["E_Gold_loss"], color="tab:green", linewidth=2.2, label="Model E_Gold_loss")
-        plt.plot(model_data["time_ns"], model_data["E_Gold_wall_loss"], color="tab:purple", linestyle=":", linewidth=2.3, label="Model E_Gold_wall_loss")
+        plt.plot(model_data["time_ns"], model_data["E_Gold_wall_loss"], color="tab:purple", linewidth=2.2, label="Model E_Gold_wall_loss")
+        # Flattop
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_loss_flattop"], color="tab:green", linestyle=":", linewidth=2.4, label="Model E_Gold_loss - flattop")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_wall_loss_flattop"], color="tab:purple", linestyle=":", linewidth=2.4, label="Model E_Gold_wall_loss - flattop")
 
     plt.xlabel("Time (ns)")
     plt.ylabel("Energy (hJ)")

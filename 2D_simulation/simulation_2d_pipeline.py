@@ -20,8 +20,8 @@ from simulation_2d_plots import (
 )
 global heatmap_times
 
-Material = "Ta2O5"
-CoatingMaterial = "Be"
+Material = "SiO2"
+CoatingMaterial = "Gold"
 if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
     heatmap_times = (1e-9, 2e-9, 2.5e-9)
@@ -253,8 +253,8 @@ def run_eff_lam_radius_sweep(
         radius_name = _radius_tag(radius_cm)
         print(f"Running eff_lam sweep for R_foam={radius_cm:.6g} cm")
 
-        run_figures_dir = figure_root / f"R_{radius_name}"
-        run_data_dir = data_root / f"R_{radius_name}"
+        run_figures_dir = figure_root / f"R_{radius_name}_g1"
+        run_data_dir = data_root / f"R_{radius_name}_g1"
         ensure_dir(run_figures_dir)
         ensure_dir(run_data_dir)
 

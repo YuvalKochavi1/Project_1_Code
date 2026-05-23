@@ -108,11 +108,21 @@ def load_model_energy():
         # fallback to generic name
         csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape" / "simulated_energy_vs_time.csv"
     df = pd.read_csv(csv_path)
+
+    flat_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape" / "simulated_energy_vs_time_SiO2_flattop.csv"
+    if not flat_path.exists():
+        # fallback to generic name
+        flat_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape" / "simulated_energy_vs_time_flattop.csv"
+    fdf = pd.read_csv(flat_path)
+
     return {
         "time_ns": df["time_ns"].to_numpy(),
         "E_marshak": df["E_marshak"].to_numpy(),
         "E_Gold_loss": df.get("E_Gold_loss", df.get("E_gold_loss", np.zeros_like(df["time_ns"]))),
-        "E_Gold_wall_loss": df.get("E_Gold_wall_loss", np.zeros_like(df["time_ns"])),
+        "E_Gold_wall_loss": df.get("E_Gold_wall_loss", df.get("E_wall_gold_loss", df.get("E_gold_wall_loss", np.zeros_like(df["time_ns"])))),
+        "flattop_time_ns": fdf["time_ns"].to_numpy(),
+        "E_Gold_loss_flattop": fdf.get("E_Gold_loss", fdf.get("E_gold_loss", np.zeros_like(fdf["time_ns"]))),
+        "E_Gold_wall_loss_flattop": fdf.get("E_Gold_wall_loss", fdf.get("E_wall_gold_loss", fdf.get("E_gold_wall_loss", np.zeros_like(fdf["time_ns"])))),
     }
 
 
@@ -166,9 +176,16 @@ def plot_energy(output_dir, wall, sim, model):
     plt.figure(figsize=(8, 6))
     plt.plot(sim["time_ns"], sim["foam_energy_hJ"], color="tab:blue", linestyle="--", linewidth=2.2, label="Simulation foam energy")
     plt.plot(sim["time_ns"], sim["coating_energy_hJ"], color="tab:orange", linestyle="-.", linewidth=2.2, label="Simulation coating energy")
+    
+    # Model - Regular (Heyney)
     plt.plot(model["time_ns"], model["E_marshak"], color="tab:red", linewidth=2.3, label="Model E_marshak")
     plt.plot(model["time_ns"], model["E_Gold_loss"], color="tab:green", linewidth=2.2, label="Model E_Gold_loss")
-    plt.plot(model["time_ns"], model["E_Gold_wall_loss"], color="tab:purple", linestyle=":", linewidth=2.3, label="Model E_Gold_wall_loss")
+    plt.plot(model["time_ns"], model["E_Gold_wall_loss"], color="tab:purple", linewidth=2.2, label="Model E_Gold_wall_loss")
+    
+    # Model - Flattop
+    plt.plot(model["flattop_time_ns"], model["E_Gold_loss_flattop"], color="tab:green", linestyle=":", linewidth=2.4, label="Model E_Gold_loss - flattop")
+    plt.plot(model["flattop_time_ns"], model["E_Gold_wall_loss_flattop"], color="tab:purple", linestyle=":", linewidth=2.4, label="Model E_Gold_wall_loss - flattop")
+    
     plt.xlabel("Time (ns)")
     plt.ylabel("Energy (hJ)")
     plt.title(f"Energy Comparison ({Experiment} - {Material} - {wall})")
