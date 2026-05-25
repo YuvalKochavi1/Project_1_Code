@@ -51,7 +51,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = "SiO2"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = "Ta2O5"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 Flattop_condition = True  # "flattop" or "gaussian"
 
 if Material == "SiO2":
@@ -119,8 +119,8 @@ elif Material == "Ta2O5":
     Experiment = "Back"
     # self similarity model fudge factors - Ta2O5 - Fig 13a
     f = 4.78 * 10**13          # fudge factor for sigma (new model) [erg/g]
-    g = 1 / 8433.3      
-    alpha = 1.78       # opacity exponent
+    g = 1 / 8433.3
+    alpha = 1.78    # opacity exponent
     beta = 1.37     # beta exponent
     lambda_param = 0.24
     mu = 0.12
@@ -336,7 +336,7 @@ z = np.linspace(0.0, L, Nz)
 dz = z[1] - z[0]
 
 # Radial grid for 2D cylindrical (Foam)
-Nr = 1000
+Nr = 500
 r_grid = np.linspace(0.0, R_cm, Nr)
 dr = r_grid[1] - r_grid[0]
 

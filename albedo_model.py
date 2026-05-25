@@ -61,8 +61,8 @@ class AlbedoModel:
         sigma_SB_hev = a_hev * 3e10 / 4.0
         wall_flux_rate = dE_wall_array / dt_sec
         T_s_array = np.full_like(wall_flux_rate, T_s)
-        F_in = sigma_SB_hev * (T_s_array ** 4.0) + 0.5 * wall_flux_rate
-        F_out = sigma_SB_hev * (T_s_array ** 4.0) - 0.5 * wall_flux_rate
+        F_in = sigma_SB_hev * (T_s_array ** 4.0) #+ 0.5 * wall_flux_rate
+        F_out = sigma_SB_hev * (T_s_array ** 4.0) - wall_flux_rate
         # if F_out <= 0:
         #     return np.inf
         with np.errstate(divide='ignore', invalid='ignore'):

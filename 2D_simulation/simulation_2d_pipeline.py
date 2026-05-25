@@ -1,3 +1,4 @@
+
 from pathlib import Path
 import os
 import sys
@@ -18,10 +19,11 @@ from simulation_2d_plots import (
     plot_temperature_maps_gouraud,
     plot_temperature_maps_simple,
 )
-global heatmap_times
+
+heatmap_times = (1e-9, 2e-9, 2.5e-9)  # default; overridden per-material below
 
 Material = "SiO2"
-CoatingMaterial = "Gold"
+CoatingMaterial = "Be"
 if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
     heatmap_times = (1e-9, 2e-9, 2.5e-9)
@@ -51,8 +53,8 @@ def create_simulation(
     material: str = Material,
     coating_material: str = "Gold",
     R_foam: float | None = None,
-    Nz: int = 120,
-    Nr_foam: int = 120,
+    Nz: int = 150,
+    Nr_foam: int = 150,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -89,9 +91,14 @@ def create_simulation(
         mu = 0.06
         rho = 0.16     # initial density (g/cm^3)
         R_foam_default = 0.01
-        global heatmap_times
-        heatmap_times = (0.5e-9, 1e-9, 1.3e-9)
         Lz = 0.03
+        heatmap_times = (0.5e-9, 1e-9, 1.3e-9)
+        csv_path = BASE_DIR / "Data_new" / Experiment / Material / "article" / "Temperatures" / "T_drive.csv"
+        t_drive_ns, T_drive_eV = load_time_temp(csv_path)
+        print(csv_path)
+
+        t_final = 1.31e-9
+        dt_init = 5e-15
     
     elif material == "Ta2O5":
         f = 4.78 * 10**13          # fudge factor for sigma (new model) [erg/g]
@@ -293,6 +300,7 @@ def run_eff_lam_radius_sweep(
             out_dir=run_figures_dir,
             figure_data_dir=run_data_dir,
         )
+        print(heatmap_times)
         plot_temperature_maps_simple(
             sim,
             stored_t,
@@ -313,6 +321,7 @@ def run_eff_lam_radius_sweep(
             sim,
             stored_t,
             stored_Tm,
+            times_s=heatmap_times,
             out_path=run_figures_dir / "front_surface - Front Surface zF vs r.png",
             figure_data_dir=run_data_dir,
         )
@@ -441,6 +450,7 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
         sim,
         stored_t,
         stored_Tm,
+        times_s=heatmap_times,
         out_path=FIGURES_DIR_2D / "front_surface - Front Surface zF vs r.png",
         figure_data_dir=FIGURE_DATA_DIR_2D,
     )

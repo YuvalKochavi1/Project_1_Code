@@ -40,59 +40,6 @@ def plot_energies(stored_t, total_energies, marshak_boundary=False, energy_lost_
         color='orange',
     )
 
-    plt.plot(stored_t, total_energies_hJ, color='blue', linestyle="-.", label="Simulated Material Energy")
-    plt.xlabel("Time (ns)")
-    plt.ylabel("Total Energy (hJ)")
-    plt.title(f"Total Energy vs Time - Material: {Material}")
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-
-    # # annotate the std on the plot, make it look good with a box
-    # plt.annotate(f"Std Dev from analytical: {stdev_percent:.2f} %", xy=(0.05, 0.95), xycoords='axes fraction',
-    #     fontsize=10, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-
-    save_figure("total_energy.png")
-
-
-#I want to plot the surface temperature (at z=0) where there is marshak boundary condition vs when there is not marshak boundary conditiondef plot_surface_temperature_comparison(stored_t_m, stored_Tm_m, stored_t_nm, stored_Tm_nm):
-def plot_surface_temperature_comparison(times_to_store):
-    E, UR = init_state()
-    stored_times, _, stored_Tm_m = run_time_loop(E, UR, times_to_store, marshak_boundary=True)[0:3]
-    surface_temps_m = [Tm[0] for Tm in stored_Tm_m]
-    E, UR = init_state()
-    surface_temps_nm = []
-    for t_query in stored_times:
-        surface_temps_nm.append(get_TD(t_query, t_array_TD, T_array_TD))
-    _, Ts_1D, _, _, *_ = analytic_wave_front_dispatch(stored_times,  use_seconds=True, mode = "marshak", vary_rho=False)
-    _, Ts_2D, _, _, *_ = analytic_wave_front_dispatch(stored_times,  use_seconds=True, mode = "marshak_wall_loss", vary_rho=False)
-    plt.figure(figsize=(8, 6))
-    plt.plot(stored_times, surface_temps_m, label="With Marshak BC", color='blue', linestyle='--')
-    plt.plot(stored_times, Ts_1D, label="Analytic Ts(t) (Marshak BC)", color='blue', linestyle='-')
-    plt.plot(stored_times, Ts_2D, label="Analytic Ts(t) with Gold wall loss", color='red', linestyle='-')
-    plt.plot(stored_times, surface_temps_nm, label="Without Marshak BC", color='green', linestyle='-')
-
-    plot_csv_series(
-        article_temperature_path("surface_marshak.csv"),
-        y_scale=100,
-        linestyle="-.",
-        label="article 1 surface temp with marshak boundary condition",
-    )
-    plot_csv_series(
-        article_temperature_path("surface_gold_lost.csv"),
-        y_scale=100,
-        linestyle="-.",
-        label="article 1 surface temp with gold wall loss",
-    )
-
-    plt.xlabel("Time (ns)")
-    plt.ylabel(r"Surface Temperature $T(z=0,t)$ (HeV)")
-    plt.title("Surface Temperature Comparison with and without Marshak Boundary Condition")
-    plt.grid(False)
-    plt.legend()
-    plt.tight_layout()
-    save_figure("surface_temperature_comparison.png", model1_5=True)
-
 
 def Back_SiO2(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, wall_material='Gold', lam_eff_power=1.5)
@@ -116,6 +63,8 @@ def Back_SiO2(times_to_store):
     bessel_data_marshak = front_series["bessel_data_marshak"]
     bessel_data_gold_loss = front_series["bessel_data_gold_loss"]
     data_of_R = front_series["data_of_R_2D"]
+    analytic_positions_vacuum_lost, Ts_vacuum_lost, E_vacuum_loss, _, data_of_R, bessel_data_vacuum_loss = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Vacuum', lam_eff = False, power=1)  # stored_t is ns
+    analytic_position_Be_lost, Ts_Be_lost, E_Be_lost, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = False, power=1)  # stored_t is ns
 
     plt.figure(figsize=(8, 6))
     plot_standard_front_analytic_models(
@@ -187,8 +136,9 @@ def Back_SiO2(times_to_store):
         "E_marshak": E_marshak,
         "E_gold_loss": E_gold_loss,
         "E_wall_gold_loss": E_wall_gold_loss,
-        # "E_Be_loss": E_out,
-        # "E_Be_wall_loss": Ew_be_out,
+        "E_vacuum_loss": E_vacuum_loss,
+        "E_Be_loss": E_Be_lost,
+        "E_Be_wall_loss": Ew_be_out,
     })
     
     plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
@@ -214,7 +164,8 @@ def Back_SiO2(times_to_store):
                 "Ablation with const rho": analytic_positions_ablation_const_rho,
                 "gold loss": analytic_positions_energy_lost_gold,
                 "No Marshak": analytic_positions_no_marshak,
-                #"Be Loss": analytic_position_Be_lost,
+                "Vacuum loss": analytic_positions_vacuum_lost,
+                "Be Loss": analytic_position_Be_lost,
             }
         },
         output_csv_path = output_csv_path,
@@ -253,18 +204,25 @@ def Back_SiO2(times_to_store):
     # plot_2D_front_spatial(bessel_data_2D, analytic_positions_2D,
     #                      times_to_store, times_ns=[1.0, 2.0, 2.5])
     # Plot temperature heatmaps T(r,z,t)
-    plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
-                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=True, title_suffix="(varying rho)", color_option = "prr_back")
-    plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
-                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=True, title_suffix="(lam_eff)", color_option = "prr_back")
-    plot_temperature_heatmap_2D(bessel_data_ablation_const_rho, analytic_positions_ablation_const_rho,
-                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=True, title_suffix="(const rho)", color_option = "prr_back")
+    # plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
+    #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+    #                 ablation=True, title_suffix="(varying rho)", color_option = "prr_back")
+    # plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
+    #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+    #                 ablation=True, title_suffix="(lam_eff)", color_option = "prr_back")
+    # plot_temperature_heatmap_2D(bessel_data_ablation_const_rho, analytic_positions_ablation_const_rho,
+    #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+    #                 ablation=True, title_suffix="(const rho)", color_option = "prr_back")
     plot_temperature_heatmap_2D(bessel_data_gold_loss, analytic_positions_energy_lost_gold,
                     Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=False, title_suffix="(gold wall loss)", color_option = "default", flattop=Flattop_condition)
+                    ablation=False, title_suffix="(gold wall loss)", color_option = "default", wall = 'gold', flattop=Flattop_condition)
+    plot_temperature_heatmap_2D(bessel_data_vacuum_loss, analytic_positions_vacuum_lost,
+                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=False, title_suffix="(vacuum wall loss)", color_option = "default", wall = 'Vacuum', flattop=Flattop_condition)
+    plot_temperature_heatmap_2D(Be_bessel_data, analytic_position_Be_lost,
+                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=False, title_suffix="(Be wall loss)", color_option = "default", wall = 'Be', flattop=Flattop_condition)
+    
     # plot_temperature_heatmap_2D(bessel_data_marshak, analytic_positions_marshak,
     #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
     #                 ablation=False, title_suffix="(Marshak BC)", color_option = "prr_back")
@@ -420,7 +378,8 @@ def compare_with_article_2_exp3_13a(times_to_store):
     E_wall_out_2D = front_series["E_wall_out_2D"]
     bessel_data_2D = front_series["bessel_data_2D"]
     bessel_data_gold_loss = front_series["bessel_data_gold_loss"]
-    analytic_position_Be_lost, Ts_out, E_out, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = True, power=1)  # stored_t is ns
+    analytic_positions_vacuum_lost, Ts_vacuum_lost, E_vacuum_loss, _, data_of_R, bessel_data_vacuum_loss = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Vacuum', lam_eff = True, power=1)  # stored_t is ns
+    analytic_position_Be_lost, Ts_Be_lost, E_Be_lost, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = True, power=1)  # stored_t is ns
     plt.figure(figsize=(8, 6))
     # fit data to analytical
     plot_standard_front_analytic_models(
@@ -464,7 +423,7 @@ def compare_with_article_2_exp3_13a(times_to_store):
     # Plot energies
     plt.figure(figsize=(8, 6))
     plt.plot(times_to_store, E_marshak, label="E - Marshak BC", linestyle="-", color='blue')
-    plt.plot(times_to_store, E_out, label="E - Foam with Be Loss", linestyle="-", color='green')
+    plt.plot(times_to_store, E_Be_lost, label="E - Foam with Be Loss", linestyle="-", color='red')
     plt.plot(times_to_store, Ew_be_out, label="E - Be Wall Loss", linestyle="-", color='red')
     
     plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
@@ -498,8 +457,9 @@ def compare_with_article_2_exp3_13a(times_to_store):
         "E_marshak": E_marshak,
         "E_Gold_loss": E_gold_loss,
         "E_Gold_wall_loss": E_wall_gold_loss,
-        "E_Be_loss": E_out,
+        "E_Be_loss": E_Be_lost,
         "E_Be_wall_loss": Ew_be_out,
+        "E_Vacuum_loss": E_vacuum_loss,
     })
 
     #save the analytic positions to csv
@@ -514,6 +474,7 @@ def compare_with_article_2_exp3_13a(times_to_store):
                 "Marshak": analytic_positions_marshak,
                 "gold loss": analytic_positions_gold_loss,
                 "Be Loss": analytic_position_Be_lost,
+                "Vacuum Loss": analytic_positions_vacuum_lost,
             }
         },
         output_csv_path= output_csv_path,
@@ -537,6 +498,10 @@ def compare_with_article_2_exp3_13a(times_to_store):
                     Ts_marshak, times_to_store, times_ns=[1.0, 2.0, 2.5],
                     ablation=False, title_suffix="(gold wall loss)", color_option = "default", 
                     show_shock=False, wall="Gold", flattop=Flattop_condition)
+    plot_temperature_heatmap_2D(bessel_data_vacuum_loss, analytic_positions_vacuum_lost,
+                    Ts_marshak, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=False, title_suffix="(vacuum loss)", color_option = "default", 
+                    show_shock=False, wall="Vacuum", flattop=Flattop_condition)
 
 def compare_with_article_2_exp4_14(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=1)

@@ -114,19 +114,30 @@ def plot_front_time_vs_diameter(*, data_root: Path = DATA_ROOT, figure_root: Pat
 
     # use a serif font for all text in the figure
     plt.rcParams["font.family"] = "serif"
-    plt.figure(figsize=(8, 5))
-    plt.plot(diameters_mm, crossing_times_ns, marker="o", linewidth=2.0, color="tab:blue", label="Original")
+    fig, main_ax = plt.subplots(figsize=(8, 5))
+    main_ax.plot(diameters_mm, crossing_times_ns, marker="o", linewidth=2.0, color="tab:blue", label="x100 opaque Gold")
     if len(diameters_mm_g1) > 0:
-        plt.plot(diameters_mm_g1, crossing_times_ns_g1, marker="s", linewidth=2.0, color="tab:green", label="g=1")
+        main_ax.plot(diameters_mm_g1, crossing_times_ns_g1, marker="s", linewidth=2.0, color="tab:green", label="Nominal Gold")
     # add a y line at y= 1.057 and call it mmarshak_1D result
-    plt.axhline(0.773, color="tab:orange", linestyle="--", label="Marshak 1D")
-    plt.xlabel("Diameter (mm)")
-    plt.ylabel("Time for front to reach 0.5 mm (ns)")
+    main_ax.axhline(0.773, color="tab:orange", linestyle="--", label="Marshak 1D")
+    main_ax.set_xlabel("Diameter (mm)")
+    main_ax.set_ylabel("Time for front to reach 0.5 mm (ns)")
     # no title requested
     # plt.xscale("log")
-    # plt.yscale("log")
-    plt.grid(True, alpha=0.3)
-    plt.legend()
+    #plt.yscale("log")
+    main_ax.grid(True, alpha=0.3)
+    main_ax.legend()
+
+    # Create inset axis
+    ins_ax = main_ax.inset_axes([0.4, 0.25, 0.55, 0.5])
+    ins_ax.plot(diameters_mm, crossing_times_ns, marker="o", linewidth=2.0, color="tab:blue")
+    if len(diameters_mm_g1) > 0:
+        ins_ax.plot(diameters_mm_g1, crossing_times_ns_g1, marker="s", linewidth=2.0, color="tab:green")
+    ins_ax.axhline(0.773, color="tab:orange", linestyle="--")
+    ins_ax.set_xscale("log")
+    ins_ax.set_xlim(5e-3, 2)
+    ins_ax.grid(True, alpha=0.3)
+
     plt.tight_layout()
     plt.savefig(figure_path, dpi=150, bbox_inches="tight")
     plt.close()

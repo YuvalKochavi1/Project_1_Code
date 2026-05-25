@@ -363,6 +363,9 @@ def _store_bessel_snapshot(
     epsilon = 3 / 4 * (1 - albedo) * (1 / lambda_ross) * R_cm
     kappa_0 = kappa_roots(epsilon, R_cm, n_roots=1)[0]
     kappa_0_approx = np.sqrt(2 * epsilon) / R_cm
+    if i == 340: 
+        print(f"t: {t_sec[i]},kappa_0: {kappa_0}, kappa_0_approx: {kappa_0_approx}, wall: {wall_material}")
+        print(albedo)
     
     # Compute z_F at r=R_cm (edge of foam) using kappa_0
     z_F_at_rcm = xF_i * special.j0(kappa_0 * R_cm)

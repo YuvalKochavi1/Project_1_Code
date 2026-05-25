@@ -403,6 +403,8 @@ def plot_temperature_heatmap_2D(
         exponent_wall = 1.0 / (4.0 + alpha_copper - beta_copper)
     elif wall == "Be":
         exponent_wall = 1.0 / (4.0 + alpha_be - beta_be)
+    elif wall == "Vacuum":
+        exponent_wall = 0
     else:
         print(f"Warning: Unrecognized wall material '{wall}', using foam exponent for the wall heyney-like profile.")
         exponent_wall = exponent
@@ -516,21 +518,22 @@ def plot_temperature_heatmap_2D(
                 if np.any(wall_valid):
                     T_mesh_plot[wall_valid] = T_wall_profile[wall_valid]
         else:
-            # Non-ablation: wall heat wave starts at fixed R_cm and penetrates into gold.
-            T_wall_profile = _compute_wall_heyney_horizontal_profile(
-                T_mesh_foam,
-                foam_mask=None,
-                wall_mask=None,
-                r_mesh=r_mesh_foam,
-                exponent_wall=exponent_wall,
-                is_ablation=False,
-                r_mesh_wall=r_mesh,
-                penetration_radius_profile=penetration_profile,
-                shock_radius_profile=shock_profile,
-            )
-            wall_valid = np.isfinite(T_wall_profile)
-            if np.any(wall_valid):
-                T_mesh_plot[wall_valid] = T_wall_profile[wall_valid]
+            if wall != "Vacuum":
+                # Non-ablation: wall heat wave starts at fixed R_cm and penetrates into gold.
+                T_wall_profile = _compute_wall_heyney_horizontal_profile(
+                    T_mesh_foam,
+                    foam_mask=None,
+                    wall_mask=None,
+                    r_mesh=r_mesh_foam,
+                    exponent_wall=exponent_wall,
+                    is_ablation=False,
+                    r_mesh_wall=r_mesh,
+                    penetration_radius_profile=penetration_profile,
+                    shock_radius_profile=shock_profile,
+                )
+                wall_valid = np.isfinite(T_wall_profile)
+                if np.any(wall_valid):
+                    T_mesh_plot[wall_valid] = T_wall_profile[wall_valid]
 
         if show_shock and shock_profile is not None:
             shock_mask = np.isfinite(shock_profile)

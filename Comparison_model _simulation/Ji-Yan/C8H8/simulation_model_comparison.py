@@ -38,7 +38,7 @@ def simulation_front_surface_load():
     Expects CSV with columns like: r_cm, zF_cm_t1.00ns, zF_cm_t2.00ns
     Returns dict: {r_cm, profiles(dict time_ns->z_profile), columns(dict)}
     """
-    csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_simulation" / "front_surface" / "front_surface_profiles.csv"
+    csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_simulation" / "front_surface" / "front_surface_profiles_vacuum.csv"
     if not csv_path.exists():
         raise FileNotFoundError(f"Front-surface CSV not found: {csv_path}")
     df = pd.read_csv(csv_path)
@@ -72,7 +72,7 @@ def model_front_shape_load():
         raise FileNotFoundError(f"Model shape directory not found: {data_dir}")
     profiles = {}
     files = {}
-    for p in sorted(data_dir.glob("front_shape_t*ns.csv")):
+    for p in sorted(data_dir.glob("front_shape_Gold_t*ns.csv")):
         df = pd.read_csv(p)
         required = {"r_cm", "z_F_radial_cm"}
         if not required.issubset(df.columns):
@@ -144,7 +144,7 @@ def plot_simulation_vs_model_each_time(sim_data, model_data, output_dir):
 
 def simulation_front_position_load():
     """Load Ji-Yan 2D simulation front-position data (r=0)."""
-    csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_simulation" / "front_vs_time" / "front_position_vs_time_r0.csv"
+    csv_path = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_simulation" / "front_vs_time" / "front_position_vs_time_Vacuum_r0.csv"
     if not csv_path.exists():
         raise FileNotFoundError(f"Front-position CSV not found: {csv_path}")
     df = pd.read_csv(csv_path)
