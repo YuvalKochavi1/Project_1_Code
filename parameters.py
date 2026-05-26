@@ -51,7 +51,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = "SiO2"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = "SiO2_low_energy"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 Flattop_condition = False  # "flattop" or "gaussian"
 
 if Material == "SiO2":
@@ -172,7 +172,7 @@ if Material == "SiO2_low_energy":
     mu = 0.1
     rho = 0.01     # initial density (g/cm^3)
     R_cm = 0.15      # radius of the foam cylinder (cm) - The diameter is 1.6 mm
-    csv_path = article_temperature_path("T_bath_right.csv")
+    csv_path = article_temperature_path("T_drive.csv")
     t_array_TD, T_array_TD = load_time_temp(csv_path)
     # T_array_TD = 100 * T_array_TD
     #lambda_ross = 0.11 # Rosseland mean free path (cm) at maximum temperature (1.8 Hev)
