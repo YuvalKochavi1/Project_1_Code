@@ -1175,13 +1175,115 @@ def compare_for_material():
         return None
     return times_to_store
 
-if __name__ == "__main__":
+def run_2D_shape_eff_lam_sweep():
+    import parameters
+    import model_main
+    import wall_loss_model
+    import ablation_model
+    import eigen_bessel_solver
+    import csv_helpers
+    from csv_helpers import save_series_csv, ensure_dir
+    import numpy as np
+
+    diameters_mm = [
+        0.008, 0.012, 0.014, 0.016, 0.02, 0.03, 0.05, 0.06, 
+        0.1, 0.12, 0.14, 0.16, 0.2, 0.4, 0.8, 1.2, 1.6
+    ]
+
+    base_dir = csv_helpers.BASE_DIR / "Data_new" / "Back" / "SiO2" / "2D_shape" / "eff_lam"
+    ensure_dir(base_dir)
+
     times_to_store = np.linspace(0.01, 3, 1000)
+    
+    for d_mm in diameters_mm:
+        r_cm = round(d_mm / 20.0, 5)
+        
+        # Override R_cm everywhere it matters
+        parameters.R_cm = r_cm
+        model_main.R_cm = r_cm
+        ablation_model.R_cm = r_cm
+        wall_loss_model.R_cm = r_cm
+        eigen_bessel_solver.R_cm = r_cm
+        
+        from model_main import analytic_wave_front_dispatch
+
+        # 1. Marshak
+        (
+            analytic_positions_marshak, _, E_marshak, _, _, _
+        ) = analytic_wave_front_dispatch(
+            times_to_store, use_seconds=True, mode="marshak", wall_material='Gold'
+        )
+
+        # 2. Just gold loss
+        (
+            analytic_positions_gold_loss, _, E_gold_loss, E_wall_gold_loss, _, _
+        ) = analytic_wave_front_dispatch(
+            times_to_store, use_seconds=True, mode="marshak_wall_loss", wall_material='Gold', lam_eff=False
+        )
+
+        # 3. Gold loss with lam_eff and power = 10
+        (
+            analytic_positions_gold_loss_lam_eff, _, E_gold_loss_lam_eff, E_wall_gold_loss_lam_eff, _, _
+        ) = analytic_wave_front_dispatch(
+            times_to_store, use_seconds=True, mode="marshak_wall_loss", wall_material='Gold', lam_eff=True, power=10
+        )
+        
+        # 4. Gold loss with lam_eff and power = 1
+        (
+            analytic_positions_gold_loss_lam_eff_power_1, _, E_gold_loss_lam_eff_power_1, E_wall_gold_loss_lam_eff_power_1, _, _
+        ) = analytic_wave_front_dispatch(
+            times_to_store, use_seconds=True, mode="marshak_wall_loss", wall_material='Gold', lam_eff=True, power=1
+        )
+
+        # 5. Gold loss with lam_eff and power = 2
+        (
+            analytic_positions_gold_loss_lam_eff_power_2, _, E_gold_loss_lam_eff_power_2, E_wall_gold_loss_lam_eff_power_2, _, _
+        ) = analytic_wave_front_dispatch(
+            times_to_store, use_seconds=True, mode="marshak_wall_loss", wall_material='Gold', lam_eff=True, power=2
+        )
+        
+        # Formatting to match R_0p...
+        folder_suffix = str(r_cm).replace('.', 'p')
+        out_folder = base_dir / f"R_{folder_suffix}"
+        
+        ensure_dir(out_folder)
+        ensure_dir(out_folder / "energy_comparison")
+        ensure_dir(out_folder / "front_vs_time")
+        
+        # Save Energy
+        save_series_csv(out_folder / "energy_comparison" / "analytic_energy_vs_time.csv", {
+            "time_ns": times_to_store,
+            "E_marshak_hJ": E_marshak,
+            "E_foam_gold_loss_hJ": E_gold_loss,
+            "E_wall_gold_loss_hJ": E_wall_gold_loss,
+            "E_foam_gold_loss_lam_eff_hJ": E_gold_loss_lam_eff,
+            "E_wall_gold_loss_lam_eff_hJ": E_wall_gold_loss_lam_eff,
+            "E_foam_gold_loss_lam_eff_power_1_hJ": E_gold_loss_lam_eff_power_1,
+            "E_wall_gold_loss_lam_eff_power_1_hJ": E_wall_gold_loss_lam_eff_power_1,
+            "E_foam_gold_loss_lam_eff_power_2_hJ": E_gold_loss_lam_eff_power_2,
+            "E_wall_gold_loss_lam_eff_power_2_hJ": E_wall_gold_loss_lam_eff_power_2,
+        })
+        
+        # Save Front Position
+        save_series_csv(out_folder / "front_vs_time" / "analytic_positions.csv", {
+            "time_ns": times_to_store,
+            "front_position_marshak_cm": analytic_positions_marshak,
+            "front_position_gold_loss_cm": analytic_positions_gold_loss,
+            "front_position_gold_loss_lam_eff_cm": analytic_positions_gold_loss_lam_eff,
+            "front_position_gold_loss_lam_eff_power_1_cm": analytic_positions_gold_loss_lam_eff_power_1,
+            "front_position_gold_loss_lam_eff_power_2_cm": analytic_positions_gold_loss_lam_eff_power_2,
+        })
+        print(f"Saved analytical sweep for diameter {d_mm} mm in {folder_suffix}")
+
+
+if __name__ == "__main__":
+    # times_to_store = np.linspace(0.01, 3, 1000)
     #plot_albedo_z0_vs_time(times_to_store, mode="marshak_wall_loss", vary_rho=False, lam_eff=False, power=1.5, wall_material="Be")
-    times_to_store = compare_for_material()  # times_to_store will be set inside the function based on the material
+    # times_to_store = compare_for_material()  # times_to_store will be set inside the function based on the material
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)
     #compare_n_1(times_to_store)
     # plot_surface_temperature_comparison(times_to_store)
-    plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold")
+    # plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold")
     #plot_model_shock_wave_at_z0_all_times(times_to_store)
+    run_2D_shape_eff_lam_sweep()

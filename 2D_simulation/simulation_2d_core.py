@@ -149,7 +149,7 @@ class SelfSimilarDiffusion2D:
         self.R_foam = float(R_foam)
         self.Nz, self.Nr_foam = int(Nz), int(Nr_foam)
         self.z = np.linspace(0.0, self.Lz, self.Nz)
-        self.r, self.r_info = make_r_two_block(self.R_foam, self.coat_width, self.Nr_foam, Nr_gold=35, dr0=self.coat_width / 3000)
+        self.r, self.r_info = make_r_two_block(self.R_foam, self.coat_width, self.Nr_foam, Nr_gold=35, dr0=self.coat_width / 30000)
         self.Nr = self.r.size
         print(self.r)
         self.dz = self.z[1] - self.z[0]

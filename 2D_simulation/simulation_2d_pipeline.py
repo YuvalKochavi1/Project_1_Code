@@ -23,7 +23,7 @@ from simulation_2d_plots import (
 heatmap_times = (1e-9, 2e-9, 2.5e-9)  # default; overridden per-material below
 
 Material = "SiO2"
-CoatingMaterial = "Be"
+CoatingMaterial = "Gold"
 if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
     heatmap_times = (1e-9, 2e-9, 2.5e-9)
@@ -215,9 +215,7 @@ def run_eff_lam_radius_sweep(
     coating_material: str = "Gold",
     radii_cm: tuple[float, ...] | list[float] = (
         0.0004,
-        0.00055,
         0.0007,
-        0.00085,
         0.01,
         0.001,
         0.02,
@@ -225,16 +223,13 @@ def run_eff_lam_radius_sweep(
         0.005,
         0.04,
         0.06,
-        0.006,
         0.08,
         0.008,
-        0.007,
-        0.0015,
         0.0025,
     ),
     Nz: int = 160,
     Nr_foam: int = 160,
-    gold_g_scale: float = 1,
+    gold_g_scale: float = 1e-6,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -260,8 +255,8 @@ def run_eff_lam_radius_sweep(
         radius_name = _radius_tag(radius_cm)
         print(f"Running eff_lam sweep for R_foam={radius_cm:.6g} cm")
 
-        run_figures_dir = figure_root / f"R_{radius_name}_g1"
-        run_data_dir = data_root / f"R_{radius_name}_g1"
+        run_figures_dir = figure_root / f"R_{radius_name}_g{gold_g_scale}"
+        run_data_dir = data_root / f"R_{radius_name}_g{gold_g_scale}"
         ensure_dir(run_figures_dir)
         ensure_dir(run_data_dir)
 
