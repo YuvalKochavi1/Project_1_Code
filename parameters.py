@@ -51,8 +51,8 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = "SiO2_low_energy"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
-Flattop_condition = False  # "flattop" or "gaussian"
+Material = "Ta2O5"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Flattop_condition = True  # "flattop" or "gaussian"
 
 if Material == "SiO2":
     Experiment = "Back"
@@ -326,6 +326,8 @@ mu_be = 0.0701
 rho_be = 1.85      # initial density (g/cm^3)
 
 # self similarity model fudge factors - Copper 
+f_copper = 5.7 * 10**13          # fudge factor for sigma (new model) [erg/g]
+g_copper = 1 / 2237
 alpha_copper = 2.21       # opacity exponent
 beta_copper = 1.35     # beta exponent
 lambda_param_copper = 0.29

@@ -385,8 +385,8 @@ def compare_with_article_2_exp3_13a(times_to_store):
     plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
-        # analytic_positions_2D=analytic_positions_2D,
-        # analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
+        analytic_positions_2D=analytic_positions_2D,
+        analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
         analytic_positions_gold_loss=analytic_positions_gold_loss,
     )
     if analytic_position_Be_lost is not None:
@@ -1279,11 +1279,11 @@ def run_2D_shape_eff_lam_sweep():
 if __name__ == "__main__":
     # times_to_store = np.linspace(0.01, 3, 1000)
     #plot_albedo_z0_vs_time(times_to_store, mode="marshak_wall_loss", vary_rho=False, lam_eff=False, power=1.5, wall_material="Be")
-    # times_to_store = compare_for_material()  # times_to_store will be set inside the function based on the material
+    times_to_store = compare_for_material()  # times_to_store will be set inside the function based on the material
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)
     #compare_n_1(times_to_store)
     # plot_surface_temperature_comparison(times_to_store)
-    # plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold")
+    plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold")
     #plot_model_shock_wave_at_z0_all_times(times_to_store)
-    run_2D_shape_eff_lam_sweep()
+    #run_2D_shape_eff_lam_sweep()

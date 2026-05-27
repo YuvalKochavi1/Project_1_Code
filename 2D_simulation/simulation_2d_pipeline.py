@@ -30,6 +30,9 @@ if Material == "SiO2" or Material == "Ta2O5":
 elif Material == "C8H8":
     Experiment = "Ji-Yan"
     heatmap_times = (0.5e-9, 1e-9, 1.3e-9)
+elif Material == "SiO2_copper" or Material == "SiO2_gold":
+    Experiment = "French"
+    heatmap_times = (1e-9, 2e-9, 2.5e-9)
 
 BASE_DIR = PROJECT_ROOT
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
@@ -53,8 +56,8 @@ def create_simulation(
     material: str = Material,
     coating_material: str = "Gold",
     R_foam: float | None = None,
-    Nz: int = 150,
-    Nr_foam: int = 150,
+    Nz: int = 250,
+    Nr_foam: int = 250,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -117,6 +120,41 @@ def create_simulation(
 
         t_final = 3e-9
         dt_init = 5e-15
+
+    elif material == "SiO2_gold":
+        f = 8.77 * 10**13          # fudge factor for sigma (new model) [erg/g]
+        g = 1 / 9175      
+        alpha = 3.53     # opacity exponent
+        beta_exp = 1.1       # beta exponent
+        lambda_param = 0.75
+        mu = 0.09
+        rho = 0.029     # initial density (g/cm^3)
+        R_foam_default = 0.05      # radius of the foam cylinder (cm) - The diameter is 1.6 mm
+        Lz = 0.2
+        csv_path = BASE_DIR / "Data_new" / Experiment / Material / "article" / "Temperatures" / "T_drive.csv"
+        t_drive_ns, T_drive_eV = load_time_temp(csv_path)
+        print(csv_path)
+
+        t_final = 3e-9
+        dt_init = 5e-15
+
+    elif material == "SiO2_copper":
+        f = 8.77 * 10**13          # fudge factor for sigma (new model) [erg/g]
+        g = 1 / 9175      
+        alpha = 3.53     # opacity exponent
+        beta_exp = 1.1       # beta exponent
+        lambda_param = 0.75
+        mu = 0.09
+        rho = 0.0189     # initial density (g/cm^3)
+        R_foam_default = 0.1      # radius of the foam cylinder (cm) - The diameter is 1.6 mm
+        Lz = 0.4
+        csv_path = BASE_DIR / "Data_new" / Experiment / Material / "article" / "Temperatures" / "T_drive.csv"
+        t_drive_ns, T_drive_eV = load_time_temp(csv_path)
+        print(csv_path)
+
+        t_final = 3e-9
+        dt_init = 5e-15
+
     else:
         raise ValueError(f"{material} is not supported in this function for now.")
 

@@ -272,7 +272,7 @@ def main() -> None:
     # This script is located at: article1/extarcting points of a graph.py
     # Image is at: article1/image.png
     script_dir = Path(__file__).resolve().parent
-    image_path = script_dir / "2D/figures/front_surface - Front Surface zF vs r.png"
+    image_path = script_dir / "Data_new/Back/Ta2O5/article/flux_curvature/data.png"
 
     sampler = ClickSampler(image_path=image_path)
     sampler.run()
