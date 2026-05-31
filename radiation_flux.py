@@ -301,6 +301,7 @@ def compute_and_plot_radiation_flux(
         Flux datasets for each detector position.
     """
     # --- Step 1: obtain z_F(t) and Ts(t) from the wave-front solver ---
+    import pandas as pd
     result = analytic_wave_front_dispatch(
         times_to_store,
         use_seconds=use_seconds,
@@ -339,19 +340,38 @@ def compute_and_plot_radiation_flux(
         df.to_csv(csv_path, index=False)
         print(f"Saved flux data -> {csv_path}")
 
+    # --- Load experimental data ---
+    exp_data = {}
+    if Material == "SiO2_low_energy":
+        for d in [0.5, 1.0, 1.5]:
+            csv_file = f"{d:g}mm.csv"
+            if d == 1.0:
+                csv_file = "1mm.csv"
+            csv_path = BASE_DIR / "Data_new" / "Back" / "SiO2_low_energy" / "article" / "flux" / csv_file
+            if csv_path.exists():
+                exp_data[d] = pd.read_csv(csv_path)
+
     # --- Step 4b: plot ---
     if show_plot:
         fig, axes = plt.subplots(1, 3, figsize=(20, 6))
 
-        colors = ['#e6194b', '#3cb44b', '#4363d8']
+        colors = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6']
 
         # Panel 1: raw flux
         ax = axes[0]
         for ds, c in zip(datasets, colors):
-            label = f"z = {ds['z_pos_mm']:.1f} mm"
+            label = f"z = {ds['z_pos_mm']:g} mm"
             ax.plot(ds['times'], ds['flux_raw'], color=c, linewidth=1.5, label=label)
             if ds['t_arrival'] is not None:
                 ax.axvline(ds['t_arrival'], color=c, linestyle=':', alpha=0.5)
+            
+            # Plot experimental data
+            z_mm = float(ds['z_pos_mm'])
+            if z_mm in exp_data:
+                # Plot as is without normalizing
+                df_exp = exp_data[z_mm]
+                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=f"Data {z_mm:g} mm")
+
         ax.set_xlabel("Time (ns)", fontsize=14, fontname='serif')
         ax.set_ylabel(r"$\Phi$ [W/m²]", fontsize=14, fontname='serif')
         ax.set_title("Raw Radiation Flux", fontsize=15, fontname='serif')
@@ -361,10 +381,17 @@ def compute_and_plot_radiation_flux(
         # Panel 2: normalised flux
         ax = axes[1]
         for ds, c in zip(datasets, colors):
-            label = f"z = {ds['z_pos_mm']:.1f} mm"
+            label = f"z = {ds['z_pos_mm']:g} mm"
             ax.plot(ds['times'], ds['flux_normalised'], color=c, linewidth=1.5, label=label)
             if ds['t_arrival'] is not None:
                 ax.axvline(ds['t_arrival'], color=c, linestyle=':', alpha=0.5)
+            
+            # Plot experimental data here too just in case
+            z_mm = float(ds['z_pos_mm'])
+            if z_mm in exp_data:
+                df_exp = exp_data[z_mm]
+                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=f"Data {z_mm:g} mm")
+
         ax.set_xlabel("Time (ns)", fontsize=14, fontname='serif')
         ax.set_ylabel(r"$\Phi / \Phi_{\max}$", fontsize=14, fontname='serif')
         ax.set_title("Normalised Radiation Flux", fontsize=15, fontname='serif')
@@ -374,7 +401,7 @@ def compute_and_plot_radiation_flux(
         # Panel 3: temperature at each detector
         ax = axes[2]
         for ds, c in zip(datasets, colors):
-            label = f"z = {ds['z_pos_mm']:.1f} mm"
+            label = f"z = {ds['z_pos_mm']:g} mm"
             ax.plot(ds['times'], ds['T_hev'], color=c, linewidth=1.5, label=label)
             if ds['t_arrival'] is not None:
                 ax.axvline(ds['t_arrival'], color=c, linestyle=':', alpha=0.5)
@@ -711,7 +738,7 @@ def plot_flux_curvature(
         print("Warning: no data to plot for flux curvature.")
         return
 
-    colors = ['#e6194b', '#3cb44b', '#4363d8']
+    colors = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4']
 
     fig, axes = plt.subplots(
         n_detectors, n_times,
@@ -898,8 +925,10 @@ def plot_flux_curvature_post_breakout(
         if t_breakout is None:
             print(f"Heat front never reaches z = {z_mm:.1f} mm. Skipping.")
             continue
-            
-        t_target = t_breakout + delay_ns
+        if (z_mm == 0.25 or z_mm == 0.5) and Material == "Ta2O5": 
+            t_target = t_breakout + delay_ns - 0.1
+        else:
+            t_target = t_breakout + delay_ns
         
         # Find closest snapshot in bessel_data
         available = np.array(list(bessel_data.keys()), dtype=float)
@@ -929,6 +958,35 @@ def plot_flux_curvature_post_breakout(
 
     plt.figure(figsize=(8, 6))
 
+    # --- Pre-load experimental Data to calculate global normalisation factor (Ta2O5 / SiO2)
+    exp_ta2o5 = {}
+    ta2o5_max_y = 0.0
+    exp_sio2 = {}
+    if Material == "Ta2O5":
+        base_ta_path = BASE_DIR / "Data_new" / "Back" / "Ta2O5" / "article" / "flux_curvature"
+        # files 1.csv -> 0.25mm, 2.csv -> 0.5mm, 3.csv -> 0.75mm, 4.csv -> 1.0mm
+        file_mapping = {0.25: "1new.csv", 0.5: "2new.csv", 0.75: "3new.csv", 1.0: "4new.csv"}
+        for z_key, fname in file_mapping.items():
+            csv_path = base_ta_path / fname
+            if csv_path.exists():
+                try:
+                    df = pd.read_csv(csv_path)
+                    exp_ta2o5[z_key] = df
+                    y_max_local = df['y'].max()
+                    if y_max_local > ta2o5_max_y:
+                        ta2o5_max_y = y_max_local
+                except Exception as e:
+                    print(f"Error loading {fname}: {e}")
+    elif Material == "SiO2":
+        base_sio2_path = BASE_DIR / "Data_new" / "Back" / "SiO2" / "article" / "flux"
+        csv_path = base_sio2_path / "1mm.csv"
+        if csv_path.exists():
+            try:
+                df = pd.read_csv(csv_path)
+                exp_sio2[1.0] = df
+            except Exception as e:
+                print(f"Error loading SiO2 1mm.csv: {e}")
+
     r_mm_last = None
     for idx, (z_mm, t_breakout, t_closest, ds) in enumerate(raw_profiles):
         r_mm = ds['r_grid'] * 10.0
@@ -944,6 +1002,43 @@ def plot_flux_curvature_post_breakout(
         
         label = f"z = {z_mm:.2f} mm ($t_{{br}} = {t_breakout:.2f}$ ns, plot $t = {t_closest:.2f}$ ns)"
         plt.plot(r_sym, flux_sym, color=colors[idx % len(colors)], linewidth=2.2, label=label)
+
+        # Plot Ta2O5 experimental data
+        if Material == "Ta2O5":
+            for z_key, df_exp in exp_ta2o5.items():
+                if abs(z_mm - z_key) < 1e-3:
+                    x_exp = df_exp['x'].to_numpy()
+                    y_exp = df_exp['y'].to_numpy()
+                    if ta2o5_max_y > 0:
+                        y_exp_norm = y_exp / ta2o5_max_y
+                    else:
+                        y_exp_norm = y_exp
+                    plt.plot(
+                        x_exp, y_exp_norm,
+                        color=colors[idx % len(colors)], linestyle='--', linewidth=2.0,
+                        # No label so it doesn't clutter the legend or set a simple one
+                        zorder=5
+                    )
+                    break
+        # Plot SiO2 experimental data
+        elif Material == "SiO2":
+            for z_key, df_exp in exp_sio2.items():
+                if abs(z_mm - z_key) < 1e-3:
+                    x_exp = df_exp['x'].to_numpy()
+                    y_exp = df_exp['y'].to_numpy()
+                    y_exp_norm = y_exp / np.max(y_exp) if np.max(y_exp) > 0 else y_exp
+                    
+                    # Symmetric mapping
+                    x_sym = np.concatenate((-x_exp[::-1], x_exp[1:]))
+                    y_sym = np.concatenate((y_exp_norm[::-1], y_exp_norm[1:]))
+                    
+                    plt.plot(
+                        x_sym, y_sym,
+                        color=colors[idx % len(colors)], linestyle='--', linewidth=2.0,
+                        label="Experiment (1mm.csv)",
+                        zorder=5
+                    )
+                    break
 
     # Draw original Foam-Wall interface symmetrically
     plt.axvline(x=R_cm * 10.0, color='gray', linestyle='--', alpha=0.7, label='Foam-Wall interface')
@@ -1064,14 +1159,17 @@ if __name__ == "__main__":
     # Select default time array based on Material (consistent with comparison.py)
     if Material == "SiO2":
         times = np.linspace(0.01, 4.0, 1000)
+        detector_positions_mm = [0.5, 1.0, 1.25]
     elif Material == "SiO2_low_energy":
         times = np.linspace(0.01, 15.0, 1000)
+        detector_positions_mm = [0.5, 1.0, 1.5]
     elif Material == "C11H16Pb0.3852":
         times = np.linspace(0.01, 1.0, 1000)
     elif Material in ["C6H12", "C6H12Cu0.394"]:
         times = np.linspace(0.01, 2.0, 1000)
     elif Material == "Ta2O5":
-        times = np.linspace(0.01, 3.0, 1000)
+        times = np.linspace(0.01, 4.0, 1000)
+        detector_positions_mm = [0.25, 0.5, 0.75, 1.0]
     elif Material == "SiO2_Moore":
         times = np.linspace(0.01, 4.0, 1000)
     elif Material == "C8H7Cl":
@@ -1094,6 +1192,7 @@ if __name__ == "__main__":
         mode="marshak_ablation",
         vary_rho = True,
         wall_material="Gold",
+        detector_positions_mm=detector_positions_mm if 'detector_positions_mm' in locals() else [1.0],
         show_plot=True,
         save_csv=True,
     )
@@ -1106,7 +1205,7 @@ if __name__ == "__main__":
 
     # Select snapshot times based on material
     if Material in ["SiO2", "SiO2_Moore"]:
-        curvature_snapshots = [0.5, 1.0, 1.25]
+        curvature_snapshots = [1.0]
     elif Material == "SiO2_low_energy":
         curvature_snapshots = [9.5]
     elif Material == "C8H8":
@@ -1126,7 +1225,7 @@ if __name__ == "__main__":
         vary_rho=False,
         show_plot=True,
         save_csv=True,
-        detector_positions_mm=[0.25, 0.5, 0.75, 1.0], 
+        detector_positions_mm=detector_positions_mm if 'detector_positions_mm' in locals() else [1.0], 
         title_suffix=" (gold loss)",
     )
     compute_and_plot_flux_curvature(
@@ -1138,7 +1237,7 @@ if __name__ == "__main__":
         lam_eff=False,
         show_plot=True,
         save_csv=True,
-        detector_positions_mm=[0.25, 0.5, 0.75, 1.0], 
+        detector_positions_mm=detector_positions_mm if 'detector_positions_mm' in locals() else [1.0], 
         title_suffix=" (ablation)",
     )
     
@@ -1156,6 +1255,21 @@ if __name__ == "__main__":
             power=1,
             detector_positions_mm=[0.25, 0.5, 0.75, 1.0],
             delay_ns=0.5,
+            show_plot=True,
+        )
+    elif Material == "SiO2":
+        print("\n" + "=" * 72)
+        print("STARTING FLUX CURVATURE POST-BREAKOUT COMPARISON")
+        print("=" * 72)
+        plot_flux_curvature_post_breakout(
+            times,
+            mode="marshak_ablation",
+            wall_material="Gold",
+            vary_rho=True,
+            lam_eff=True,
+            power=1,
+            detector_positions_mm=[1.0],
+            delay_ns=0.4 - 0.15,
             show_plot=True,
         )
         

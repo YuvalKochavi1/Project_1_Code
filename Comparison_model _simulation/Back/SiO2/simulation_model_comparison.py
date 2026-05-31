@@ -123,6 +123,32 @@ def wall_configurations():
             / "simulated_energy_vs_time_vacuum.csv",
             "output_dir": Path(__file__).resolve().parent / "Vacuum",
         },
+        {
+            "name": "Copper",
+            "front_loss_column": "front_position (Copper loss)",
+            "simulation_front_position": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2"
+            / "2D_simulation"
+            / "front_vs_time"
+            / "front_position_vs_time_Copper_r0.csv",
+            "simulation_front_surface": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2"
+            / "2D_simulation"
+            / "front_surface"
+            / "front_surface_profiles_copper.csv",
+            "simulation_energy": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2"
+            / "2D_simulation"
+            / "energy_comparison"
+            / "simulated_energy_vs_time_copper.csv",
+            "output_dir": Path(__file__).resolve().parent / "Copper",
+            },
     ]
 
 
@@ -266,12 +292,16 @@ def load_model_energy():
         "E_Gold_wall_loss": df["E_wall_gold_loss"].to_numpy(dtype=float),
         "E_Be_loss": df["E_Be_loss"].to_numpy(dtype=float),
         "E_Be_wall_loss": df["E_Be_wall_loss"].to_numpy(dtype=float),
+        "E_Cu_loss": df["E_Cu_loss"].to_numpy(dtype=float),
+        "E_Cu_wall_loss": df["E_Cu_wall_loss"].to_numpy(np.dtype(float)),
         "E_vacuum_loss": df["E_vacuum_loss"].to_numpy(dtype=float),
         "flattop_time_ns": fdf["time_ns"].to_numpy(dtype=float),
         "E_Gold_loss_flattop": fdf["E_gold_loss"].to_numpy(dtype=float),
         "E_Gold_wall_loss_flattop": fdf["E_wall_gold_loss"].to_numpy(dtype=float),
         "E_Be_loss_flattop": fdf["E_Be_loss"].to_numpy(dtype=float),
         "E_Be_wall_loss_flattop": fdf["E_Be_wall_loss"].to_numpy(dtype=float),
+        "E_Cu_loss_flattop": fdf["E_Cu_loss"].to_numpy(dtype=float),
+        "E_Cu_wall_loss_flattop": fdf["E_Cu_wall_loss"].to_numpy(dtype=float),
         "E_vacuum_loss_flattop": fdf["E_vacuum_loss"].to_numpy(dtype=float),
     }
 

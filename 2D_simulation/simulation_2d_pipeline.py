@@ -22,7 +22,7 @@ from simulation_2d_plots import (
 
 heatmap_times = (1e-9, 2e-9, 2.5e-9)  # default; overridden per-material below
 
-Material = "SiO2"
+Material = "Ta2O5"
 CoatingMaterial = "Gold"
 if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
@@ -56,8 +56,8 @@ def create_simulation(
     material: str = Material,
     coating_material: str = "Gold",
     R_foam: float | None = None,
-    Nz: int = 250,
-    Nr_foam: int = 250,
+    Nz: int = 150,
+    Nr_foam: int = 150,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -130,7 +130,7 @@ def create_simulation(
         mu = 0.09
         rho = 0.029     # initial density (g/cm^3)
         R_foam_default = 0.05      # radius of the foam cylinder (cm) - The diameter is 1.6 mm
-        Lz = 0.2
+        Lz = 0.5
         csv_path = BASE_DIR / "Data_new" / Experiment / Material / "article" / "Temperatures" / "T_drive.csv"
         t_drive_ns, T_drive_eV = load_time_temp(csv_path)
         print(csv_path)
@@ -164,8 +164,8 @@ def create_simulation(
     coating_key = coating_material.strip().lower()
     coating_width_map = {
         "gold": 25 * 1e-4,
-        "copper": 25 * 1e-4,
-        "be": 4e-3,
+        "copper": 3.5 * 1e-3,
+        "be": 6e-3,
         "vacuum": 0.0,
     }
     coating_width = coating_width_map.get(coating_key)
@@ -494,8 +494,61 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
         out_path=FIGURES_DIR_2D / "energy_comparison - Foam Energy vs Time.png",
         figure_data_dir=FIGURE_DATA_DIR_2D,
         base_dir=BASE_DIR,
-        material=Material,
+        material=material,
         experiment=Experiment,
+    )
+
+    # --- Flux Curvature and vs-Time Analysis ---
+    from simulation_2d_flux import (
+        plot_flux_curvature_post_breakout,
+        compute_and_plot_flux_curvature,
+        compute_and_plot_flux_vs_time,
+    )
+
+    flux_fig_dir = FIGURES_DIR_2D / "flux"
+    if material == "Ta2O5":
+        detector_pos = [0.25, 0.5, 0.75, 1.0]
+    elif material == "SiO2":
+        detector_pos = [0.25, 0.5, 0.75, 1.0]
+    else:
+        detector_pos = [0.5, 1.0, 1.5]
+
+    print("\n--- Running Flux vs Time Analysis ---")
+    compute_and_plot_flux_vs_time(
+        sim,
+        stored_t,
+        stored_Tm,
+        detector_positions_mm=detector_pos,
+        r_index=0,
+        show_plot=False,
+        out_dir=flux_fig_dir,
+        title_suffix=f" — on-axis (r=0, {material})",
+    )
+
+    print("\n--- Running Flux Curvature Analysis (Snapshots) ---")
+    snap_ns = [float(t) * 1e9 for t in heatmap_times]
+    compute_and_plot_flux_curvature(
+        sim,
+        stored_t,
+        stored_Tm,
+        times_ns_snapshots=snap_ns,
+        detector_positions_mm=detector_pos,
+        show_plot=False,
+        out_dir=flux_fig_dir,
+        title_suffix=f" — {material}",
+    )
+
+    print("\n--- Running Post-Breakout Flux Curvature ---")
+    plot_flux_curvature_post_breakout(
+        sim,
+        stored_t,
+        stored_Tm,
+        detector_positions_mm=detector_pos,
+        delay_ns=0.5,
+        show_plot=False,
+        out_dir=flux_fig_dir,
+        mode="Simulation",
+        material=material,
     )
 
     heated_gold_cells_by_z = sim.compute_heated_gold_cells_by_z(stored_Tm)

@@ -156,14 +156,15 @@ class WallLossModel:
         return 0.59 * T0**3.35 * (t_exposed * 1e9)**0.59
         #gold supersonic
         g0gold = 1/7200
-        #return 0.175 * ((g_gold/g0gold) ** 0.5) * (T0 ** 3.55) * ((t_exposed * 1e9) ** 0.5) 
+        return 0.175 * ((g_gold/g0gold) ** 0.5) * (T0 ** 3.55) * ((t_exposed * 1e9) ** 0.5) 
 
     @staticmethod
     def E_wall_copper(t_exposed, T0):
         """Wall energy loss for copper in hJ/mm^2 (Eq. 11 parameterization)."""
         if t_exposed <= 0:
             return 0.0
-        return 1.58 * T0**3.4 * (t_exposed * 1e9)**0.61
+        # return 1.58 * T0**3.4 * (t_exposed * 1e9)**0.61
+        return 0.4 * T0**3.78 * (t_exposed * 1e9)**0.5
 
     @staticmethod
     def E_wall_be(t_exposed, T0):
@@ -185,7 +186,7 @@ class WallLossModel:
         """Copper areal loading sigma_Cu = rho_Cu * zF_Cu in g/cm^2."""
         if t_exposed <= 0:
             return 0.0
-        return 1.24e-3 * (T0 ** 2.3) * ((t_exposed * 1e9) ** 0.54)
+        return 1.2e-3 * (T0 ** 2.43) * ((t_exposed * 1e9) ** 0.5)
     
     @staticmethod
     def Be_areal_loading_g_per_cm2(t_exposed, T0):
