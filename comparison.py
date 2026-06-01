@@ -1172,10 +1172,10 @@ def compare_for_material():
     elif Material == "C8H8":
         times_to_store = np.linspace(0.01, 1.5, 1000)
         compare_with_article_2_exp7_17(times_to_store)
-    elif Material == "french_gold":
+    elif Material == "SiO2_gold":
         times_to_store = np.linspace(0.01, 4, 1000)
         compare_with_french_gold(times_to_store)
-    elif Material == "french_cupper":
+    elif Material == "SiO2_copper":
         times_to_store = np.linspace(0.01, 4, 1000)
         compare_with_french_copper(times_to_store)
     else:
@@ -1292,6 +1292,6 @@ if __name__ == "__main__":
     #R_of_t_z(times_to_store=times_to_store)
     #compare_n_1(times_to_store)
     # plot_surface_temperature_comparison(times_to_store)
-    plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold")
+    plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1, wall_material="Copper")
     #plot_model_shock_wave_at_z0_all_times(times_to_store)
     #run_2D_shape_eff_lam_sweep()

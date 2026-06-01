@@ -51,7 +51,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = "SiO2"  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = os.getenv("PHYSICS_MATERIAL", "SiO2_copper")  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 Flattop_condition = True  # "flattop" or "gaussian"
 
 if Material == "SiO2":
@@ -222,7 +222,7 @@ elif Material == "C8H8":
     t_array_TD, T_array_TD = load_time_temp(csv_path)
     #lambda_ross = 0.047 # Rosseland mean free path (cm) at maximum temperature (1.75 Hev)
 
-if Material == "french_gold":
+if Material == "SiO2_gold":
     Experiment = "French"
     # self similarity model fudge factors - Foam (the first article and the first part of the second article)
     f = 8.77 * 10**13          # fudge factor for sigma (new model) [erg/g]
@@ -232,12 +232,12 @@ if Material == "french_gold":
     lambda_param = 0.75
     mu = 0.09
     rho = 0.029     # initial density (g/cm^3)
-    R_cm = 0.05      # radius of the foam cylinder (cm) - The diameter is 1.6 mm
+    R_cm = 0.05      # radius of the foam cylinder (cm) - The diameter is 1 mm
     csv_path = article_temperature_path("T_drive.csv")
     t_array_TD, T_array_TD = load_time_temp(csv_path)
     #lambda_ross = 0.41 # Rosseland mean free path (cm) at maximum temperature (1.78 Hev)
 
-if Material == "french_cupper":
+if Material == "SiO2_copper":
     Experiment = "French"
     # self similarity model fudge factors - Foam (the first article and the first part of the second article)
     f = 8.77 * 10**13          # fudge factor for sigma (new model) [erg/g]
@@ -247,7 +247,7 @@ if Material == "french_cupper":
     lambda_param = 0.75
     mu = 0.09
     rho = 0.0189     # initial density (g/cm^3)
-    R_cm = 0.1      # radius of the foam cylinder (cm) - The diameter is 1.6 mm
+    R_cm = 0.1      # radius of the foam cylinder (cm) - The diameter is 2 mm
     csv_path = article_temperature_path("T_drive.csv")
     t_array_TD, T_array_TD = load_time_temp(csv_path)
     #lambda_ross = 0.866 # Rosseland mean free path (cm) at maximum temperature (1.78 Hev)
@@ -301,10 +301,10 @@ elif Material == "C15H20O6" or Material == "C15H20O6Au0.172":
 elif Material == "C8H8":
     L = 0.03      
     Nz = 500   # increase resolution because domain is much larger
-elif Material == "french_gold":
-    L = 0.2      
+elif Material == "SiO2_gold":
+    L = 0.4      
     Nz = 500   # increase resolution because domain is much larger
-elif Material == "french_cupper":
+elif Material == "SiO2_copper":
     L = 0.4      
     Nz = 500   # increase resolution because domain is much larger
 

@@ -349,6 +349,9 @@ def _store_bessel_snapshot(
     shock_penetration_cell_idx_profile=None,
     wall_material='Gold',
     ablation=False,
+    lam_eff=False,
+    power=2,
+    lambda_eff_val=None,
 ):
     dE_wall = E_wall_array_erg[i] - E_wall_array_erg[i - 1]
     if i <= 2:
@@ -359,8 +362,26 @@ def _store_bessel_snapshot(
         closest_key = min(bessel_data.keys(), key=lambda k: abs(k - t_prev_ns)) if bessel_data else None
         albedo = bessel_data[closest_key]['avg_albedo']
     albedo_old = AlbedoModel.compute_albedo_step(Ts_i, dE_wall, dt_i, xF_i)
+    
     lambda_ross = g * (Ts_i ** alpha) * (rho ** (-lambda_param - 1))
-    epsilon = 3 / 4 * (1 - albedo) * (1 / lambda_ross) * R_cm
+    
+    if lam_eff and Experiment == "French":
+        if lambda_eff_val is not None and lambda_eff_val > 0:
+            lambda_use = lambda_eff_val
+        else:
+            if data_of_R is not None and t_sec[i] in data_of_R:
+                R_array = data_of_R[t_sec[i]]
+                xF_index = np.searchsorted(z, xF_i)
+                R_average = np.mean(R_array[:xF_index + 1]) if xF_index > 0 else R_array[0]
+            else:
+                R_average = R_cm
+            lambda_geom = 2.0 * R_average
+            lambda_eff = ((lambda_geom ** (-power) + lambda_ross ** (-power))) ** (-1 / power)
+            lambda_use = lambda_eff
+    else:
+        lambda_use = lambda_ross
+        
+    epsilon = 3 / 4 * (1 - albedo) * (1 / lambda_use) * R_cm
     kappa_0 = kappa_roots(epsilon, R_cm, n_roots=1)[0]
     kappa_0_approx = np.sqrt(2 * epsilon) / R_cm
     if i == 340: 
@@ -587,7 +608,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
         if wall_loss and i > 1:
             #calcultates the bessel function profiles and parameters for the current time step and stores them in bessel_data for later retrieval and plotting
             _store_bessel_snapshot(i, t_sec, Ts[i], dt_i, xF[i], E_wall_array_erg, bessel_data, data_of_R=data_of_R if ablation else None, t_ref_sec=t_sec[i] if ablation else None, t_heat=t_heat, wall_penetration_depth_cm_profile=wall_penetration_depth_cm_profile, wall_penetration_radius_profile=wall_penetration_radius_profile, wall_penetration_cell_idx_profile=wall_penetration_cell_idx_profile, shock_penetration_depth_cm_profile=shock_penetration_depth_cm_profile, shock_penetration_radius_profile=shock_penetration_radius_profile, shock_penetration_cell_idx_profile=shock_penetration_cell_idx_profile,
-                                   wall_material=wall_material, ablation=ablation,)
+                                   wall_material=wall_material, ablation=ablation, lam_eff=lam_eff, power=power, lambda_eff_val=lambda_eff_array[i])
 
             # Extract z_F at r=R_cm from the current time snapshot.
             t_key = t_sec[i] * 1e9

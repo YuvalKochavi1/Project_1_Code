@@ -50,7 +50,7 @@ class AblationModel:
         return -510.1 * u_tilde * (T0 ** 0.716) * (t_ns ** 0.036)
 
     @staticmethod
-    def ablation_velocity_cupper(t_exposed, T0, u_tilde):
+    def ablation_velocity_copper(t_exposed, T0, u_tilde):
         """
         Eq. (14): ablative wall velocity for copper.
 
@@ -81,9 +81,9 @@ class AblationModel:
                 if wall_material == 'Gold':
                     u_kms_t = AblationModel.ablation_velocity_gold(t_exp, T0, u_tilde)
                     u_kms_t_minus_dt = AblationModel.ablation_velocity_gold(t_exp - dt, T0, u_tilde)
-                elif wall_material == 'Cupper':
-                    u_kms_t = AblationModel.ablation_velocity_cupper(t_exp, T0, u_tilde)
-                    u_kms_t_minus_dt = AblationModel.ablation_velocity_cupper(t_exp - dt, T0, u_tilde)
+                elif wall_material == 'Copper':
+                    u_kms_t = AblationModel.ablation_velocity_copper(t_exp, T0, u_tilde)
+                    u_kms_t_minus_dt = AblationModel.ablation_velocity_copper(t_exp - dt, T0, u_tilde)
                 u_cms = u_kms_t * 1e5
                 u_cms_minus_dt = u_kms_t_minus_dt * 1e5
                 R_prev_i = R0_cm if (R_array_prev is None) else R_array_prev[i]

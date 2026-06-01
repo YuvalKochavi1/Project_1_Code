@@ -929,6 +929,7 @@ def plot_flux_curvature_post_breakout(
             t_target = t_breakout + delay_ns - 0.1
         else:
             t_target = t_breakout + delay_ns
+        #t_target = t_breakout + delay_ns
         
         # Find closest snapshot in bessel_data
         available = np.array(list(bessel_data.keys()), dtype=float)
@@ -962,6 +963,8 @@ def plot_flux_curvature_post_breakout(
     exp_ta2o5 = {}
     ta2o5_max_y = 0.0
     exp_sio2 = {}
+    exp_sio2_ta2o5 = {}
+    exp_sio2_model_ta2o5 = {}
     if Material == "Ta2O5":
         base_ta_path = BASE_DIR / "Data_new" / "Back" / "Ta2O5" / "article" / "flux_curvature"
         # files 1.csv -> 0.25mm, 2.csv -> 0.5mm, 3.csv -> 0.75mm, 4.csv -> 1.0mm
@@ -986,6 +989,22 @@ def plot_flux_curvature_post_breakout(
                 exp_sio2[1.0] = df
             except Exception as e:
                 print(f"Error loading SiO2 1mm.csv: {e}")
+        
+        csv_ta2o5_path = base_sio2_path / "Ta2O5_1mm.csv"
+        if csv_ta2o5_path.exists():
+            try:
+                df_ta = pd.read_csv(csv_ta2o5_path)
+                exp_sio2_ta2o5[1.0] = df_ta
+            except Exception as e:
+                print(f"Error loading SiO2 Ta2O5_1mm.csv: {e}")
+
+        csv_model_ta2o5_path = base_sio2_path / "modelTa2O5.csv"
+        if csv_model_ta2o5_path.exists():
+            try:
+                df_mta = pd.read_csv(csv_model_ta2o5_path)
+                exp_sio2_model_ta2o5[1.0] = df_mta
+            except Exception as e:
+                print(f"Error loading SiO2 modelTa2O5.csv: {e}")
 
     r_mm_last = None
     for idx, (z_mm, t_breakout, t_closest, ds) in enumerate(raw_profiles):
@@ -1039,6 +1058,43 @@ def plot_flux_curvature_post_breakout(
                         zorder=5
                     )
                     break
+
+            for z_key, df_exp in exp_sio2_ta2o5.items():
+                if abs(z_mm - z_key) < 1e-3:
+                    x_exp = df_exp['x'].to_numpy()
+                    y_exp = df_exp['y'].to_numpy()
+                    y_exp_norm = y_exp / np.max(y_exp) if np.max(y_exp) > 0 else y_exp
+                    
+                    # Symmetric mapping
+                    x_sym = np.concatenate((-x_exp[::-1], x_exp[1:]))
+                    y_sym = np.concatenate((y_exp_norm[::-1], y_exp_norm[1:]))
+                    
+                    plt.plot(
+                        x_sym, y_sym,
+                        color='blue', linestyle=':', linewidth=2.0,
+                        label="Experiment (Ta2O5_1mm.csv)",
+                        zorder=5
+                    )
+                    break
+
+            for z_key, df_exp in exp_sio2_model_ta2o5.items():
+                if abs(z_mm - z_key) < 1e-3:
+                    x_exp = df_exp['x'].to_numpy()
+                    y_exp = df_exp['y'].to_numpy()
+                    y_exp_norm = y_exp / np.max(y_exp) if np.max(y_exp) > 0 else y_exp
+                    
+                    # Already spans both positive and negative x
+                    x_sym = x_exp
+                    y_sym = y_exp_norm
+                    
+                    plt.plot(
+                        x_sym, y_sym,
+                        color='blue', linestyle='-.', linewidth=2.0,
+                        label="Model Ta2O5 (modelTa2O5.csv)",
+                        zorder=5
+                    )
+                    break
+
 
     # Draw original Foam-Wall interface symmetrically
     plt.axvline(x=R_cm * 10.0, color='gray', linestyle='--', alpha=0.7, label='Foam-Wall interface')
@@ -1243,14 +1299,28 @@ if __name__ == "__main__":
     
     # --- New: Curvature post breakout comparison ---
     if Material == "Ta2O5":
+        # print("\n" + "=" * 72)
+        # print("STARTING FLUX CURVATURE POST-BREAKOUT COMPARISON")
+        # print("=" * 72)
+        # plot_flux_curvature_post_breakout(
+        #     times,
+        #     mode="marshak_ablation",
+        #     wall_material="Gold",
+        #     vary_rho=True,
+        #     lam_eff=True,
+        #     power=1,
+        #     detector_positions_mm=[0.25, 0.5, 0.75, 1.0],
+        #     delay_ns=0.5,
+        #     show_plot=True,
+        # )
         print("\n" + "=" * 72)
         print("STARTING FLUX CURVATURE POST-BREAKOUT COMPARISON")
         print("=" * 72)
         plot_flux_curvature_post_breakout(
             times,
-            mode="marshak_ablation",
+            mode="marshak_wall_loss",
             wall_material="Gold",
-            vary_rho=True,
+            vary_rho=False,
             lam_eff=True,
             power=1,
             detector_positions_mm=[0.25, 0.5, 0.75, 1.0],

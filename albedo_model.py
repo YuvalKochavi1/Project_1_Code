@@ -79,7 +79,7 @@ class AlbedoModel:
             albedo[albedo < 0] = 0.0
             albedo[albedo > 1] = 1.0
             #average without the zeroed values to avoid biasing the average when the front is near z=0
-            albedo_nonzero = albedo[:x_front_index][albedo[:x_front_index] > 0]
+            #albedo_nonzero = albedo[:x_front_index][albedo[:x_front_index] > 0]
             # if t_sec < 0.1e-9:
             #     avg_albedo = np.mean(albedo[:x_front_index])
             # else:
