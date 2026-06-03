@@ -13,5 +13,6 @@ from simulation_2d_pipeline import *
 
 if __name__ == "__main__":
     #run_default_pipeline(material=Material, coating_material=CoatingMaterial)
-    run_default_pipeline(material="Ta2O5", coating_material="gold")
+    run_default_pipeline(material="SiO2", coating_material="gold", gold_g_scale=1)
+    run_default_pipeline(material="SiO2", coating_material="gold", gold_g_scale=100)
     #run_eff_lam_radius_sweep(material=Material)

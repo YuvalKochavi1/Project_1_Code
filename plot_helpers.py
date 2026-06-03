@@ -69,61 +69,68 @@ def plot_standard_front_analytic_models(
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_marshak,
-        label="Analytic x_F(t) (Marshak BC)",
+        label=r"Model $x_F(t)$ (Marshak BC)",
         linestyle="-",
         color='blue',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_2D,
-        label=f"Analytic x_F(t) ({wall_material} Lost + ablation + varying rho)",
-        linestyle="--",
+        label=fr"Model $x_F(t)$ - 2D effects",
+        linestyle="-",
         color='black',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_2D_lam_eff,
-        label=f"Analytic x_F(t) ({wall_material} Lost + ablation + varying rho + lam_eff)",
-        linestyle="--",
-        color='purple',
+        label=fr"Model $x_F(t)$ - 2D effects + $\lambda_{{\mathrm{{eff}}}}$",
+        linestyle="-",
+        color='red',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_no_marshak,
-        label="HR",
+        label=r"$\mathrm{HR}$",
         linestyle="-",
         color='green',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_gold_loss,
-        label=f"Analytic x_F(t) ({wall_material} Loss)",
-        linestyle="--",
+        label=fr"Model $x_F(t)$ ({wall_material} Loss)",
+        linestyle="-",
         color='orange',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_ablation_const_rho,
-        label=f"Analytic x_F(t) ({wall_material} Ablation Const rho)",
-        linestyle="--",
-        color='red',
+        label=fr"Model $x_F(t)$ ({wall_material} Ablation Const $\rho$)",
+        linestyle="-",
+        color='pink',
     )
 
 
-def plot_standard_surface_temperature_models(times_to_store, *, Ts_1D=None, Ts_2D=None):
+def plot_standard_surface_temperature_models(times_to_store, *, Ts_1D=None, Ts_2D=None, Ts_2D_lam_eff=None):
     plot_analytic_if_available(
         times_to_store,
         Ts_1D,
-        label="Analytic 1D Ts(t) (Marshak BC)",
+        label=r"Model $1\mathrm{D}$ $T_s(t)$ (Marshak BC)",
         linestyle="--",
         color='blue',
     )
     plot_analytic_if_available(
         times_to_store,
         Ts_2D,
-        label="Analytic 2D Ts(t) (Gold Lost BC)",
+        label=r"Model $2\mathrm{D}$ $T_s(t)$ (Gold Lost BC)",
         linestyle="--",
         color='red',
+    )
+    plot_analytic_if_available(
+        times_to_store,
+        Ts_2D_lam_eff,
+        label=r"Model $2\mathrm{D}$ $T_s(t)$ (Gold Lost BC + $\lambda_{{\mathrm{{eff}}}}$)",
+        linestyle="--",
+        color='green',
     )
 
 

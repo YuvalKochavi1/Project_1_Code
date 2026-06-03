@@ -827,7 +827,7 @@ def plot_flux_curvature_post_breakout(
 
     # --- Pre-load experimental Data to calculate global normalisation factor (Ta2O5)
     exp_ta2o5 = {}
-    ta2o5_max_y = 0.0
+    y_norm = 1.0
     if material == "Ta2O5":
         base_ta_path = PROJECT_ROOT / "Data_new" / "Back" / "Ta2O5" / "article" / "flux_curvature"
         file_mapping = {0.25: "1new.csv", 0.5: "2new.csv", 0.75: "3new.csv", 1.0: "4new.csv"}
@@ -837,11 +837,15 @@ def plot_flux_curvature_post_breakout(
                 try:
                     df = pd.read_csv(csv_path)
                     exp_ta2o5[z_key] = df
-                    y_max_local = df['y'].max()
-                    if y_max_local > ta2o5_max_y:
-                        ta2o5_max_y = y_max_local
                 except Exception as e:
                     print(f"Error loading {fname}: {e}")
+        
+        # Normalize the experimental data according to "1new.csv" at x closest to 0
+        if 0.25 in exp_ta2o5:
+            df_ref = exp_ta2o5[0.25]
+            idx_closest = df_ref['x'].abs().idxmin()
+            y_norm = df_ref.loc[idx_closest, 'y']
+            print(f"Ta2O5 normalization factor from 1new.csv at x ~ 0: {y_norm}")
 
     r_mm_last = None
     for idx, (z_mm, t_breakout, t_closest, flux_raw, T_radial_hev) in enumerate(raw_profiles):
@@ -862,8 +866,8 @@ def plot_flux_curvature_post_breakout(
                 if abs(z_mm - z_key) < 1e-3:
                     x_exp = df_exp['x'].to_numpy()
                     y_exp = df_exp['y'].to_numpy()
-                    if ta2o5_max_y > 0:
-                        y_exp_norm = y_exp / ta2o5_max_y
+                    if y_norm > 0:
+                        y_exp_norm = y_exp / y_norm
                     else:
                         y_exp_norm = y_exp
                     plt.plot(

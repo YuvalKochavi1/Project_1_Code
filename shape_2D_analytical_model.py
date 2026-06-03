@@ -2,6 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
+
+# Simple font configuration - just serif
+plt.rcParams.update({
+    'font.family': 'serif',
+    'text.usetex': True,
+    'axes.unicode_minus': False,
+})
 from scipy.interpolate import interp1d
 
 from csv_helpers import save_figure
@@ -25,6 +32,9 @@ def _resolve_colormap_settings(
     if Material == "C8H8":
         default_vmax = 1.50
         default_cbar_ticks = (0.00, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4)
+    elif Material == "SiO2_copper":
+        default_vmax = 1.75
+        default_cbar_ticks = (0.00, 0.25, 0.5, 0.75, 1.00, 1.25, 1.5)
     else:
         default_vmax = 2.00
         default_cbar_ticks = (0.00, 0.25, 0.5, 0.75, 1.00, 1.25, 1.5, 1.75)
@@ -273,8 +283,27 @@ def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.
     times_ns : list
         List of times (in ns) to plot
     """
-    fig, axes = plt.subplots(1, len(times_ns), figsize=(18, 8))
-    if len(times_ns) == 1:
+    n_plots = len(times_ns)
+    if n_plots == 1:
+        fig_height = 6.5
+        axes_height = fig_height - 1.5
+        axes_width = axes_height * (R_cm / (L/2))
+        fig_width = axes_width + 0.9 + 0.3
+        wspace = 0.15
+        fig, axes = plt.subplots(1, n_plots, figsize=(fig_width, fig_height))
+    else:
+        fig_height = 6.0
+        axes_height = fig_height - 1.5
+        axes_width = axes_height * (R_cm / (L/2))
+        wspace = 0.15
+        fig_width = 0.9 + 0.3 + (n_plots + (n_plots - 1) * wspace) * axes_width
+        fig, axes = plt.subplots(
+            1, 
+            n_plots, 
+            figsize=(fig_width, fig_height), 
+            gridspec_kw={"wspace": wspace}
+        )
+    if n_plots == 1:
         axes = [axes]
 
     for idx, t_target in enumerate(times_ns):
@@ -308,10 +337,10 @@ def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.
         ax = axes[idx]
 
         # Plot the domain boundaries
-        ax.axhline(y=0, color='black', linewidth=2, label='z = 0 (wall)')
-        ax.axhline(y=L, color='gray', linewidth=2, linestyle='--', label=f'z = L = {L:.2f} cm')
-        ax.axvline(x=0, color='black', linewidth=1, alpha=0.5, label='r = 0 (axis)')
-        ax.axvline(x=R_cm, color='gray', linewidth=2, linestyle='--', label=f'r = R = {R_cm:.2f} cm')
+        # ax.axhline(y=0, color='black', linewidth=2, label='z = 0 (wall)')
+        # ax.axhline(y=L, color='gray', linewidth=2, linestyle='--', label=f'z = L = {L:.2f} cm')
+        # ax.axvline(x=0, color='black', linewidth=1, alpha=0.5, label='r = 0 (axis)')
+        # ax.axvline(x=R_cm, color='gray', linewidth=2, linestyle='--', label=f'r = R = {R_cm:.2f} cm')
 
         # Plot the curved front position
         ax.plot(
@@ -319,32 +348,32 @@ def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.
             z_F_radial,
             linewidth=3,
             color='red',
-            label='Front z_F(r,t)',
+            label=r'$z_F(r,t)$',
             linestyle='-',
             markersize=4,
         )
 
-        r_csv, z_csv = _load_simulated_front_csv(t_target)
-        ax.plot(r_csv, z_csv, color='blue', label=f'Simulated front ({t_target:.2f} ns)', linestyle='--')
+        # r_csv, z_csv = _load_simulated_front_csv(t_target)
+        # ax.plot(r_csv, z_csv, color='blue', label=f'Simulated front ({t_target:.2f} ns)', linestyle='--')
 
         # Shade the region behind the front (heated region)
-        ax.fill_between(r_grid, 0, z_F_radial, alpha=0.3, color='orange', label='Heated region')
+        # ax.fill_between(r_grid, 0, z_F_radial, alpha=0.3, color='orange', label='Heated region')
 
-        ax.set_xlabel('Radial position r (cm)', fontsize=12, fontname='serif')
-        ax.set_ylabel('Axial position z (cm)', fontsize=12, fontname='serif')
-        ax.set_title(
-            f't = {t_closest:.2f} ns\nkappa_0 = {kappa_0:.3f}, kappa_0_approx = {kappa_0_approx:.3f}, albedo = {albedo:.3f}',
-            fontsize=12,
-            fontname='serif',
-        )
+        ax.set_xlabel(r'$r$ [cm]', fontsize=12, fontname='serif')
+        ax.set_ylabel(r'$z$ [cm]', fontsize=12, fontname='serif')
+        # ax.set_title(
+        #     f't = {t_closest:.2f} ns\n$\kappa_0$ = {kappa_0:.3f}, $\kappa_0^{{approx}}$ = {kappa_0_approx:.3f}, albedo = {albedo:.3f}',
+        #     fontsize=12,
+        #     fontname='serif',
+        # )
         ax.set_ylim([0, L/2])
         ax.set_xlim([0, R_cm])
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=9, loc='best', prop={'family': 'serif'})
         ax.set_aspect('equal', adjustable='box')
 
-    plt.suptitle('2D Spatial View of Heat Front z_F(r,t) in Cylindrical Geometry', fontsize=14, y=1.00, fontname='serif')
-    plt.tight_layout()
+    #plt.suptitle('2D Spatial View of Heat Front z_F(r,t) in Cylindrical Geometry', fontsize=14, y=1.00, fontname='serif')
+    # plt.tight_layout()
 
     save_figure('2D_front_spatial.png', model2_D=True, dpi=150, bbox_inches='tight')
     plt.close()
@@ -422,8 +451,35 @@ def plot_temperature_heatmap_2D(
     plot_cmap.set_bad('white')
 
 
-    fig, axes = plt.subplots(1, len(times_ns), figsize=(18, 6), gridspec_kw={'wspace': 0.08})
-    if len(times_ns) == 1:
+    n_plots = len(times_ns)
+    if bessel_data and len(bessel_data) > 0:
+        first_time = next(iter(bessel_data))
+        first_data = bessel_data[first_time]
+        r_max = float(first_data.get('r_gold_grid', first_data.get('r_grid', [R_cm]))[-1])
+    else:
+        r_max = float(globals().get('r_gold', globals().get('r_grid', [R_cm]))[-1])
+    
+    if n_plots == 1:
+        fig_height = 7.5
+        axes_height = fig_height - 1.5
+        axes_width = axes_height * (r_max / L)
+        fig_width = axes_width + 0.9 + 1.2
+        wspace = 0.15
+        fig, axes = plt.subplots(1, n_plots, figsize=(fig_width, fig_height))
+    else:
+        fig_height = 6.5
+        axes_height = fig_height - 1.5
+        axes_width = axes_height * (r_max / L)
+        wspace = 0.15
+        plot_cell_width = axes_width + 0.9
+        fig_width = 0.9 + 0.3 + (n_plots * plot_cell_width) + (n_plots - 1) * wspace * plot_cell_width
+        fig, axes = plt.subplots(
+            1, 
+            n_plots, 
+            figsize=(fig_width, fig_height), 
+            gridspec_kw={"wspace": wspace}
+        )
+    if n_plots == 1:
         axes = [axes]
 
     for idx, t_target in enumerate(times_ns):
@@ -593,28 +649,30 @@ def plot_temperature_heatmap_2D(
         cbar = plt.colorbar(pcm, ax=ax, pad=0.01, fraction=0.046)
         if cmap_settings['cbar_ticks'] is not None:
             cbar.set_ticks(cmap_settings['cbar_ticks'])
-        cbar.set_label('Temperature T (heV)')
+        cbar.set_label(r'$T$ [heV]')
 
         # Domain boundaries
-        ax.axhline(y=0, color='white', linewidth=2, linestyle='-', alpha=0.7)
-        ax.axhline(y=L, color='gray', linewidth=1, linestyle='--', alpha=0.5)
-        ax.axvline(x=R_cm, color='gray', linewidth=1, linestyle='--', alpha=0.5)
-        ax.set_xlabel('Radial position r (cm)')
-        ax.set_ylabel('Axial position z (cm)')
-        ax.set_title(f't = {t_closest:.2f} ns')
+        # ax.axhline(y=0, color='white', linewidth=2, linestyle='-', alpha=0.7)
+        # ax.axhline(y=L/2, color='gray', linewidth=1, linestyle='--', alpha=0.5)
+        # ax.axvline(x=R_cm, color='gray', linewidth=1, linestyle='--', alpha=0.5)
+        ax.set_xlabel(r'$r$ [cm]')
+        ax.set_ylabel(r'$z$ [cm]')
+        # ax.set_title(r'$t = ' + f'{t_closest:.2f}' + r'$ ns')
         print(f"Plotting time {t_closest:.2f} ns, t_target was {t_target:.2f} ns")
-        ax.set_ylim([0, L])
-        ax.set_xlim([0.0, float(r_mesh[-1])])
+        ax.set_ylim([0, L/2])
+        #ax.set_xlim([0.0, float(r_mesh[-1])])
+        ax.set_xlim([0.0, R_cm])
         ax.set_aspect('equal', adjustable='box')
         # ax.legend(fontsize=9, loc='upper right')
 
-    plt.suptitle(
-        f'Temperature Distribution T(r,z,t) with Self-Similar Profile (exponent = {exponent:.3f})',
-        y=1.00,
-        fontsize=20,
-    )
-    fig.subplots_adjust(wspace=0.08)
-    plt.tight_layout(pad=0.6, w_pad=0.2)
+    title_fontsize = 12 if n_plots == 1 else 16
+    # plt.suptitle(
+    #     f'Temperature Distribution T(r,z,t) with Self-Similar Profile (exponent = {exponent:.3f})',
+    #     y=0.98 if n_plots == 1 else 1.00,
+    #     fontsize=title_fontsize,
+    # )
+    fig.subplots_adjust(wspace=wspace if n_plots > 1 else 0.2)
+    # plt.tight_layout(pad=0.6, w_pad=0.2)
 
     save_figure(f'temperature_heatmap_2D{title_suffix}.png', model2_D=True, dpi=150, bbox_inches='tight')
     if show_plot:
@@ -752,7 +810,7 @@ def plot_temperature_heatmap_2D_series_model(
         )
 
         field_mesh = np.power(np.maximum(T4_mesh, 0.0), 0.25)
-        field_label = 'Temperature T (HeV)'
+        field_label = r'$T$ [heV]'
 
         ax = axes[idx]
         pcm = ax.pcolormesh(
@@ -787,8 +845,8 @@ def plot_temperature_heatmap_2D_series_model(
         ax.axhline(y=0, color='white', linewidth=2, linestyle='-', alpha=0.7)
         ax.axhline(y=L, color='gray', linewidth=1, linestyle='--', alpha=0.5)
         ax.axvline(x=R_cm, color='gray', linewidth=1, linestyle='--', alpha=0.5)
-        ax.set_xlabel('Radial position r (cm)')
-        ax.set_ylabel('Axial position z (cm)')
+        ax.set_xlabel(r'$r$ [cm]')
+        ax.set_ylabel(r'$z$ [cm]')
         ax.set_title(f't = {t_eval:.2f} ns')
         ax.set_ylim([0, L/2])
         ax.set_xlim([0, R_cm])

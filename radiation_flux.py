@@ -20,10 +20,17 @@ All three curves are then normalised to [0, 1] for relative comparison.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from parameters import alpha, beta, K_per_Hev, Experiment, Material, a_hev, c, r_grid as R_GRID_DEFAULT, alpha_gold, beta_gold, alpha_copper, beta_copper, alpha_be, beta_be, R_cm
+
+# Font configuration: serif and LaTeX style math font
+plt.rcParams.update({
+    'font.family': 'serif',
+    'text.usetex': True,
+    'axes.unicode_minus': False,
+})
+from parameters import alpha, beta, K_per_Hev, Experiment, Material, a_hev, c, r_grid as R_GRID_DEFAULT, alpha_gold, beta_gold, alpha_copper, beta_copper, alpha_be, beta_be, R_cm, z, L
 from model_main import analytic_wave_front_dispatch, BASE_DIR
 from csv_helpers import save_figure, save_series_csv
-from shape_2D_analytical_model import _compute_wall_heyney_horizontal_profile
+from shape_2D_analytical_model import _compute_wall_heyney_horizontal_profile, _compute_temperature_mesh
 from scipy import special
 
 # --------------------------------------------------------------------------
@@ -360,7 +367,7 @@ def compute_and_plot_radiation_flux(
         # Panel 1: raw flux
         ax = axes[0]
         for ds, c in zip(datasets, colors):
-            label = f"z = {ds['z_pos_mm']:g} mm"
+            label = fr"$z = {ds['z_pos_mm']:g}$ mm"
             ax.plot(ds['times'], ds['flux_raw'], color=c, linewidth=1.5, label=label)
             if ds['t_arrival'] is not None:
                 ax.axvline(ds['t_arrival'], color=c, linestyle=':', alpha=0.5)
@@ -370,10 +377,10 @@ def compute_and_plot_radiation_flux(
             if z_mm in exp_data:
                 # Plot as is without normalizing
                 df_exp = exp_data[z_mm]
-                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=f"Data {z_mm:g} mm")
+                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=fr"Data ${z_mm:g}$ mm")
 
-        ax.set_xlabel("Time (ns)", fontsize=14, fontname='serif')
-        ax.set_ylabel(r"$\Phi$ [W/m²]", fontsize=14, fontname='serif')
+        ax.set_xlabel(r"$t$ [ns]", fontsize=14, fontname='serif')
+        ax.set_ylabel(r"$\Phi$ [$\mathrm{W/m}^2$]", fontsize=14, fontname='serif')
         ax.set_title("Raw Radiation Flux", fontsize=15, fontname='serif')
         ax.legend(prop={'family': 'serif'})
         ax.grid(True, alpha=0.3)
@@ -381,7 +388,7 @@ def compute_and_plot_radiation_flux(
         # Panel 2: normalised flux
         ax = axes[1]
         for ds, c in zip(datasets, colors):
-            label = f"z = {ds['z_pos_mm']:g} mm"
+            label = fr"$z = {ds['z_pos_mm']:g}$ mm"
             ax.plot(ds['times'], ds['flux_normalised'], color=c, linewidth=1.5, label=label)
             if ds['t_arrival'] is not None:
                 ax.axvline(ds['t_arrival'], color=c, linestyle=':', alpha=0.5)
@@ -390,9 +397,9 @@ def compute_and_plot_radiation_flux(
             z_mm = float(ds['z_pos_mm'])
             if z_mm in exp_data:
                 df_exp = exp_data[z_mm]
-                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=f"Data {z_mm:g} mm")
+                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=fr"Data ${z_mm:g}$ mm")
 
-        ax.set_xlabel("Time (ns)", fontsize=14, fontname='serif')
+        ax.set_xlabel(r"$t$ [ns]", fontsize=14, fontname='serif')
         ax.set_ylabel(r"$\Phi / \Phi_{\max}$", fontsize=14, fontname='serif')
         ax.set_title("Normalised Radiation Flux", fontsize=15, fontname='serif')
         ax.legend(prop={'family': 'serif'})
@@ -401,18 +408,18 @@ def compute_and_plot_radiation_flux(
         # Panel 3: temperature at each detector
         ax = axes[2]
         for ds, c in zip(datasets, colors):
-            label = f"z = {ds['z_pos_mm']:g} mm"
+            label = fr"$z = {ds['z_pos_mm']:g}$ mm"
             ax.plot(ds['times'], ds['T_hev'], color=c, linewidth=1.5, label=label)
             if ds['t_arrival'] is not None:
                 ax.axvline(ds['t_arrival'], color=c, linestyle=':', alpha=0.5)
-        ax.set_xlabel("Time (ns)", fontsize=14, fontname='serif')
-        ax.set_ylabel("T (HeV)", fontsize=14, fontname='serif')
+        ax.set_xlabel(r"$t$ [ns]", fontsize=14, fontname='serif')
+        ax.set_ylabel(r"$T$ [heV]", fontsize=14, fontname='serif')
         ax.set_title("Temperature at Detectors", fontsize=15, fontname='serif')
         ax.legend(prop={'family': 'serif'})
         ax.grid(True, alpha=0.3)
 
         fig.suptitle(
-            f"Radiation Flux Analysis — {Material}  ({mode}, wall={wall_material})",
+            f"Radiation Flux Analysis - {Material} ({mode}, wall={wall_material})",
             fontsize=16, fontname='serif', y=1.02,
         )
         plt.tight_layout()
@@ -764,7 +771,7 @@ def plot_flux_curvature(
             ax.plot(
                 r_sym, flux_sym,
                 color=color, linewidth=2.0,
-                label=f"z = {z_mm:.1f} mm",
+                label=fr"$z = {z_mm:.1f}$ mm",
             )
 
             # Load experimental data if available and we are at z = 1.0 mm and t approx 9.5 ns
@@ -811,20 +818,20 @@ def plot_flux_curvature(
             #     )
 
             # Draw original Foam-Wall interface symmetrically on both sides
-            ax.axvline(
-                x=R_cm * 10.0,
-                color='gray', linestyle='--', alpha=0.7,
-                label='Foam-Wall interface'
-            )
-            ax.axvline(
-                x=-R_cm * 10.0,
-                color='gray', linestyle='--', alpha=0.7
-            )
+            # ax.axvline(
+            #     x=R_cm * 10.0,
+            #     color='gray', linestyle='--', alpha=0.7,
+            #     label='Foam-Wall interface'
+            # )
+            # ax.axvline(
+            #     x=-R_cm * 10.0,
+            #     color='gray', linestyle='--', alpha=0.7
+            # )
 
-            ax.set_xlabel("r (mm)", fontsize=12, fontname='serif')
+            ax.set_xlabel(r"$r$ [mm]", fontsize=12, fontname='serif')
             if j == 0:
                 ax.set_ylabel(
-                    "Normilized flux",
+                    r"Flux [a.u]",
                     fontsize=12, fontname='serif',
                 )
 
@@ -961,7 +968,7 @@ def plot_flux_curvature_post_breakout(
 
     # --- Pre-load experimental Data to calculate global normalisation factor (Ta2O5 / SiO2)
     exp_ta2o5 = {}
-    ta2o5_max_y = 0.0
+    y_norm = 1.0
     exp_sio2 = {}
     exp_sio2_ta2o5 = {}
     exp_sio2_model_ta2o5 = {}
@@ -975,11 +982,15 @@ def plot_flux_curvature_post_breakout(
                 try:
                     df = pd.read_csv(csv_path)
                     exp_ta2o5[z_key] = df
-                    y_max_local = df['y'].max()
-                    if y_max_local > ta2o5_max_y:
-                        ta2o5_max_y = y_max_local
                 except Exception as e:
                     print(f"Error loading {fname}: {e}")
+        
+        # Normalize the experimental data according to "1new.csv" at x closest to 0
+        if 0.25 in exp_ta2o5:
+            df_ref = exp_ta2o5[0.25]
+            idx_closest = df_ref['x'].abs().idxmin()
+            y_norm = df_ref.loc[idx_closest, 'y']
+            print(f"Ta2O5 normalization factor from 1new.csv at x ~ 0: {y_norm}")
     elif Material == "SiO2":
         base_sio2_path = BASE_DIR / "Data_new" / "Back" / "SiO2" / "article" / "flux"
         csv_path = base_sio2_path / "1mm.csv"
@@ -1019,7 +1030,7 @@ def plot_flux_curvature_post_breakout(
         r_sym = np.concatenate((-r_mm[::-1], r_mm[1:]))
         flux_sym = np.concatenate((flux_norm[::-1], flux_norm[1:]))
         
-        label = f"z = {z_mm:.2f} mm ($t_{{br}} = {t_breakout:.2f}$ ns, plot $t = {t_closest:.2f}$ ns)"
+        label = fr"$z = {z_mm:.2f}$ mm"
         plt.plot(r_sym, flux_sym, color=colors[idx % len(colors)], linewidth=2.2, label=label)
 
         # Plot Ta2O5 experimental data
@@ -1028,8 +1039,8 @@ def plot_flux_curvature_post_breakout(
                 if abs(z_mm - z_key) < 1e-3:
                     x_exp = df_exp['x'].to_numpy()
                     y_exp = df_exp['y'].to_numpy()
-                    if ta2o5_max_y > 0:
-                        y_exp_norm = y_exp / ta2o5_max_y
+                    if y_norm > 0:
+                        y_exp_norm = y_exp / y_norm
                     else:
                         y_exp_norm = y_exp
                     plt.plot(
@@ -1072,7 +1083,7 @@ def plot_flux_curvature_post_breakout(
                     plt.plot(
                         x_sym, y_sym,
                         color='blue', linestyle=':', linewidth=2.0,
-                        label="Experiment (Ta2O5_1mm.csv)",
+                        label="Experiment (Ta2O5 1mm.csv)",
                         zorder=5
                     )
                     break
@@ -1097,17 +1108,16 @@ def plot_flux_curvature_post_breakout(
 
 
     # Draw original Foam-Wall interface symmetrically
-    plt.axvline(x=R_cm * 10.0, color='gray', linestyle='--', alpha=0.7, label='Foam-Wall interface')
-    plt.axvline(x=-R_cm * 10.0, color='gray', linestyle='--')
+    # plt.axvline(x=R_cm * 10.0, color='gray', linestyle='--', alpha=0.7, label='Foam-Wall interface')
+    # plt.axvline(x=-R_cm * 10.0, color='gray', linestyle='--')
 
-    plt.xlabel("r (mm)", fontsize=13, fontname='serif')
-    plt.ylabel("Normalized flux", fontsize=13, fontname='serif')
-    plt.title(f"Flux Curvature at {delay_ns} ns after breakout — {Material} ({mode})", fontsize=14, fontname='serif', y=1.02)
+    plt.xlabel(r"$r$ [mm]", fontsize=13, fontname='serif')
+    plt.ylabel(r"Flux [a.u.]", fontsize=13, fontname='serif')
     if r_mm_last is not None:
         plt.xlim(-r_mm_last[-1], r_mm_last[-1])
     plt.ylim(bottom=0)
     plt.grid(True, alpha=0.3)
-    plt.legend(prop={'family': 'serif'}, fontsize=10)
+    plt.legend(prop={'family': 'serif'}, loc='upper left', fontsize=10)
     plt.tight_layout()
 
     save_figure(f"flux_curvature_post_breakout_{delay_ns}ns.png", model1_5=False, model2_D=True)
@@ -1124,7 +1134,7 @@ def compute_and_plot_flux_curvature(
     use_seconds=True,
     vary_rho=True,
     lam_eff=False,
-    power=2,
+    power=1.5,
     detector_positions_mm=None,
     save_csv=True,
     show_plot=True,
@@ -1205,6 +1215,212 @@ def compute_and_plot_flux_curvature(
 
     return curvature_datasets
 
+
+def compute_and_plot_T4_heatmap(
+    times_to_store,
+    *,
+    mode="marshak_ablation",
+    wall_material="Gold",
+    use_seconds=True,
+    vary_rho=True,
+    lam_eff=None,
+    power=None,
+    show_plot=True,
+    save_csv=True,
+    time_snapshot_ns=2.0,
+):
+    """
+    Compute and plot a 2D spatial heatmap of T^4(r, z) at a selected time snapshot (default 2.0 ns).
+    The heatmap is plotted for r >= 0 and z >= 0.
+    """
+    # Determine defaults based on material
+    if lam_eff is None:
+        lam_eff = (Material in ["Ta2O5", "SiO2"])
+    if power is None:
+        power = 1 if (Material in ["Ta2O5", "SiO2"]) else 2
+
+    # --- Step 1: run the solver ---
+    result = analytic_wave_front_dispatch(
+        times_to_store,
+        use_seconds=use_seconds,
+        mode=mode,
+        wall_material=wall_material,
+        vary_rho=vary_rho,
+        lam_eff=lam_eff,
+        power=power,
+    )
+
+    xF = result[0]       # heat-front position [cm]
+    Ts = result[1]       # surface temperature [HeV]
+    bessel_data = result[5] if len(result) > 5 else {}
+    times = np.asarray(times_to_store, dtype=float)
+
+    if not bessel_data:
+        print("Error: No bessel_data available in solver. Cannot compute T^4 heatmap.")
+        return
+
+    # Find snapshot closest to time_snapshot_ns (e.g. 2.0 ns)
+    available = np.array(list(bessel_data.keys()), dtype=float)
+    t_closest = float(available[np.argmin(np.abs(available - time_snapshot_ns))])
+    data = bessel_data[t_closest]
+
+    # Resolve exponents
+    exponent = 1.0 / (4.0 + alpha - beta)
+    if wall_material == "Gold":
+        exponent_wall = 1.0 / (4.0 + alpha_gold - beta_gold)
+    elif wall_material == "Copper":
+        exponent_wall = 1.0 / (4.0 + alpha_copper - beta_copper)
+    elif wall_material == "Be":
+        exponent_wall = 1.0 / (4.0 + alpha_be - beta_be)
+    elif wall_material == "Vacuum":
+        exponent_wall = 0.0
+    else:
+        exponent_wall = exponent
+
+    # Grids
+    r_mesh_foam = np.asarray(data.get('r_grid', R_GRID_DEFAULT), dtype=float)
+    r_mesh = np.asarray(data.get('r_gold_grid', r_mesh_foam), dtype=float)
+    z_mesh = np.asarray(data.get('z_grid', z), dtype=float)
+    R_mesh, Z_mesh = np.meshgrid(r_mesh, z_mesh)
+
+    z_F_radial = np.asarray(data['z_F_radial'], dtype=float)
+    Ts_t = np.interp(t_closest, times, Ts)
+
+    # Compute foam temperature mesh
+    T_mesh_foam = _compute_temperature_mesh(z_mesh, z_F_radial, Ts_t, exponent)
+
+    # Map foam solution onto full radial grid
+    T_mesh_plot = np.zeros((z_mesh.size, r_mesh.size), dtype=float)
+    foam_domain = r_mesh <= R_cm
+    for i_z in range(z_mesh.size):
+        T_mesh_plot[i_z, foam_domain] = np.interp(
+            r_mesh[foam_domain],
+            r_mesh_foam,
+            T_mesh_foam[i_z],
+            left=0.0,
+            right=0.0,
+        )
+
+    # Wall profile
+    penetration_profile = data.get('wall_penetration_radius_profile')
+    if penetration_profile is None:
+        penetration_profile = np.full_like(z_mesh, R_cm, dtype=float)
+    else:
+        penetration_profile = np.asarray(penetration_profile, dtype=float)
+
+    shock_profile = data.get('shock_penetration_radius_profile')
+    if shock_profile is not None:
+        shock_profile = np.asarray(shock_profile, dtype=float)
+
+    foam_mask = data.get('ablation_foam_mask')
+    wall_mask = data.get('ablation_wall_mask')
+    if foam_mask is not None:
+        foam_mask = np.asarray(foam_mask, dtype=bool)
+    if wall_mask is not None:
+        wall_mask = np.asarray(wall_mask, dtype=bool)
+
+    ablation = "ablation" in mode
+    if ablation:
+        if (
+            foam_mask is not None
+            and wall_mask is not None
+            and foam_mask.shape == T_mesh_foam.shape
+            and wall_mask.shape == T_mesh_foam.shape
+        ):
+            T_wall_profile = _compute_wall_heyney_horizontal_profile(
+                T_mesh_foam,
+                foam_mask,
+                wall_mask,
+                r_mesh_foam,
+                exponent_wall,
+                is_ablation=True,
+                r_mesh_wall=r_mesh,
+                penetration_radius_profile=penetration_profile,
+                shock_radius_profile=shock_profile,
+            )
+            wall_valid = np.isfinite(T_wall_profile)
+            if np.any(wall_valid):
+                T_mesh_plot[wall_valid] = T_wall_profile[wall_valid]
+    else:
+        if wall_material != "Vacuum":
+            T_wall_profile = _compute_wall_heyney_horizontal_profile(
+                T_mesh_foam,
+                foam_mask=None,
+                wall_mask=None,
+                r_mesh=r_mesh_foam,
+                exponent_wall=exponent_wall,
+                is_ablation=False,
+                r_mesh_wall=r_mesh,
+                penetration_radius_profile=penetration_profile,
+                shock_radius_profile=shock_profile,
+            )
+            wall_valid = np.isfinite(T_wall_profile)
+            if np.any(wall_valid):
+                T_mesh_plot[wall_valid] = T_wall_profile[wall_valid]
+
+    # Convert shock boundary to NaN if needed
+    show_shock = True
+    if show_shock and shock_profile is not None:
+        shock_mask = np.isfinite(shock_profile)
+        if np.any(shock_mask):
+            T_mesh_plot = np.array(T_mesh_plot, copy=True)
+            for i_z, shock_r in enumerate(shock_profile):
+                if np.isfinite(shock_r):
+                    T_mesh_plot[i_z, r_mesh > shock_r] = np.nan
+
+    # Raise temperature to the 4th power to get T^4
+    T4_spatial = T_mesh_plot ** 4
+
+    # Set unheated/unreached regions (where T4_spatial <= 1e-10) to NaN to show as white background
+    T4_spatial = np.where(T4_spatial > 1e-10, T4_spatial, np.nan)
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(6, 7))
+    ax.set_facecolor('white')
+
+    pcm = ax.pcolormesh(
+        R_mesh,
+        Z_mesh,
+        T4_spatial,
+        shading='gouraud',
+        cmap='Spectral_r',
+        vmin=0.0,
+    )
+
+    cbar = fig.colorbar(pcm, ax=ax, pad=0.02, fraction=0.046, shrink=0.5)
+    cbar.set_label(r'$T^4$ [$\mathrm{heV}^4$]', fontsize=13, fontname='serif')
+
+    # Draw horizontal dashed line at detector depth if z_pos_mm is provided
+
+    ax.set_xlabel(r'$r$ [cm]', fontsize=14, fontname='serif')
+    ax.set_ylabel(r'$z$ [cm]', fontsize=14, fontname='serif')
+
+    ax.set_xlim(0.0, float(r_mesh[-1]))
+    ax.set_ylim(0.0, L/2)
+    ax.set_aspect('equal', adjustable='box')
+    ax.grid(True, which='both', linestyle=':', alpha=0.3)
+
+    plt.tight_layout()
+
+    save_figure(f"T4_spatial_heatmap_{t_closest:.1f}ns.png", model1_5=False, model2_D=True, dpi=250, bbox_inches='tight')
+
+    if show_plot:
+        plt.show()
+    plt.close()
+
+    # Save to CSV if requested
+    if save_csv:
+        out_dir = BASE_DIR / "Data_new" / Experiment / Material / "2D_shape" / "T4_spatial_heatmap"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        flat_r = R_mesh.flatten()
+        flat_z = Z_mesh.flatten()
+        flat_T4 = T4_spatial.flatten()
+        df = pd.DataFrame({"r_cm": flat_r, "z_cm": flat_z, "T4_hev4": flat_T4})
+        csv_path = out_dir / f"T4_spatial_heatmap_{t_closest:.1f}ns.csv"
+        df.to_csv(csv_path, index=False)
+        print(f"Saved T^4 spatial heatmap data -> {csv_path}")
+
+
 if __name__ == "__main__":
     print("\n" + "=" * 72)
     print("STARTING STANDALONE RADIATION FLUX COMPUTATION")
@@ -1218,7 +1434,7 @@ if __name__ == "__main__":
         detector_positions_mm = [0.5, 1.0, 1.25]
     elif Material == "SiO2_low_energy":
         times = np.linspace(0.01, 15.0, 1000)
-        detector_positions_mm = [0.5, 1.0, 1.5]
+        detector_positions_mm = [1.0]
     elif Material == "C11H16Pb0.3852":
         times = np.linspace(0.01, 1.0, 1000)
     elif Material in ["C6H12", "C6H12Cu0.394"]:
@@ -1290,7 +1506,8 @@ if __name__ == "__main__":
         mode="marshak_ablation",
         wall_material="Gold",
         vary_rho=True,
-        lam_eff=False,
+        lam_eff=True,
+        power = 1.5,
         show_plot=True,
         save_csv=True,
         detector_positions_mm=detector_positions_mm if 'detector_positions_mm' in locals() else [1.0], 
@@ -1299,34 +1516,34 @@ if __name__ == "__main__":
     
     # --- New: Curvature post breakout comparison ---
     if Material == "Ta2O5":
-        # print("\n" + "=" * 72)
-        # print("STARTING FLUX CURVATURE POST-BREAKOUT COMPARISON")
-        # print("=" * 72)
-        # plot_flux_curvature_post_breakout(
-        #     times,
-        #     mode="marshak_ablation",
-        #     wall_material="Gold",
-        #     vary_rho=True,
-        #     lam_eff=True,
-        #     power=1,
-        #     detector_positions_mm=[0.25, 0.5, 0.75, 1.0],
-        #     delay_ns=0.5,
-        #     show_plot=True,
-        # )
         print("\n" + "=" * 72)
         print("STARTING FLUX CURVATURE POST-BREAKOUT COMPARISON")
         print("=" * 72)
         plot_flux_curvature_post_breakout(
             times,
-            mode="marshak_wall_loss",
+            mode="marshak_ablation",
             wall_material="Gold",
-            vary_rho=False,
+            vary_rho=True,
             lam_eff=True,
             power=1,
             detector_positions_mm=[0.25, 0.5, 0.75, 1.0],
             delay_ns=0.5,
             show_plot=True,
         )
+        # print("\n" + "=" * 72)
+        # print("STARTING FLUX CURVATURE POST-BREAKOUT COMPARISON")
+        # print("=" * 72)
+        # plot_flux_curvature_post_breakout(
+        #     times,
+        #     mode="marshak_wall_loss",
+        #     wall_material="Gold",
+        #     vary_rho=False,
+        #     lam_eff=True,
+        #     power=1,
+        #     detector_positions_mm=[0.25, 0.5, 0.75, 1.0],
+        #     delay_ns=0.5,
+        #     show_plot=True,
+        # )
     elif Material == "SiO2":
         print("\n" + "=" * 72)
         print("STARTING FLUX CURVATURE POST-BREAKOUT COMPARISON")
@@ -1342,5 +1559,19 @@ if __name__ == "__main__":
             delay_ns=0.4 - 0.15,
             show_plot=True,
         )
+
+    # --- New: T^4 Space-Time Heatmap at 1.0 mm ---
+    print("\n" + "=" * 72)
+    print("STARTING T^4 HEATMAP AT 1.0 mm")
+    print("=" * 72)
+    compute_and_plot_T4_heatmap(
+        times,
+        mode="marshak_ablation",
+        wall_material="Gold",
+        vary_rho=True,
+        show_plot=True,
+        save_csv=True,
+        time_snapshot_ns = 6,
+    )
         
     print("Done! Flux curvature results saved.")

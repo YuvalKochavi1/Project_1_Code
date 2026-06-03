@@ -281,24 +281,15 @@ def plot_front_position(output_dir, wall_name, simulation_data, model_data, loss
     plt.plot(
         simulation_data["time_ns"],
         simulation_data["front_position_cm"],
-        color="tab:blue",
+        color="blue",
         linestyle="--",
         linewidth=2.3,
-        label="Simulation front (r=0)",
+        label="Simulation",
     )
-    plt.plot(model_data["time_ns"], model_data["marshak"], color="tab:red", linewidth=2.3, label="Model front_position (Marshak) - heyney")
-    plt.plot(model_data["time_ns"], model_data["loss_regular"], color="tab:green", linewidth=2.2, label=f"Model {loss_label} - heyney")
-    plt.plot(
-        model_data["flattop_time_ns"],
-        model_data["loss_flattop"],
-        color="tab:purple",
-        linestyle=":",
-        linewidth=2.4,
-        label=f"Model {loss_label} - flattop",
-    )
-    plt.xlabel("Time (ns)")
-    plt.ylabel("Front position (cm)")
-    plt.title(f"Front Position vs Time ({Experiment} - Ta2O5 - {wall_name})")
+    plt.plot(model_data["time_ns"], model_data["marshak"], color="orange", linestyle="-.", linewidth=2.3, label="Model (Marshak)")
+    plt.plot(model_data["time_ns"], model_data["loss_regular"], color="red", linewidth=2.2, label="Model")
+    plt.xlabel(r"$t$ [ns]")
+    plt.ylabel(r"$x_F$ [cm]")
     plt.grid(True, alpha=0.3)
     plt.legend(loc="best")
     plt.tight_layout()
@@ -309,29 +300,37 @@ def plot_front_position(output_dir, wall_name, simulation_data, model_data, loss
 
 
 def plot_front_surface(output_dir, wall_name, simulation_data, model_data):
-    colors = {1.0: "tab:blue", 2.0: "tab:orange", 2.5: "tab:green"}
-    fig, axes = plt.subplots(1, len(FRONT_TIMES_NS), figsize=(5.4 * len(FRONT_TIMES_NS), 4.9), sharey=True)
-    if len(FRONT_TIMES_NS) == 1:
+    n_plots = len(FRONT_TIMES_NS)
+    # Calculate optimal figure size so columns are closer and bigger
+    fig_height = 6.5
+    axes_height = fig_height - 1.5
+    axes_width = axes_height * (R_cm / L)
+    wspace = 0.15
+    fig_width = 0.9 + 0.3 + (n_plots + (n_plots - 1) * wspace) * axes_width
+    
+    fig, axes = plt.subplots(
+        1, 
+        n_plots, 
+        figsize=(fig_width, fig_height), 
+        sharey=True, 
+        gridspec_kw={"wspace": wspace}
+    )
+    if n_plots == 1:
         axes = [axes]
 
     for index, time_ns in enumerate(FRONT_TIMES_NS):
         ax = axes[index]
-        color = colors[time_ns]
-        ax.plot(simulation_data["r_cm"], simulation_data["profiles"][time_ns], color=color, linestyle="--", linewidth=2.2, label=f"Simulation t={time_ns:.1f} ns")
-        ax.plot(model_data["regular"][time_ns]["r_cm"], model_data["regular"][time_ns]["z_F_radial_cm"], color=color, linewidth=2.2, label=f"Heyney t={time_ns:.1f} ns")
-        ax.plot(model_data["flattop"][time_ns]["r_cm"], 0.9*model_data["flattop"][time_ns]["z_F_radial_cm"], color=color, linestyle=":", linewidth=2.4, label=f"Flattop t={time_ns:.1f} ns")
+        ax.plot(simulation_data["r_cm"], simulation_data["profiles"][time_ns], color="blue", linestyle="--", linewidth=2.2, label=f"Simulation t={time_ns:.1f} ns")
+        ax.plot(model_data["regular"][time_ns]["r_cm"], model_data["regular"][time_ns]["z_F_radial_cm"], color="red", linewidth=2.2, label=f"Model t={time_ns:.1f} ns")
         ax.set_xlim([0, R_cm])
         ax.set_ylim([0, L])
         ax.set_aspect("equal", adjustable="box")
         ax.grid(True, alpha=0.3)
-        ax.set_title(f"Model {time_ns:.1f} ns")
-        ax.set_xlabel("r (cm)")
+        ax.set_xlabel(r"$r$ [cm]")
+        ax.legend(loc="best", fontsize=8)
         if index == 0:
-            ax.set_ylabel("z_F (cm)")
-            ax.legend(loc="best", fontsize=8)
+            ax.set_ylabel(r"$z_F$ [cm]")
 
-    fig.suptitle(f"Front Surface Comparison at Each Time\n({Experiment} - Ta2O5 - {wall_name})", fontsize=13)
-    fig.tight_layout()
     out_path = output_dir / "front_surface.png"
     fig.savefig(out_path, dpi=180, bbox_inches="tight")
     plt.close(fig)
@@ -340,37 +339,29 @@ def plot_front_surface(output_dir, wall_name, simulation_data, model_data):
 
 def plot_energy(output_dir, wall_name, simulation_data, model_data):
     plt.figure(figsize=(8.2, 6.1))
-    plt.plot(simulation_data["time_ns"], simulation_data["foam_energy_hJ"], color="tab:blue", linestyle="--", linewidth=2.3, label="Simulation foam energy")
+    plt.plot(simulation_data["time_ns"], simulation_data["foam_energy_hJ"], color="blue", linestyle="--", linewidth=2.3, label="Simulation foam energy")
     if wall_name != "Vacuum":
-        plt.plot(simulation_data["time_ns"], simulation_data["coating_energy_hJ"], color="tab:orange", linestyle="-.", linewidth=2.3, label="Simulation coating energy")
+        plt.plot(simulation_data["time_ns"], simulation_data["coating_energy_hJ"], color="royalblue", linestyle="--", linewidth=2.3, label="Simulation coating energy")
     
     # Model - Regular (Heyney)
-    plt.plot(model_data["time_ns"], model_data["E_marshak"], color="tab:red", linewidth=2.3, label="Model E_marshak")
-
-    # Model - Flattop Marshak
+    plt.plot(model_data["time_ns"], model_data["E_marshak"], color="orange", linestyle="-.", linewidth=2.3, label="Model E (Marshak)")
 
     if wall_name == "Be":
         # Regular
-        plt.plot(model_data["time_ns"], model_data["E_Be_loss"], color="tab:green", linewidth=2.2, label="Model E_Be_loss")
-        plt.plot(model_data["time_ns"], model_data["E_Be_wall_loss"], color="tab:purple", linewidth=2.2, label="Model E_Be_wall_loss")
-        # Flattop
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_loss_flattop"], color="tab:green", linestyle=":", linewidth=2.4, label="Model E_Be_loss - flattop")
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_wall_loss_flattop"], color="tab:purple", linestyle=":", linewidth=2.4, label="Model E_Be_wall_loss - flattop")
+        plt.plot(model_data["time_ns"], model_data["E_Be_loss"], color="red", linewidth=2.2, label="Model E Be loss")
+        plt.plot(model_data["time_ns"], model_data["E_Be_wall_loss"], color="crimson", linewidth=2.2, label="Model E Be wall loss")
     elif wall_name == "Vacuum":
-        plt.plot(model_data["time_ns"], model_data["E_vacuum_loss"], color="tab:green", linewidth=2.2, label="Model E_Vacuum_loss")
-        # Flattop
-        plt.plot(model_data["flattop_time_ns"], model_data["E_vacuum_loss_flattop"], color="tab:green", linestyle=":", linewidth=2.4, label="Model E_Vacuum_loss - flattop")
+        plt.plot(model_data["time_ns"], model_data["E_vacuum_loss"], color="red", linewidth=2.2, label="Model E Vacuum loss")
+    elif wall_name == "Copper":
+        plt.plot(model_data["time_ns"], model_data["E_Cu_loss"], color="red", linewidth=2.2, label="Model E Copper loss")
+        plt.plot(model_data["time_ns"], model_data["E_Cu_wall_loss"], color="crimson", linewidth=2.2, label="Model E Copper wall loss")
     else:
         # Regular
-        plt.plot(model_data["time_ns"], model_data["E_Gold_loss"], color="tab:green", linewidth=2.2, label="Model E_Gold_loss")
-        plt.plot(model_data["time_ns"], model_data["E_Gold_wall_loss"], color="tab:purple", linewidth=2.2, label="Model E_Gold_wall_loss")
-        # Flattop
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_loss_flattop"], color="tab:green", linestyle=":", linewidth=2.4, label="Model E_Gold_loss - flattop")
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_wall_loss_flattop"], color="tab:purple", linestyle=":", linewidth=2.4, label="Model E_Gold_wall_loss - flattop")
+        plt.plot(model_data["time_ns"], model_data["E_Gold_loss"], color="red", linewidth=2.2, label="Model E Gold loss")
+        plt.plot(model_data["time_ns"], model_data["E_Gold_wall_loss"], color="crimson", linewidth=2.2, label="Model E Gold wall loss")
 
-    plt.xlabel("Time (ns)")
-    plt.ylabel("Energy (hJ)")
-    plt.title(f"Energy Comparison ({Experiment} - Ta2O5 - {wall_name})")
+    plt.xlabel(r"$t$ [ns]")
+    plt.ylabel(r"$E$ [hJ]")
     plt.grid(True, alpha=0.3)
     plt.legend(loc="best")
     plt.tight_layout()

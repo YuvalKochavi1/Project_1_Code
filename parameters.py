@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # Simple font configuration - just serif
 plt.rcParams.update({
     'font.family': 'serif',
-    'text.usetex': False,
+    'text.usetex': True,
     'axes.unicode_minus': False,
 })
 
@@ -51,7 +51,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = os.getenv("PHYSICS_MATERIAL", "SiO2_copper")  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = os.getenv("PHYSICS_MATERIAL", "SiO2")  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 Flattop_condition = True  # "flattop" or "gaussian"
 
 if Material == "SiO2":
@@ -276,7 +276,7 @@ T_material_0_hev = T_material_0_Kelvin / K_per_Hev
 # -----------------------------
 if Material == "SiO2":
     L = 0.3      
-    Nz = 500   # increase resolution because domain is much larger
+    Nz = 800   # increase resolution because domain is much larger
 elif Material == "SiO2_low_energy":
     L = 0.2      
     Nz = 500 
@@ -291,7 +291,7 @@ elif Material == "C6H12" or Material == "C6H12Cu0.394":
     Nz = 500
 elif Material == "Ta2O5":
     L = 0.2      
-    Nz = 500   # increase resolution because domain is much larger
+    Nz = 800   # increase resolution because domain is much larger
 elif Material == "C8H7Cl" or Material == "SiO2_Moore":
     L = 0.28      
     Nz = 500   # increase resolution because domain is much larger
@@ -305,12 +305,12 @@ elif Material == "SiO2_gold":
     L = 0.4      
     Nz = 500   # increase resolution because domain is much larger
 elif Material == "SiO2_copper":
-    L = 0.4      
+    L = 0.5      
     Nz = 500   # increase resolution because domain is much larger
 
 # self similarity model fudge factors - gold
 f_gold = 3.4 * 10**13          # fudge factor for sigma (new model) [erg/g]
-g_gold = 1 / 7200
+g_gold = 1 / 7200 * 100
 alpha_gold = 1.5       # opacity exponent
 beta_gold = 1.6       # beta exponent
 lambda_param_gold = 0.2
@@ -338,7 +338,7 @@ z = np.linspace(0.0, L, Nz)
 dz = z[1] - z[0]
 
 # Radial grid for 2D cylindrical (Foam)
-Nr = 500
+Nr = 1000
 r_grid = np.linspace(0.0, R_cm, Nr)
 dr = r_grid[1] - r_grid[0]
 

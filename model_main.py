@@ -61,7 +61,7 @@ def analytic_wave_front_no_marshak(times_to_store, *, use_seconds=True, lam_eff=
     if lam_eff:
         for i in range(1, len(t_sec)):
             dt_i = t_sec[i] - t_sec[i - 1]
-            TD_i = get_TD(t_sec[i]*1e9, t_array_TD, T_array_TD)
+            TD_i = np.interp(t_sec[i]*1e9, t_array_TD, T_array_TD) * 0.01
             lambda_ross = g * (TD_i**alpha) * (rho**(-lambda_param-1))
             lambda_geom = 2 * R_cm 
             lambda_param_eff = ((lambda_geom**(-power) + lambda_ross**(-power)))**(-1/power)
@@ -78,13 +78,13 @@ def analytic_wave_front_no_marshak(times_to_store, *, use_seconds=True, lam_eff=
     if t_sec[-1] > 1e-5:
         t_sec = t_sec * 1e-9
     t_ns = t_sec * 1e9
-    Ts_hev = np.array([get_TD(ti, t_array_TD, T_array_TD) for ti in t_ns], dtype=float)
+    Ts_hev = np.interp(t_ns, t_array_TD, T_array_TD) * 0.01
     H = Ts_hev ** (4.0 + alpha)
 
     # cumulative trapezoid I(t)=∫_0^t H dt
     if t_sec[0] > 0.0:
         t_aug = np.concatenate(([0.0], t_sec))
-        H0 = get_TD(0.0, t_array_TD, T_array_TD) ** (4.0 + alpha)
+        H0 = (np.interp(0.0, t_array_TD, T_array_TD) * 0.01) ** (4.0 + alpha)
         H_aug = np.concatenate(([H0], H))
 
         if lam_eff:
@@ -201,7 +201,6 @@ def _update_vary_rho_terms(i, dt_i, Ts_prev, xF_prev, R_array, t_sec, p, K, eps,
             R_average = np.mean(R_array[:xF_index + 1]) if xF_index > 0 else R_array[0]
         else:
             R_average = R_cm
-
         lambda_geom = 2 * R_average
         lambda_eff = ((lambda_geom ** (-power) + lambda_ross ** (-power))) ** (-1 / power)
         lambda_eff_array[i] = lambda_eff
@@ -333,6 +332,7 @@ def _store_bessel_snapshot(
     i,
     t_sec,
     Ts_i,
+    Ts_1D_i,
     dt_i,
     xF_i,
     E_wall_array_erg,
@@ -355,33 +355,34 @@ def _store_bessel_snapshot(
 ):
     dE_wall = E_wall_array_erg[i] - E_wall_array_erg[i - 1]
     if i <= 2:
-        albedo = AlbedoModel.compute_albedo_step(Ts_i, dE_wall, dt_i, xF_i)
+        albedo = AlbedoModel.compute_albedo_step(Ts_1D_i, dE_wall, dt_i, xF_i)
     else:
         # Find closest time key in bessel_data to avoid floating-point key mismatch
         t_prev_ns = t_sec[i-1] * 1e9
         closest_key = min(bessel_data.keys(), key=lambda k: abs(k - t_prev_ns)) if bessel_data else None
         albedo = bessel_data[closest_key]['avg_albedo']
-    albedo_old = AlbedoModel.compute_albedo_step(Ts_i, dE_wall, dt_i, xF_i)
+    albedo_old = AlbedoModel.compute_albedo_step(Ts_1D_i, dE_wall, dt_i, xF_i)
     
     lambda_ross = g * (Ts_i ** alpha) * (rho ** (-lambda_param - 1))
     
     if lam_eff and Experiment == "French":
         if lambda_eff_val is not None and lambda_eff_val > 0:
             lambda_use = lambda_eff_val
-        else:
-            if data_of_R is not None and t_sec[i] in data_of_R:
-                R_array = data_of_R[t_sec[i]]
-                xF_index = np.searchsorted(z, xF_i)
-                R_average = np.mean(R_array[:xF_index + 1]) if xF_index > 0 else R_array[0]
-            else:
-                R_average = R_cm
-            lambda_geom = 2.0 * R_average
-            lambda_eff = ((lambda_geom ** (-power) + lambda_ross ** (-power))) ** (-1 / power)
-            lambda_use = lambda_eff
+        # else:
+        #     if data_of_R is not None and t_sec[i] in data_of_R:
+        #         R_array = data_of_R[t_sec[i]]
+        #         xF_index = np.searchsorted(z, xF_i)
+        #         R_average = np.mean(R_array[:xF_index + 1]) if xF_index > 0 else R_array[0]
+        #     else:
+        #         R_average = R_cm
+        #     lambda_geom = 2.0 * R_average
+        #     lambda_eff = ((lambda_geom ** (-power) + lambda_ross ** (-power))) ** (-1 / power)
+        #     lambda_use = lambda_eff
     else:
         lambda_use = lambda_ross
         
     epsilon = 3 / 4 * (1 - albedo) * (1 / lambda_use) * R_cm
+    #epsilon = 3 / 2 * (1 - albedo) / (1 + albedo) * (1 / lambda_use) * R_cm
     kappa_0 = kappa_roots(epsilon, R_cm, n_roots=1)[0]
     kappa_0_approx = np.sqrt(2 * epsilon) / R_cm
     if i == 340: 
@@ -390,19 +391,17 @@ def _store_bessel_snapshot(
     
     # Compute z_F at r=R_cm (edge of foam) using kappa_0
     z_F_at_rcm = xF_i * special.j0(kappa_0 * R_cm)
-    albedo_array, avg_albedo = AlbedoModel.compute_albedo_profile(t_sec[i], dt_i, t_heat, Ts_i, z_F_at_rcm, wall_material= wall_material)
+    albedo_array, avg_albedo = AlbedoModel.compute_albedo_profile(t_sec[i], dt_i, t_heat, Ts_1D_i, z_F_at_rcm, wall_material= wall_material)
     J0_profile = special.j0(kappa_0 * r_grid)
     J0_profile_approx = special.j0(kappa_0_approx * r_grid)
     z_F_radial = _compute_z_front_radial_snapshot(xF_i, J0_profile)
     z_F_radial_approx = _compute_z_front_radial_snapshot(xF_i, J0_profile_approx)
-    J0_profiles = np.tile(J0_profile, (len(z), 1)) # shape (Nz, Nr)
-    J0_profiles_approx = np.tile(J0_profile_approx, (len(z), 1))
 
     snapshot = {
         'r_grid': r_grid.copy(),
         'z_grid': z.copy(),
-        'J0_profiles': J0_profiles.copy(),
-        'J0_profiles_approx': J0_profiles_approx.copy(),
+        'J0_profiles': J0_profile.copy(),
+        'J0_profiles_approx': J0_profile_approx.copy(),
         'kappa_0': kappa_0,
         'kappa_0_approx': kappa_0_approx,
         'z_F_radial': z_F_radial.copy(),
@@ -493,6 +492,13 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
     E  = np.zeros_like(t_sec)  # "energy-like" integral over flux (per area-ish, matching your current usage)
     z_F_rcm = np.zeros_like(t_sec)  # z_F at r=R_cm (edge of foam)
     
+    # 1D-only storage for albedo calculations
+    Ts_1D = np.zeros_like(t_sec)
+    H_1D  = np.zeros_like(t_sec)
+    I_1D  = np.zeros_like(t_sec)
+    F_1D  = np.zeros_like(t_sec)
+    E_1D  = np.zeros_like(t_sec)
+    
     new_rho = np.full_like(t_sec, rho, dtype=float)
     C_changing_rho = np.full_like(t_sec, 0, dtype=float)
     Z1_changing_rho = np.full_like(t_sec, 0, dtype=float)
@@ -514,6 +520,12 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
     F[0]  = 0.0
     E[0]  = 0.0
     xF[0] = 0.0
+    
+    Ts_1D[0] = 0.01
+    H_1D[0]  = Ts_1D[0] ** (4.0 + alpha)
+    I_1D[0]  = 0.0
+    F_1D[0]  = 0.0
+    E_1D[0]  = 0.0
     g_eff_array = np.full_like(t_sec, g, dtype=float)
     lambda_eff_array = np.full_like(t_sec, 0, dtype=float)
     E_wall_array_erg[0] = 0.0
@@ -545,6 +557,17 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
         TD_now = get_TD(t_sec[i] * 1e9, t_array_TD, T_array_TD)
         Ts_prev = Ts[i - 1]
         C_eff = C0
+        
+        # Always run the 1D model to obtain Ts_1D for albedo calculations
+        base_flux_1D = 2.0 * sigma_SB_hev * (TD_now**4 - Ts_1D[i - 1]**4)
+        F_1D[i] = base_flux_1D
+        E_1D[i] = E_1D[i - 1] + 0.5 * (F_1D[i] + F_1D[i - 1]) * dt_i
+        Z1_1D = Z1_changing_rho[0]  # Z1 for constant C0 and constant rho
+        H_1D_new = WavefrontHelpers.solve_for_H_new_brentq(Z1_1D, eps, E_1D[i]**2, I_1D[i - 1], H_1D[i - 1], dt_i)
+        H_1D[i] = max(H_1D_new, 1e-100)
+        Ts_1D[i] = H_1D[i] ** (1.0 / (4.0 + alpha))
+        I_1D[i] = I_1D[i - 1] + 0.5 * (H_1D[i - 1] + H_1D[i]) * dt_i
+
         if lam_eff and (not vary_rho):
             lambda_ross = g*(Ts_prev**alpha)*(rho**(-lambda_param-1))
             lambda_geom = 2*R_cm
@@ -607,7 +630,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
             i, t_sec, dt_i, t_heat, Ts[i], z_F_rcm[i-1], wall_material, wall_penetration_radius_profile,)
         if wall_loss and i > 1:
             #calcultates the bessel function profiles and parameters for the current time step and stores them in bessel_data for later retrieval and plotting
-            _store_bessel_snapshot(i, t_sec, Ts[i], dt_i, xF[i], E_wall_array_erg, bessel_data, data_of_R=data_of_R if ablation else None, t_ref_sec=t_sec[i] if ablation else None, t_heat=t_heat, wall_penetration_depth_cm_profile=wall_penetration_depth_cm_profile, wall_penetration_radius_profile=wall_penetration_radius_profile, wall_penetration_cell_idx_profile=wall_penetration_cell_idx_profile, shock_penetration_depth_cm_profile=shock_penetration_depth_cm_profile, shock_penetration_radius_profile=shock_penetration_radius_profile, shock_penetration_cell_idx_profile=shock_penetration_cell_idx_profile,
+            _store_bessel_snapshot(i, t_sec, Ts[i], Ts[i], dt_i, xF[i], E_wall_array_erg, bessel_data, data_of_R=data_of_R if ablation else None, t_ref_sec=t_sec[i] if ablation else None, t_heat=t_heat, wall_penetration_depth_cm_profile=wall_penetration_depth_cm_profile, wall_penetration_radius_profile=wall_penetration_radius_profile, wall_penetration_cell_idx_profile=wall_penetration_cell_idx_profile, shock_penetration_depth_cm_profile=shock_penetration_depth_cm_profile, shock_penetration_radius_profile=shock_penetration_radius_profile, shock_penetration_cell_idx_profile=shock_penetration_cell_idx_profile,
                                    wall_material=wall_material, ablation=ablation, lam_eff=lam_eff, power=power, lambda_eff_val=lambda_eff_array[i])
 
             # Extract z_F at r=R_cm from the current time snapshot.

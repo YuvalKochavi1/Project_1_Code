@@ -67,15 +67,17 @@ def plot_material_albedo(material_name, bessel_data, wall_material):
     fig_dir = BASE_DIR / "Figures_new" / "French" / material_name
     ensure_dir(fig_dir)
     
+    material_label = material_name.replace('_', r'\_')
+
     # 1. Surface Albedo vs Time
     surface_albedos = [bessel_data[t]['albedo'] for t in times_ns]
     
     plt.figure(figsize=(8, 6))
     plt.rcParams.update({'font.family': 'serif'})
-    plt.plot(times_ns, surface_albedos, color='darkred', linewidth=2.5, label=f'{wall_material} Surface Albedo (z=0)')
-    plt.xlabel("Time (ns)", fontsize=13, fontname='serif')
-    plt.ylabel("Albedo", fontsize=13, fontname='serif')
-    plt.title(f"Surface Albedo vs Time\n({material_name} with lam_eff)", fontsize=14, fontname='serif', pad=15)
+    plt.plot(times_ns, surface_albedos, color='darkred', linewidth=2.5, label=fr'{wall_material} Surface Albedo ($z=0$)')
+    plt.xlabel(r"Time $t$ [ns]", fontsize=13, fontname='serif')
+    plt.ylabel(r"Albedo $\alpha$", fontsize=13, fontname='serif')
+    plt.title(f"Surface Albedo vs Time\n({material_label} with " + r"$\lambda_{\mathrm{eff}}$" + ")", fontsize=14, fontname='serif', pad=15)
     plt.grid(True, which='both', linestyle=':', alpha=0.5)
     plt.ylim(0.0, 1.0)
     plt.xlim(0.0, 4.0)
@@ -104,9 +106,9 @@ def plot_material_albedo(material_name, bessel_data, wall_material):
         plt.plot(z_grid * 10.0, albedo_array, color=colors[idx], linewidth=2.2, 
                  label=f't = {t_closest:.2f} ns (Avg: {avg_albedo:.3f})')
                  
-    plt.xlabel("Depth z (mm)", fontsize=13, fontname='serif')
-    plt.ylabel("Albedo", fontsize=13, fontname='serif')
-    plt.title(f"Albedo Profile vs Depth\n({material_name} with lam_eff)", fontsize=14, fontname='serif', pad=15)
+    plt.xlabel(r"Depth $z$ [mm]", fontsize=13, fontname='serif')
+    plt.ylabel(r"Albedo $\alpha$", fontsize=13, fontname='serif')
+    plt.title(f"Albedo Profile vs Depth\n({material_label} with " + r"$\lambda_{\mathrm{eff}}$" + ")", fontsize=14, fontname='serif', pad=15)
     plt.grid(True, which='both', linestyle=':', alpha=0.5)
     plt.ylim(0.0, 1.0)
     plt.legend(prop={'family': 'serif'}, fontsize=11, loc='best')
@@ -190,7 +192,7 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
         mode="marshak_ablation",
         vary_rho=True,
         lam_eff=True,
-        power=1,
+        power=2.25,
         wall_material=wall_material,
     )
     bessel_ablation_lam_eff = result_ablation_lam_eff[5]
@@ -218,30 +220,31 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     t_arr_ablation_lam_eff_sym = np.concatenate((t_arrival_ablation_lam_eff[::-1], t_arrival_ablation_lam_eff[1:]))
     
     # Plotting comparison
+    material_label = material_name.replace('_', r'\_')
     plt.figure(figsize=(9, 7))
     plt.rcParams.update({
         'font.family': 'serif',
-        'text.usetex': False,
+        'text.usetex': True,
         'axes.unicode_minus': False,
     })
     
     # Plot models
-    plt.plot(r_symmetric, t_arr_ablation_sym, color='green', linestyle='-', linewidth=2, label='2D Ablation (varying rho, without lam_eff)')
-    plt.plot(r_symmetric, t_arr_ablation_lam_eff_sym-0.05, color='purple', linestyle='--', linewidth=2, label='2D Ablation + lam_eff (varying rho, with lam_eff)')
+    plt.plot(r_symmetric, t_arr_ablation_sym, color='green', linestyle='-', linewidth=2, label=r'2D Ablation (varying $\rho$, without $\lambda_{\mathrm{eff}}$)')
+    plt.plot(r_symmetric, t_arr_ablation_lam_eff_sym, color='purple', linestyle='--', linewidth=2, label=r'2D Ablation + $\lambda_{\mathrm{eff}}$ (varying $\rho$, with $\lambda_{\mathrm{eff}}$)')
     
     # Plot experimental data
     plt.scatter(data_df['x'], data_df['y'], color='black', label=f'Experiment ({csv_data_filename})', marker='o', s=45, zorder=5)
     
     # Customize the plot
-    plt.xlabel("Radial Location r (cm)", fontsize=14, fontname='serif')
-    plt.ylabel("Arrival Time t (ns)", fontsize=14, fontname='serif')
-    plt.title(f"Wavefront Arrival Time vs Radial Location\nat z = {z_detector_mm} mm ({material_name})", fontsize=15, fontname='serif', pad=15)
+    plt.xlabel(r"Radial Location $r$ [cm]", fontsize=14, fontname='serif')
+    plt.ylabel(r"Arrival Time $t$ [ns]", fontsize=14, fontname='serif')
+    plt.title(f"Wavefront Arrival Time vs Radial Location\nat z = {z_detector_mm} mm ({material_label})", fontsize=15, fontname='serif', pad=15)
     
     # Use reloaded parameters R_cm for limit boundary and label
     r_limit = parameters.R_cm
     plt.xlim(-r_limit - 0.01, r_limit + 0.01)
     
-    plt.axvline(x=r_limit, color='gray', linestyle='--', alpha=0.7, label=f'Foam-{wall_material} Interface (R = {r_limit} cm)')
+    plt.axvline(x=r_limit, color='gray', linestyle='--', alpha=0.7, label=fr'Foam-{wall_material} Interface ($R = {r_limit}$ cm)')
     plt.axvline(x=-r_limit, color='gray', linestyle='--', alpha=0.7)
     
     plt.grid(True, which='both', linestyle=':', alpha=0.5)

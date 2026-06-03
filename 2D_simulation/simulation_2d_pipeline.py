@@ -22,7 +22,7 @@ from simulation_2d_plots import (
 
 heatmap_times = (1e-9, 2e-9, 2.5e-9)  # default; overridden per-material below
 
-Material = "Ta2O5"
+Material = "SiO2"
 CoatingMaterial = "Gold"
 if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
@@ -56,12 +56,12 @@ def create_simulation(
     material: str = Material,
     coating_material: str = "Gold",
     R_foam: float | None = None,
-    Nz: int = 150,
-    Nr_foam: int = 150,
+    Nz: int = 260,
+    Nr_foam: int = 260,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
-    gold_g_scale: float = 1.0,
+    gold_g_scale: float = 1,
 ):
     material = str(material)
     coating_material = str(coating_material)
@@ -436,8 +436,8 @@ def save_run_data(file_path, stored_t, stored_Um=None, stored_Tm=None, stored_TR
     return file_path
 
 
-def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gold"):
-    sim = create_simulation(material=material, coating_material=coating_material)
+def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gold", gold_g_scale: float = 1):
+    sim = create_simulation(material=material, coating_material=coating_material, gold_g_scale=gold_g_scale)
     stored_t, stored_Um, stored_Tm, stored_TR = run_simulation(
         sim,
         n_store=50,
@@ -449,8 +449,13 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
         marshak_boundary=True,
     )
 
-    ensure_dir(DATA_DIR / "2D")
-    save_run_data(DATA_DIR / "2D" / "run_outputs.npz", stored_t, stored_Um, stored_Tm, stored_TR)
+    dir_suffix = f"_{gold_g_scale}" if gold_g_scale != 1.0 else ""
+    current_data_dir_2d = DATA_DIR / f"2D{dir_suffix}"
+    current_figures_dir = FIGURES_DIR / f"2D_simulation{dir_suffix}"
+    current_figure_data_dir = DATA_DIR / f"2D_simulation{dir_suffix}"
+
+    ensure_dir(current_data_dir_2d)
+    save_run_data(current_data_dir_2d / "run_outputs.npz", stored_t, stored_Um, stored_Tm, stored_TR)
 
     front_z_cm = sim.compute_front_at_r(stored_Tm, r_index=0, front_method="maxgrad")
 
@@ -459,8 +464,8 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
         stored_t,
         stored_Tm,
         times_s=heatmap_times,
-        out_dir=FIGURES_DIR_2D,
-        figure_data_dir=FIGURE_DATA_DIR_2D,
+        out_dir=current_figures_dir,
+        figure_data_dir=current_figure_data_dir,
     )
     print(heatmap_times)
     plot_temperature_maps_simple(
@@ -468,15 +473,15 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
         stored_t,
         stored_Tm,
         times_s=heatmap_times,
-        out_dir=FIGURES_DIR_2D,
-        figure_data_dir=FIGURE_DATA_DIR_2D,
+        out_dir=current_figures_dir,
+        figure_data_dir=current_figure_data_dir,
     )
     plot_front_vs_time(
         sim,
         stored_t,
         front_z_cm,
-        out_path=FIGURES_DIR_2D / "front_position - Front Position vs Time at r=0.png",
-        figure_data_dir=FIGURE_DATA_DIR_2D,
+        out_path=current_figures_dir / "front_position - Front Position vs Time at r=0.png",
+        figure_data_dir=current_figure_data_dir,
         base_dir=BASE_DIR,
     )
     plot_front_surface(
@@ -484,15 +489,15 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
         stored_t,
         stored_Tm,
         times_s=heatmap_times,
-        out_path=FIGURES_DIR_2D / "front_surface - Front Surface zF vs r.png",
-        figure_data_dir=FIGURE_DATA_DIR_2D,
+        out_path=current_figures_dir / "front_surface - Front Surface zF vs r.png",
+        figure_data_dir=current_figure_data_dir,
     )
     plot_energy_comparison(
         sim,
         stored_t,
         stored_Um,
-        out_path=FIGURES_DIR_2D / "energy_comparison - Foam Energy vs Time.png",
-        figure_data_dir=FIGURE_DATA_DIR_2D,
+        out_path=current_figures_dir / "energy_comparison - Foam Energy vs Time.png",
+        figure_data_dir=current_figure_data_dir,
         base_dir=BASE_DIR,
         material=material,
         experiment=Experiment,
@@ -505,7 +510,7 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
         compute_and_plot_flux_vs_time,
     )
 
-    flux_fig_dir = FIGURES_DIR_2D / "flux"
+    flux_fig_dir = current_figures_dir / "flux"
     if material == "Ta2O5":
         detector_pos = [0.25, 0.5, 0.75, 1.0]
     elif material == "SiO2":

@@ -115,6 +115,11 @@ class AnalyticalWavefrontSolver:
         power=2,
         R_average_for_lambda_geom=False,
     ):
+        if wall_material == 'Be':
+            vary_rho = False
+            if mode == "marshak_ablation":
+                mode = "marshak_wall_loss"
+
         if mode == "no_marshak":
             return self.analytic_wave_front_no_marshak(times_to_store, use_seconds=use_seconds, lam_eff=lam_eff, power=power)
         if mode == "marshak":

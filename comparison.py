@@ -3,6 +3,13 @@ from model_main import *
 from csv_helpers import *
 from plot_helpers import *
 from shape_2D_analytical_model import plot_2D_front_spatial, plot_temperature_heatmap_2D, plot_temperature_heatmap_2D_series_model
+
+# Font configuration: serif and LaTeX style math font
+plt.rcParams.update({
+    'font.family': 'serif',
+    'text.usetex': True,
+    'axes.unicode_minus': False,
+})
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
 print(f"Data directory: {DATA_DIR}")
 FIGURES_OUTPUT_DIR = BASE_DIR / "Figures_new" / Experiment / Material 
@@ -24,27 +31,26 @@ def plot_energies(stored_t, total_energies, marshak_boundary=False, energy_lost_
     plot_csv_series(
         article_energy_path("gold_wall_flattop.csv"),
         linestyle="-.",
-        label="gold_wall_flattop_energy - article 1",
+        label="Gold wall flattop energy - article 1",
         color='cyan',
     )
     plot_csv_series(
         article_energy_path("total_energy_2D.csv"),
         linestyle="-.",
-        label="total_energy_2D - article 1",
+        label="Total energy 2D - article 1",
         color='green',
     )
     plot_csv_series(
         article_energy_path("total_energy_1D.csv"),
         linestyle="-",
-        label="total_energy_1D - article 1",
+        label="Total energy 1D - article 1",
         color='orange',
     )
 
 
 def Back_SiO2(times_to_store):
-    front_series = compute_standard_analytic_front_series(times_to_store, wall_material='Gold', lam_eff_power=1.5)
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material='Gold', lam_eff_power=4)
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
-    analytic_positions_energy_lost_gold = front_series["analytic_positions_gold_loss"]
     analytic_positions_ablation_const_rho = front_series["analytic_positions_ablation_const_rho"]
     analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
@@ -54,43 +60,38 @@ def Back_SiO2(times_to_store):
     Ts_gold_loss = front_series["Ts_marshak_gold_loss"]
     Ts_lam_eff = front_series["Ts_2D_lam_eff"]
     Ts_1D = front_series["Ts_1D"]
-    E_gold_loss = front_series["E_gold_loss"]
     E_marshak = front_series["E_marshak"]
-    E_wall_gold_loss = front_series["E_W_gold_loss"]
     bessel_data_2D = front_series["bessel_data_2D"]
-    bessel_data_ablation_const_rho = front_series["bessel_data_ablation_const_rho"]
     bessel_data_2D_lam_eff = front_series["bessel_data_2D_lam_eff"]
     bessel_data_marshak = front_series["bessel_data_marshak"]
-    bessel_data_gold_loss = front_series["bessel_data_gold_loss"]
     data_of_R = front_series["data_of_R_2D"]
-    analytic_positions_vacuum_lost, Ts_vacuum_lost, E_vacuum_loss, _, data_of_R, bessel_data_vacuum_loss = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Vacuum', lam_eff = False, power=1)  # stored_t is ns
-    analytic_position_Be_lost, Ts_Be_lost, E_Be_lost, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = False, power=1)  # stored_t is ns
-    analytic_position_Cu_lost, Ts_Cu_lost, E_Cu_lost, Ew_cu_out, data_of_R, Cu_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Copper', lam_eff = False, power=1)  # stored_t is ns
+    analytic_positions_vacuum_lost, Ts_vacuum_lost, E_vacuum_loss, _, data_of_R, bessel_data_vacuum_loss = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Vacuum', lam_eff = True, power=1.5)  # stored_t is ns
+    analytic_position_Be_lost, Ts_Be_lost, E_Be_lost, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = True, power=4)  # stored_t is ns
+    analytic_position_Cu_lost, Ts_Cu_lost, E_Cu_lost, Ew_cu_out, data_of_R, Cu_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Copper', lam_eff = True, power=4)  # stored_t is ns
+    analytic_position_gold_loss, Ts_gold_loss, E_gold_loss, Ew_gold_out, data_of_R, gold_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = True, power=4)  # stored_t is ns
 
     plt.figure(figsize=(8, 6))
     plot_standard_front_analytic_models(
         times_to_store, 
         analytic_positions_marshak=analytic_positions_marshak, 
-        analytic_positions_gold_loss=analytic_positions_energy_lost_gold,
+        analytic_positions_gold_loss=analytic_position_gold_loss,
         analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
         analytic_positions_2D=analytic_positions_2D,
-        analytic_positions_ablation_const_rho=analytic_positions_ablation_const_rho,
         analytic_positions_no_marshak=analytic_positions_no_marshak,
         )
 
-    plot_csv_errorbar(article_front_path("exp_results_back.csv"), y_scale=10,xerr=0.1,fmt='o',capsize=4,elinewidth=1.5,markersize=10,label="Experimental data (article 1)", color='black')
+    plot_csv_errorbar(article_front_path("exp_results_back.csv"), y_scale=10,xerr=0.1,fmt='o',capsize=4,elinewidth=1.5,markersize=10,label="Expt. data", color='black')
 
-    plot_csv_series(
-        article_front_path("ablation_block.csv"),
-        linestyle="-.",
-        label="const ablation from article",
-        color='cyan',
-    )
+    #plot_csv_series(
+    #     article_front_path("ablation_block.csv"),
+    #     linestyle="-.",
+    #     label="const ablation from article",
+    #     color='cyan',
+    # )
 
-    plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
-    plt.ylabel("Wave Front Position (cm)", fontsize=18, fontname='serif')
+    plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
+    plt.ylabel(r"$x_F$ [cm]", fontsize=18, fontname='serif')
     plt.ylim(0,0.2)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material}", fontsize=18, fontname='serif')
     plt.grid(True)
     plt.legend(prop={'family': 'serif'})
     plt.tight_layout()
@@ -105,7 +106,7 @@ def Back_SiO2(times_to_store):
     plt.figure(figsize=(8, 6))
     plt.plot(times_to_store, E_marshak, label="E - Marshak BC", linestyle="-", color='blue')
     plt.plot(times_to_store, E_gold_loss, label="E - Gold Loss", linestyle="-", color='green')
-    plt.plot(times_to_store, E_wall_gold_loss, label="E - Gold Wall Loss", linestyle="-", color='red')
+    plt.plot(times_to_store, Ew_gold_out, label="E - Gold Wall Loss", linestyle="-", color='red')
     
     #add the energy from the article as a series
     plot_csv_series(
@@ -117,13 +118,13 @@ def Back_SiO2(times_to_store):
     plot_csv_series(
         article_energy_path("total_energy_2D.csv"),
         linestyle="-.",
-        label="total_energy_2D - article 1",
+        label="Total energy 2D - article 1",
         color='green',
     )
     plot_csv_series(
         article_energy_path("total_energy_1D.csv"),
         linestyle="-.",
-        label="total_energy_1D - article 1",
+        label="Total energy 1D - article 1",
         color='blue',
     )
     #save the simulated energy as a csv series
@@ -136,7 +137,7 @@ def Back_SiO2(times_to_store):
         "time_ns": np.asarray(times_to_store),
         "E_marshak": E_marshak,
         "E_gold_loss": E_gold_loss,
-        "E_wall_gold_loss": E_wall_gold_loss,
+        "E_wall_gold_loss": Ew_gold_out,
         "E_vacuum_loss": E_vacuum_loss,
         "E_Be_loss": E_Be_lost,
         "E_Be_wall_loss": Ew_be_out,
@@ -144,9 +145,8 @@ def Back_SiO2(times_to_store):
         "E_Cu_wall_loss": Ew_cu_out,
     })
     
-    plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
-    plt.ylabel("Total Energy (hJ)", fontsize=18, fontname='serif')
-    plt.title(f"Total Energy vs Time  - Material: {Material}", fontsize=18, fontname='serif')
+    plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
+    plt.ylabel(r"$E$ [hJ]", fontsize=18, fontname='serif')
     plt.grid(True)
     plt.legend(prop={'family': 'serif'})
     plt.tight_layout()
@@ -165,7 +165,7 @@ def Back_SiO2(times_to_store):
                 "Ablation with varying rho": analytic_positions_2D,
                 "2D effects + lam_eff": analytic_positions_2D_lam_eff,
                 "Ablation with const rho": analytic_positions_ablation_const_rho,
-                "gold loss": analytic_positions_energy_lost_gold,
+                "gold loss": analytic_position_gold_loss,
                 "No Marshak": analytic_positions_no_marshak,
                 "Vacuum loss": analytic_positions_vacuum_lost,
                 "Be Loss": analytic_position_Be_lost,
@@ -177,38 +177,31 @@ def Back_SiO2(times_to_store):
     )
     
     # Extract z_grid from one of the bessel data snapshots for albedo plots
-    z_grid_for_plots = None
-    if bessel_data_2D and len(bessel_data_2D) > 0:
-        first_snapshot = list(bessel_data_2D.values())[0]
-        if 'z_grid' in first_snapshot:
-            z_grid_for_plots = first_snapshot['z_grid']
+    # z_grid_for_plots = None
+    # if bessel_data_2D and len(bessel_data_2D) > 0:
+    #     first_snapshot = list(bessel_data_2D.values())[0]
+    #     if 'z_grid' in first_snapshot:
+    #         z_grid_for_plots = first_snapshot['z_grid']
     
-    # Plot albedo arrays for different models (only for specific times)
-    plot_albedo_arrays(bessel_data_2D, z_grid=z_grid_for_plots, 
-                       title="Albedo Profiles - 2D (varying rho)", times_ns=[1.0, 2.0, 2.5])
-    save_figure("albedo_profiles_2D_varying_rho.png", model1_5=True)
+    # # Plot albedo arrays for different models (only for specific times)
+    # plot_albedo_arrays(bessel_data_2D, z_grid=z_grid_for_plots, 
+    #                    title="Albedo Profiles - 2D (varying rho)", times_ns=[1.0, 2.0, 2.5])
+    # save_figure("albedo_profiles_2D_varying_rho.png", model1_5=True)
     
-    plot_albedo_arrays(bessel_data_2D_lam_eff, z_grid=z_grid_for_plots,
-                       title="Albedo Profiles - 2D (lam_eff)", times_ns=[1.0, 2.0, 2.5])
-    save_figure("albedo_profiles_2D_lam_eff.png", model1_5=True)
+    # plot_albedo_arrays(bessel_data_2D_lam_eff, z_grid=z_grid_for_plots,
+    #                    title="Albedo Profiles - 2D (lam_eff)", times_ns=[1.0, 2.0, 2.5])
+    # save_figure("albedo_profiles_2D_lam_eff.png", model1_5=True)
     
-    plot_albedo_arrays(bessel_data_ablation_const_rho, z_grid=z_grid_for_plots,
-                       title="Albedo Profiles - Ablation (const rho)", times_ns=[1.0, 2.0, 2.5])
-    save_figure("albedo_profiles_ablation_const_rho.png", model1_5=True)
+    # plot_albedo_arrays(bessel_data_gold_loss, z_grid=z_grid_for_plots,
+    #                    title="Albedo Profiles - Gold Loss", times_ns=[1.0, 2.0, 2.5])
+    # save_figure("albedo_profiles_gold_loss.png", model1_5=True)
     
-    plot_albedo_arrays(bessel_data_gold_loss, z_grid=z_grid_for_plots,
-                       title="Albedo Profiles - Gold Loss", times_ns=[1.0, 2.0, 2.5])
-    save_figure("albedo_profiles_gold_loss.png", model1_5=True)
-    
-    plot_albedo_arrays(bessel_data_marshak, z_grid=z_grid_for_plots,
-                       title="Albedo Profiles - Marshak BC", times_ns=[1.0, 2.0, 2.5])
-    save_figure("albedo_profiles_marshak.png", model1_5=True)
     
     
     # Plot 2D spatial view showing front in (r,z) geometry
     # plot_2D_front_spatial(bessel_data_2D, analytic_positions_2D,
     #                      times_to_store, times_ns=[1.0, 2.0, 2.5])
-    # Plot temperature heatmaps T(r,z,t)
+    #Plot temperature heatmaps T(r,z,t)
     # plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
     #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
     #                 ablation=True, title_suffix="(varying rho)", color_option = "prr_back")
@@ -218,7 +211,7 @@ def Back_SiO2(times_to_store):
     # plot_temperature_heatmap_2D(bessel_data_ablation_const_rho, analytic_positions_ablation_const_rho,
     #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
     #                 ablation=True, title_suffix="(const rho)", color_option = "prr_back")
-    plot_temperature_heatmap_2D(bessel_data_gold_loss, analytic_positions_energy_lost_gold,
+    plot_temperature_heatmap_2D(gold_bessel_data, analytic_position_gold_loss,
                     Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
                     ablation=False, title_suffix="(gold wall loss)", color_option = "default", wall = 'gold', flattop=Flattop_condition)
     plot_temperature_heatmap_2D(bessel_data_vacuum_loss, analytic_positions_vacuum_lost,
@@ -231,9 +224,11 @@ def Back_SiO2(times_to_store):
                     Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
                     ablation=False, title_suffix="(Cu wall loss)", color_option = "default", wall = 'Copper', flattop=Flattop_condition)
     
-    # plot_temperature_heatmap_2D(bessel_data_marshak, analytic_positions_marshak,
-    #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-    #                 ablation=False, title_suffix="(Marshak BC)", color_option = "prr_back")
+    # plot_2D_front_spatial(bessel_data_gold_loss, analytic_positions_energy_lost_gold,
+    #                 times_to_store, times_ns=[2.0])
+    # plot_temperature_heatmap_2D(bessel_data_gold_loss, analytic_positions_energy_lost_gold,
+    #                 Ts_1D, times_to_store, times_ns=[2.0],
+    #                 ablation=False, title_suffix="(gold wall loss)", color_option = "default", wall = 'gold', flattop=Flattop_condition, show_shock = False)
 
 
 
@@ -253,10 +248,10 @@ def compare_with_article_2_exp1_Massen(times_to_store):
         {"path": article_front_path("100.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model Pure", "color": "black"},
     ])
 
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("Wave Front Position (cm)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.ylim(0,0.03)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material}", fontsize = 18)
+
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -276,9 +271,8 @@ def compare_with_article_2_exp1_Massen(times_to_store):
             label="Analytic Ts(t) (Marshak BC)",
             color='green'
         )
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("Surface Temperature Ts (HeV)", fontsize = 18)
-    plt.title(f"Surface Temperature vs Time  - Material: {Material}", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$T_s$ [heV]", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -317,11 +311,10 @@ def compare_with_article_2_exp2_Xu(times_to_store):
         {"path": article_front_path("exp_results_doped.csv"), "y_scale": 10, "xerr": 0.0, "label": "Expt. doped", "color": "red"},
     ])
 
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("Wave Front Position (cm)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.ylim(0,0.05)
     plt.xlim(0,1.2)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material}", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -339,11 +332,10 @@ def compare_with_article_2_exp2_Xu(times_to_store):
         {"path": article_temperature_path("Ts_1D_pure.csv"), "y_scale": 100, "linestyle": "-", "label": "Ts 1D model", "color": "blue"},
         {"path": article_temperature_path("Ts_2D_pure.csv"), "y_scale": 100, "linestyle": "--", "label": "Ts 2D model", "color": "black"},
     ])
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("T (HeV)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$T$ [heV]", fontsize = 18)
     plt.xlim(0.1,2)
     plt.ylim(0,2)
-    plt.title(f"Temperature vs Time  - Material: {Material}", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -377,6 +369,7 @@ def compare_with_article_2_exp3_13a(times_to_store):
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
     analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    analytic_positions_no_marshak = front_series["analytic_positions_no_marshak"]
     Ts_marshak = front_series["Ts_1D"]
     E_marshak = front_series["E_marshak"]
     analytic_positions_gold_loss = front_series["analytic_positions_gold_loss"]
@@ -395,6 +388,7 @@ def compare_with_article_2_exp3_13a(times_to_store):
         analytic_positions_marshak=analytic_positions_marshak,
         analytic_positions_2D=analytic_positions_2D,
         analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
+        analytic_positions_no_marshak=analytic_positions_no_marshak,
         # analytic_positions_gold_loss=analytic_positions_gold_loss,
     )
     # if analytic_position_Be_lost is not None:
@@ -415,10 +409,9 @@ def compare_with_article_2_exp3_13a(times_to_store):
     #     {"path": article_front_path("2D_front_Be.csv"), "y_scale": 10, "linestyle": "--", "label": "Ts 2D model", "color": "orange"},
     # ])
 
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("Wave Front Position (cm)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 14)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 14)
     plt.ylim(0,0.15)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material}", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -434,9 +427,8 @@ def compare_with_article_2_exp3_13a(times_to_store):
     plt.plot(times_to_store, E_Be_lost, label="E - Foam with Be Loss", linestyle="-", color='red')
     plt.plot(times_to_store, Ew_be_out, label="E - Be Wall Loss", linestyle="-", color='red')
     
-    plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
-    plt.ylabel("Total Energy (hJ)", fontsize=18, fontname='serif')
-    plt.title(f"Total Energy vs Time  - Material: {Material}", fontsize=18, fontname='serif')
+    plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
+    plt.ylabel(r"$E$ [hJ]", fontsize=18, fontname='serif')
     plt.grid(True)
     plt.legend(prop={'family': 'serif'})
     plt.tight_layout()
@@ -448,9 +440,8 @@ def compare_with_article_2_exp3_13a(times_to_store):
     plt.plot(times_to_store, E_2D, label="E - Foam with Be Loss", linestyle="-", color='green')
     plt.plot(times_to_store, E_wall_out_2D, label="E - 2D Wall Loss", linestyle="-", color='orange')
     
-    plt.xlabel("Time (ns)", fontsize=18, fontname='serif')
-    plt.ylabel("Total Energy (hJ)", fontsize=18, fontname='serif')
-    plt.title(f"Total Energy vs Time  - Material: {Material}", fontsize=18, fontname='serif')
+    plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
+    plt.ylabel(r"$E$ [hJ]", fontsize=18, fontname='serif')
     plt.grid(True)
     plt.legend(prop={'family': 'serif'})
     plt.tight_layout()
@@ -533,20 +524,19 @@ def compare_with_article_2_exp4_14(times_to_store):
         analytic_positions_no_marshak=analytic_positions_no_marshak,
     )
 
-    plot_csv_curves([
-        {"path": article_front_path("HR.csv"), "y_scale": 10, "linestyle": "-.", "label": "HR", "color": "green"},
-        {"path": article_front_path("1D_model.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Model", "color": "blue"},
-        {"path": article_front_path("2D_model.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Model", "color": "pink"},
-    ])
+    # plot_csv_curves([
+    #     {"path": article_front_path("HR.csv"), "y_scale": 10, "linestyle": "-.", "label": "HR", "color": "green"},
+    #     {"path": article_front_path("1D_model.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Model", "color": "blue"},
+    #     {"path": article_front_path("2D_model.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Model", "color": "pink"},
+    # ])
 
     plot_csv_errorbars([
         {"path": article_front_path("exp_results.csv"), "y_scale": 10, "label": "Expt.", "color": "black"},
     ])
 
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("Wave Front Position (cm)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.ylim(0,0.2)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material} (Figure 14)", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -584,10 +574,9 @@ def compare_with_article_2_exp5_15a(times_to_store):
         {"path": article_front_path("exp_results.csv"), "y_scale": 10, "yerr": 0.01, "label": "Expt.", "color": "black"},
     ])
 
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("Wave Front Position (cm)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.ylim(0,0.25)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material} (Figure 15a)", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -623,20 +612,19 @@ def compare_with_article_2_exp5_15b(times_to_store):
         analytic_positions_no_marshak=analytic_position_HR,
     )
 
-    plot_csv_curves([
-        {"path": article_front_path("HR.csv"), "y_scale": 10, "linestyle": "--", "label": "HR", "color": "green"},
-        {"path": article_front_path("1D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model", "color": "blue"},
-        {"path": article_front_path("2D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Analytic Model", "color": "black"},
-    ])
+    # plot_csv_curves([
+    #     {"path": article_front_path("HR.csv"), "y_scale": 10, "linestyle": "--", "label": "HR", "color": "green"},
+    #     {"path": article_front_path("1D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model", "color": "blue"},
+    #     {"path": article_front_path("2D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Analytic Model", "color": "black"},
+    # ])
 
     plot_csv_errorbars([
         {"path": article_front_path("exp_results.csv"), "y_scale": 10, "yerr": 0.005, "label": "Expt.", "color": "black"},
     ])
 
-    plt.xlabel("Time (ns)")
-    plt.ylabel("Wave Front Position (cm)")
+    plt.xlabel(r"$t$ [ns]")
+    plt.ylabel(r"$x_F$ [cm]")
     plt.ylim(0,0.3)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material} (Figure 15b)")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -655,9 +643,8 @@ def compare_with_article_2_exp5_15b(times_to_store):
     plot_analytic_if_available(times_to_store, Ts_marshak, label="Marshak (1D)", linestyle="-", color='blue')
     plot_analytic_if_available(times_to_store, Ts_2D, label="2D Model (varying rho)", linestyle="-", color='black')
     plot_analytic_if_available(times_to_store, Ts_lam_eff, label="2D Model (lam_eff)", linestyle="--", color='red')
-    plt.xlabel("Time (ns)", fontsize=18)
-    plt.ylabel("Surface Temperature T_s (HeV)", fontsize=18)
-    plt.title(f"Surface Temperature vs Time  - Material: {Material} (Figure 15b)")
+    plt.xlabel(r"$t$ [ns]", fontsize=18)
+    plt.ylabel(r"$T_s$ [heV]", fontsize=18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -697,10 +684,9 @@ def compare_with_article_2_exp6_16(times_to_store):
         {"path": article_front_path("exp_results_doped.csv"), "y_scale": 10, "xerr": 0.01, "yerr": 0.001, "label": "Expt. doped", "color": "black"},
     ])
     
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("Wave Front Position (cm)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.ylim(0,0.1)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material} (Figure 16)", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -734,11 +720,11 @@ def compare_with_article_2_exp7_17(times_to_store):
         analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
     )
 
-    plot_csv_curves([
-        {"path": article_front_path("HR.csv"), "y_scale": 10, "linestyle": "-.", "label": "HR (article)", "color": "green"},
-        {"path": article_front_path("1D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model (article)", "color": "blue"},
-        {"path": article_front_path("2D_front.csv"), "y_scale": 10, "linestyle": "--", "label": "2D Analytic Model (article)", "color": "black"},
-    ])
+    # plot_csv_curves([
+    #     {"path": article_front_path("HR.csv"), "y_scale": 10, "linestyle": "-.", "label": "HR (article)", "color": "green"},
+    #     {"path": article_front_path("1D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model (article)", "color": "blue"},
+    #     {"path": article_front_path("2D_front.csv"), "y_scale": 10, "linestyle": "--", "label": "2D Analytic Model (article)", "color": "black"},
+    # ])
 
     df = pd.read_csv(article_front_path("exp_results.csv"))
     # Adjust column names if needed
@@ -757,11 +743,10 @@ def compare_with_article_2_exp7_17(times_to_store):
         color='black'
     )
 
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("Wave Front Position (cm)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.ylim(0,0.025)
     plt.xlim(0,1.2)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material} (Figure 17)", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -802,11 +787,10 @@ def compare_with_article_2_exp7_17(times_to_store):
     x_csv = df["y"].to_numpy()
     plt.plot(t_csv, x_csv/100, linestyle="--", label="T_D", color='green')
 
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("T (HeV)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$T$ [heV]", fontsize = 18)
     plt.xlim(0.1,2)
     plt.ylim(0,2)
-    plt.title(f"Temperature vs Time  - Material: {Material}", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -838,10 +822,9 @@ def compare_with_french_gold(times_to_store):
         analytic_positions_2D_lam_eff=analytic_positions_ablation_varying_rho_lam_eff,
     )
     
-    plt.xlabel("Time (ns)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
     plt.ylim(0,0.3)
-    plt.ylabel("Wave Front Position (cm)", fontsize = 18)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material}", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -861,13 +844,18 @@ def compare_with_french_gold(times_to_store):
     )
 
 def compare_with_french_copper(times_to_store):
-    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Copper", lam_eff_power=1)
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Copper", lam_eff_power=2)
     analytic_positions_ablation_varying_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     analytic_positions_ablation_const_rho = front_series["analytic_positions_ablation_const_rho"]
-    analytic_positions_gold_loss = front_series["analytic_positions_gold_loss"]
+    analytic_positions_copper_loss = front_series["analytic_positions_gold_loss"]
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
     analytic_positions_non_marshak = front_series["analytic_positions_no_marshak"]
     analytic_positions_ablation_varying_rho = front_series["analytic_positions_2D"]
+
+    bessel_data_copper = front_series["bessel_data_2D_lam_eff"]
+    Ts_1D = front_series["Ts_1D"]
+    Ts_2D = front_series["Ts_2D"]
+    Ts_2D_lam_eff = front_series["Ts_2D_lam_eff"]
     
     plt.figure(figsize=(8, 6))
     plot_standard_front_analytic_models(
@@ -875,19 +863,53 @@ def compare_with_french_copper(times_to_store):
         analytic_positions_marshak=analytic_positions_marshak,
         analytic_positions_2D=analytic_positions_ablation_varying_rho,
         analytic_positions_no_marshak=analytic_positions_non_marshak,
-        analytic_positions_gold_loss=analytic_positions_gold_loss,
+        analytic_positions_gold_loss=analytic_positions_copper_loss,
         analytic_positions_ablation_const_rho=analytic_positions_ablation_const_rho,
         analytic_positions_2D_lam_eff=analytic_positions_ablation_varying_rho_lam_eff,
     )
 
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("Wave Front Position (cm)", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.ylim(0,0.25)
-    plt.title(f"Wave Front Position vs Time  - Material: {Material} (Figure 16)", fontsize = 18)
+    plt.title(fr"Wave Front Position $x_F$ vs Time $t$ — {Material} (Figure 16)", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
     save_figure("front_position - french_copper.png", model1_5=True)
+    #plot tempertatures:
+
+    plt.figure(figsize=(8, 6))
+    plot_standard_surface_temperature_models(times_to_store, Ts_1D=Ts_1D, Ts_2D=Ts_2D, Ts_2D_lam_eff=Ts_2D_lam_eff)
+
+    df = pd.read_csv(article_temperature_path("T_drive.csv"))
+    # Adjust column names if needed
+    t_csv = df["x"].to_numpy()
+    x_csv = df["y"].to_numpy()
+    plt.plot(t_csv, x_csv/100, linestyle="--", label="T_D", color='green')
+
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$T$ [heV]", fontsize = 18)
+    plt.xlim(0.1,4)
+    plt.ylim(0,2)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    save_figure("Temperatures - french_copper.png", model1_5=True)
+    z_grid_for_plots = None
+    if bessel_data_copper and len(bessel_data_copper) > 0:
+        first_snapshot = list(bessel_data_copper.values())[0]
+        if 'z_grid' in first_snapshot:
+            z_grid_for_plots = first_snapshot['z_grid']
+    
+    # Plot albedo arrays for different models (only for specific times)
+    plot_albedo_arrays(bessel_data_copper, z_grid=z_grid_for_plots, 
+                       title="Albedo Profiles - 2D (varying rho)", times_ns=[2.5,3,3.8])
+    save_figure("albedo_profiles_2D_varying_rho.png", model1_5=False, model2_D=True)
+    
+    plot_temperature_heatmap_2D(bessel_data_copper, analytic_positions_ablation_varying_rho_lam_eff,
+                    Ts_1D, times_to_store, times_ns=[2.5,3,3.8],
+                    ablation=True, title_suffix="(copper)", flattop=Flattop_condition)
 
 def R_of_t_z(times_to_store=None, show_plot=True, verbose=True):
     dispatch_out = analytic_wave_front_dispatch(times_to_store, use_seconds=True, mode="marshak_ablation", vary_rho=True)  # stored_t is ns
@@ -932,40 +954,27 @@ def R_of_t_z(times_to_store=None, show_plot=True, verbose=True):
     R_csv = df["y"].to_numpy()
     plt.plot(z_csv/10, R_csv/10, linestyle="--", label="2.5 ns", color='black')
 
-    plt.xlabel("Position z (cm)")
-    plt.ylabel("Radius R(z)")
-    plt.title(f"Radius vs position  - Material: {Material}")
+    plt.xlabel(r"$z$ [cm]")
+    plt.ylabel(r"$R(z)$ [cm]")
+    plt.title(fr"Radius $R$ vs Position $z$ — {Material}")
     plt.grid(True)
     plt.legend()
     save_figure("Radius_high_SiO2.png", model1_5=True)
 
     return data_of_R
 
-def plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5, wall_material="Gold"):
+def plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1.5, wall_material=None):
     """
-    Plot albedo at z=0 (surface/wall) as a function of time.
-    Albedo values are taken from bessel_data generated in wall-loss/ablation modes.
+    Plot albedo at z=0 (surface/wall) as a function of time for Be, Gold, and Copper.
     """
-    dispatch_out = analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        mode=mode,
-        vary_rho=vary_rho,
-        lam_eff=lam_eff,
-        power=power,
-        wall_material=wall_material
-    )
-
-    if not isinstance(dispatch_out, tuple) or len(dispatch_out) < 6:
-        raise ValueError("Selected mode does not return bessel/albedo data. Use a wall-loss or ablation mode.")
-
-    bessel_data = dispatch_out[5]
-    if not bessel_data:
-        raise ValueError("No bessel_data available to plot albedo.")
-
-    t_ns = np.array(sorted(bessel_data.keys()), dtype=float)
-    albedo_old = np.array([bessel_data[t].get('albedo_old', np.nan) for t in t_ns], dtype=float)
-    albedo_new = np.array([bessel_data[t].get('avg_albedo', np.nan) for t in t_ns], dtype=float)
+    materials = ["Be", "Gold", "Copper"]
+    colors = {
+        "Be": {"raw": "#8dd3c7", "smooth": "#33a02c"},
+        "Gold": {"raw": "#fdb462", "smooth": "#ff7f00"},
+        "Copper": {"raw": "#fb8072", "smooth": "#e31a1c"}
+    }
+    
+    plt.figure(figsize=(8, 6))
 
     def _loess_smooth(x_vals, y_vals, span=5):
         """Simple LOESS-like local linear smoother with tricube weights."""
@@ -1007,21 +1016,46 @@ def plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=Tru
 
         return y_smooth
 
-    span = 5
-    albedo_old_smooth = _loess_smooth(t_ns, albedo_old, span=span)
-    albedo_new_smooth = _loess_smooth(t_ns, albedo_new, span=span)
+    max_t = 0.0
+    for mat in materials:
+        mat_mode = "marshak_wall_loss" if mat == "Be" else mode
+        mat_vary_rho = False if mat == "Be" else vary_rho
+        dispatch_out = analytic_wave_front_dispatch(
+            times_to_store,
+            use_seconds=True,
+            mode=mat_mode,
+            vary_rho=mat_vary_rho,
+            lam_eff=lam_eff,
+            power=power,
+            wall_material=mat
+        )
 
-    plt.figure(figsize=(8, 6))
-    plt.plot(t_ns, albedo_old, color='gray', linestyle='-', linewidth=1.0, alpha=0.4, label='Albedo old (raw)')
-    plt.plot(t_ns, albedo_new, color='salmon', linestyle='-', linewidth=1.0, alpha=0.4, label='Albedo new (raw)')
-    plt.plot(t_ns, albedo_old_smooth, color='black', linestyle='-', linewidth=2, label=f'Albedo old (LOESS span={span})')
-    plt.plot(t_ns, albedo_new_smooth, color='red', linestyle='-', linewidth=2, label=f'Albedo new (LOESS span={span})')
-    plt.xlabel("Time (ns)")
-    plt.ylabel("Albedo")
-    plt.title(f"Albedo at z=0 vs Time - Material: {Material}")
+        if not isinstance(dispatch_out, tuple) or len(dispatch_out) < 6:
+            continue
+
+        bessel_data = dispatch_out[5]
+        if not bessel_data:
+            continue
+
+        t_ns = np.array(sorted(bessel_data.keys()), dtype=float)
+        if len(t_ns) == 0:
+            continue
+        max_t = max(max_t, max(t_ns))
+        albedo_new = np.array([bessel_data[t].get('avg_albedo', np.nan) for t in t_ns], dtype=float)
+
+        span = 5
+        albedo_new_smooth = _loess_smooth(t_ns, albedo_new, span=span)
+
+        # Plot raw & smooth for each material
+        plt.plot(t_ns, albedo_new, color=colors[mat]["raw"], linestyle="-", linewidth=1.0, alpha=0.5)
+        plt.plot(t_ns, albedo_new_smooth, color=colors[mat]["smooth"], linestyle="-", linewidth=2.0, label=fr'{mat} albedo')
+
+    plt.xlabel(r"$t$ [ns]")
+    plt.ylabel(r"Albedo [dimensionless]")
     plt.grid(True, alpha=0.3)
-    plt.xlim(0.2, max(t_ns)*1.1)
-    plt.legend()
+    if max_t > 0:
+        plt.xlim(0.5, max_t)
+    plt.legend(prop={'family': 'serif'}, loc='best')
     plt.tight_layout()
 
     save_figure("albedo_z0_vs_time.png", model2_D=True, dpi=150, bbox_inches='tight')
@@ -1094,9 +1128,8 @@ def plot_model_shock_wave_at_z0_all_times(times_to_store, *, wall_material='Gold
     plt.figure(figsize=(10, 6))
     plt.plot(t_ns_arr, shock_radius_mm_arr - 0.8, color='darkred', linewidth=2.5, label='Foam shock front', marker='o', markersize=3, alpha=0.7)
     plt.plot(t_ns_arr, gold_radius_mm_arr - 0.8, color='gold', linewidth=2.5, label='Gold front (foam-gold interface)', marker='s', markersize=3, alpha=0.7)
-    plt.xlabel("Time (ns)", fontsize=12)
-    plt.ylabel("Radius at z=0 (mm)", fontsize=12)
-    plt.title("Shock Wave and Gold Front at z=0 for All Times (Analytical Model)", fontsize=13)
+    plt.xlabel(r"$t$ [ns]", fontsize=12)
+    plt.ylabel(r"$R(z=0)$ [mm]", fontsize=12)
     plt.grid(True, alpha=0.3)
     plt.legend(fontsize=11, loc='best')
     plt.tight_layout()
@@ -1136,9 +1169,8 @@ def compare_n_1(times_to_store):
     t_csv = df["x"].to_numpy()
     x_csv = df["y"].to_numpy()
     plt.plot(t_csv, x_csv, linestyle="--", label="Analytic x_F(t) (ablation + Gold Lost + varying rho, power=1 and average over radius)", color='red')
-    plt.xlabel("Time (ns)", fontsize = 18)
-    plt.ylabel("T (HeV)", fontsize = 18)
-    plt.title(f"Temperature vs Time  - Material: {Material}", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$T$ [heV]", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.show()
@@ -1285,13 +1317,13 @@ def run_2D_shape_eff_lam_sweep():
 
 
 if __name__ == "__main__":
-    # times_to_store = np.linspace(0.01, 3, 1000)
+    times_to_store = np.linspace(0.01, 3, 1000)
     #plot_albedo_z0_vs_time(times_to_store, mode="marshak_wall_loss", vary_rho=False, lam_eff=False, power=1.5, wall_material="Be")
+    plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=False)
     times_to_store = compare_for_material()  # times_to_store will be set inside the function based on the material
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)
     #compare_n_1(times_to_store)
     # plot_surface_temperature_comparison(times_to_store)
-    plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=True, power=1, wall_material="Copper")
     #plot_model_shock_wave_at_z0_all_times(times_to_store)
     #run_2D_shape_eff_lam_sweep()

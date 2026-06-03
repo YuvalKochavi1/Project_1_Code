@@ -17,9 +17,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import importlib
+import os
 import parameters as _parameters
-_parameters.Material = "C8H8"
-_parameters.Experiment = "Ji-Yan"
+os.environ["PHYSICS_MATERIAL"] = "C8H8"
 importlib.reload(_parameters)
 
 from parameters import Experiment, Material, R_cm, L
@@ -103,7 +103,20 @@ def plot_simulation_vs_model_each_time(sim_data, model_data, output_dir):
         raise ValueError("No model times with matching simulation data (within 0.5 ns tolerance)")
 
     n_times = len(model_times)
-    fig, axes = plt.subplots(1, n_times, figsize=(5 * n_times, 4.8), sharey=True)
+    # Calculate optimal figure size so columns are closer and bigger
+    fig_height = 6.5
+    axes_height = fig_height - 1.5
+    axes_width = axes_height * (R_cm / L)
+    wspace = 0.15
+    fig_width = 0.9 + 0.3 + (n_times + (n_times - 1) * wspace) * axes_width
+    
+    fig, axes = plt.subplots(
+        1, 
+        n_times, 
+        figsize=(fig_width, fig_height), 
+        sharey=True, 
+        gridspec_kw={"wspace": wspace}
+    )
     if n_times == 1:
         axes = [axes]
 
@@ -112,7 +125,7 @@ def plot_simulation_vs_model_each_time(sim_data, model_data, output_dir):
         future = available_sim_times[available_sim_times >= t_model]
         t_sim = float(future[0]) if len(future) > 0 else float(available_sim_times[np.argmin(np.abs(available_sim_times - t_model))])
         z_sim = sim_profiles[t_sim]
-        ax.plot(sim_r, z_sim, color="tab:blue", linestyle="--", linewidth=2.2, label=f"Simulation t={t_sim:.2f} ns")
+        ax.plot(sim_r, z_sim, color="blue", linestyle="--", linewidth=2.2, label=f"Simulation t={t_sim:.2f} ns")
         # find matching model file entry
         matched = None
         for name, entry in model_files.items():
@@ -123,19 +136,17 @@ def plot_simulation_vs_model_each_time(sim_data, model_data, output_dir):
                 matched = entry
                 break
         if matched is not None:
-            ax.plot(matched["r_cm"], matched["z_F_radial_cm"], color="tab:red", linewidth=2.5, label="Analytic model")
+            ax.plot(matched["r_cm"], matched["z_F_radial_cm"], color="red", linewidth=2.5, label=f"Model t={t_model:.2f} ns")
         ax.set_xlim([0, R_cm])
         ax.set_ylim([0, L])
         ax.set_aspect("equal", adjustable="box")
         ax.grid(True, alpha=0.3)
-        ax.set_xlabel("r (cm)")
-        ax.set_title(f"Model {t_model:.2f} ns")
+        ax.set_xlabel(r"$r$ [cm]")
+        ax.legend(loc="best", fontsize=9)
         if idx == 0:
-            ax.set_ylabel("z_F (cm)")
-            ax.legend(loc="best", fontsize=9)
+            ax.set_ylabel(r"$z_F$ [cm]")
 
-    fig.suptitle(f"Simulation vs Model Front Comparison\n({Experiment} - {Material})", fontsize=13)
-    fig.tight_layout()
+    # fig.tight_layout()
     out_path = output_dir / "simulation_vs_model_each_time.png"
     fig.savefig(out_path, dpi=180, bbox_inches="tight")
     plt.close(fig)
@@ -174,17 +185,16 @@ def plot_simulation_vs_model_front_position(sim_data, model_data, output_dir):
     sim_fp = sim_data["front_position_cm"]
     x = model_data["time_ns"]
     series = [
-        ("Analytic model (Marshak)", model_data["front_position_marshak_cm"], {"color": "tab:red", "linestyle": "-", "linewidth": 2.4}),
-        ("Analytic model (Vacuum Loss)", model_data["front_position_vacuum_cm"], {"color": "tab:green", "linestyle": "-.", "linewidth": 2.2}),
+        ("Model (Marshak)", model_data["front_position_marshak_cm"], {"color": "orange", "linestyle": "-.", "linewidth": 2.4}),
+        ("Model", model_data["front_position_vacuum_cm"], {"color": "red", "linestyle": "-", "linewidth": 2.2}),
     ]
 
     plt.figure(figsize=(8, 6))
-    plt.plot(sim_t, sim_fp, color="tab:blue", linestyle="--", linewidth=2.2, label="2D simulation front (r=0)")
+    plt.plot(sim_t, sim_fp, color="blue", linestyle="--", linewidth=2.2, label="Simulation")
     for label, y_arr, opts in series:
         plt.plot(x, y_arr, label=label, **opts)
-    plt.xlabel("Time (ns)")
-    plt.ylabel("Front position (cm)")
-    plt.title(f"Front Position vs Time ({Experiment} - {Material})")
+    plt.xlabel(r"$t$ [ns]")
+    plt.ylabel(r"$x_F$ [cm]")
     plt.grid(True, alpha=0.3)
     plt.legend(loc="best")
     plt.tight_layout()
@@ -265,15 +275,14 @@ def main():
         import matplotlib.pyplot as _plt
 
         _plt.figure(figsize=(8, 6))
-        _plt.plot(sim_energy["time_ns"], sim_energy["foam_energy_hJ"], color="tab:blue", linestyle="--", linewidth=2.2, label="2D simulation foam energy")
+        _plt.plot(sim_energy["time_ns"], sim_energy["foam_energy_hJ"], color="blue", linestyle="--", linewidth=2.2, label="Simulation foam energy")
         
         if model_energy is not None:
-            _plt.plot(model_energy["time_ns"], model_energy["E_marshak"], color="tab:red", linestyle="-", linewidth=2.4, label="Analytic model (Marshak)")
-            _plt.plot(model_energy["time_ns"], model_energy["E_vacuum_loss"], color="tab:green", linestyle="-.", linewidth=2.2, label="Analytic model (Vacuum Loss)")
+            _plt.plot(model_energy["time_ns"], model_energy["E_marshak"], color="orange", linestyle="-.", linewidth=2.4, label="Model E (Marshak)")
+            _plt.plot(model_energy["time_ns"], model_energy["E_vacuum_loss"], color="red", linestyle="-", linewidth=2.2, label="Model E Vacuum loss")
 
-        _plt.xlabel("Time (ns)")
-        _plt.ylabel("Energy (hJ)")
-        _plt.title(f"Energy (Vacuum) ({Experiment} - {Material})")
+        _plt.xlabel(r"$t$ [ns]")
+        _plt.ylabel(r"$E$ [hJ]")
         _plt.grid(True, alpha=0.3)
         _plt.legend(loc="best")
         _plt.tight_layout()
