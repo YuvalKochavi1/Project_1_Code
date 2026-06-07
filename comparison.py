@@ -49,7 +49,7 @@ def plot_energies(stored_t, total_energies, marshak_boundary=False, energy_lost_
 
 
 def Back_SiO2(times_to_store):
-    front_series = compute_standard_analytic_front_series(times_to_store, wall_material='Gold', lam_eff_power=4)
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material='Gold', lam_eff_power=1.2)
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
     analytic_positions_ablation_const_rho = front_series["analytic_positions_ablation_const_rho"]
     analytic_positions_2D = front_series["analytic_positions_2D"]
@@ -205,9 +205,9 @@ def Back_SiO2(times_to_store):
     # plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
     #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
     #                 ablation=True, title_suffix="(varying rho)", color_option = "prr_back")
-    # plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
-    #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-    #                 ablation=True, title_suffix="(lam_eff)", color_option = "prr_back")
+    plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
+                    Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+                    ablation=True, title_suffix="(lam_eff)", color_option = "prr_back")
     # plot_temperature_heatmap_2D(bessel_data_ablation_const_rho, analytic_positions_ablation_const_rho,
     #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
     #                 ablation=True, title_suffix="(const rho)", color_option = "prr_back")
@@ -590,6 +590,7 @@ def compare_with_article_2_exp5_15a(times_to_store):
                     ablation=True, title_suffix="(lam_eff)", color_option = "prr_moore", flattop=True)
 
 
+
 def compare_with_article_2_exp5_15b(times_to_store):
     """Moore C8H7Cl experiment"""
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=2)
@@ -653,10 +654,10 @@ def compare_with_article_2_exp5_15b(times_to_store):
 
     plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_2D,
                     Ts_marshak, times_to_store, times_ns=[1.5, 2.50, 3.72],
-                    ablation=True, title_suffix="(varying rho)", color_option = "paper", show_shock=False)
+                    ablation=True, title_suffix="(varying rho)", color_option = "paper", show_shock=True)
     plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
                     Ts_marshak, times_to_store, times_ns=[1.0, 2.0, 3.72],
-                    ablation=True, title_suffix="(lam_eff)", color_option = "visit")
+                    ablation=True, title_suffix="(lam_eff)", color_option = "paper")
 
 
 def compare_with_article_2_exp6_16(times_to_store):

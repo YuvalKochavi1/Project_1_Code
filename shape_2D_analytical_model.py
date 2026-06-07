@@ -289,13 +289,13 @@ def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.
         axes_height = fig_height - 1.5
         axes_width = axes_height * (R_cm / (L/2))
         fig_width = axes_width + 0.9 + 0.3
-        wspace = 0.15
+        wspace = 0.3
         fig, axes = plt.subplots(1, n_plots, figsize=(fig_width, fig_height))
     else:
         fig_height = 6.0
         axes_height = fig_height - 1.5
         axes_width = axes_height * (R_cm / (L/2))
-        wspace = 0.15
+        wspace = 0.3
         fig_width = 0.9 + 0.3 + (n_plots + (n_plots - 1) * wspace) * axes_width
         fig, axes = plt.subplots(
             1, 
@@ -360,7 +360,11 @@ def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.
         # ax.fill_between(r_grid, 0, z_F_radial, alpha=0.3, color='orange', label='Heated region')
 
         ax.set_xlabel(r'$r$ [cm]', fontsize=12, fontname='serif')
-        ax.set_ylabel(r'$z$ [cm]', fontsize=12, fontname='serif')
+        if idx == 0:
+            ax.set_ylabel(r'$z$ [cm]', fontsize=12, fontname='serif')
+        else:
+            ax.set_ylabel('')
+            ax.tick_params(labelleft=False)
         # ax.set_title(
         #     f't = {t_closest:.2f} ns\n$\kappa_0$ = {kappa_0:.3f}, $\kappa_0^{{approx}}$ = {kappa_0_approx:.3f}, albedo = {albedo:.3f}',
         #     fontsize=12,
@@ -464,13 +468,13 @@ def plot_temperature_heatmap_2D(
         axes_height = fig_height - 1.5
         axes_width = axes_height * (r_max / L)
         fig_width = axes_width + 0.9 + 1.2
-        wspace = 0.15
+        wspace = 0.35
         fig, axes = plt.subplots(1, n_plots, figsize=(fig_width, fig_height))
     else:
         fig_height = 6.5
         axes_height = fig_height - 1.5
         axes_width = axes_height * (r_max / L)
-        wspace = 0.15
+        wspace = 0.35
         plot_cell_width = axes_width + 0.9
         fig_width = 0.9 + 0.3 + (n_plots * plot_cell_width) + (n_plots - 1) * wspace * plot_cell_width
         fig, axes = plt.subplots(
@@ -628,42 +632,61 @@ def plot_temperature_heatmap_2D(
         # )
         # ax.clabel(contour, inline=True, fontsize=8, fmt='%.1f')
 
-        # if (
-        #     ablation_contour_r is not None
-        #     and ablation_contour_z is not None
-        #     and len(ablation_contour_r) > 1
-        # ):
-        #     ax.plot(
-        #         ablation_contour_r,
-        #         ablation_contour_z,
-        #         color='black',
-        #         linewidth=1.0,
-        #         linestyle='-',
-        #         #label='Ablation contour R(t,z)',
-        #     )
+        if Material == "SiO2" and ablation:
+            if (
+                ablation_contour_r is not None
+                and ablation_contour_z is not None
+                and len(ablation_contour_r) > 1
+            ):
+                ax.plot(
+                    ablation_contour_r,
+                    ablation_contour_z,
+                    color='black',
+                    linewidth=0.5,
+                    linestyle='-',
+                )
 
         # Plot the front position
         #ax.plot(r_mesh_foam, z_F_radial, linewidth=3, color='cyan', label='Front z_F(r,t)', linestyle='--')
 
         # Add colorbar
-        cbar = plt.colorbar(pcm, ax=ax, pad=0.01, fraction=0.046)
-        if cmap_settings['cbar_ticks'] is not None:
-            cbar.set_ticks(cmap_settings['cbar_ticks'])
-        cbar.set_label(r'$T$ [heV]')
+        use_right_layout = (Material == "C8H7Cl") or (Material == "SiO2" and ablation)
+        if not use_right_layout:
+            cbar = plt.colorbar(pcm, ax=ax, pad=0.02, fraction=0.046)
+            if cmap_settings['cbar_ticks'] is not None:
+                cbar.set_ticks(cmap_settings['cbar_ticks'])
+            cbar.set_label(r'$T$ [heV]')
+        else:
+            cbar = plt.colorbar(pcm, ax=ax, pad=0.3, fraction=0.046)
+            if cmap_settings['cbar_ticks'] is not None:
+                cbar.set_ticks(cmap_settings['cbar_ticks'])
+            cbar.set_label(r'$T$ [heV]')
 
         # Domain boundaries
         # ax.axhline(y=0, color='white', linewidth=2, linestyle='-', alpha=0.7)
         # ax.axhline(y=L/2, color='gray', linewidth=1, linestyle='--', alpha=0.5)
         # ax.axvline(x=R_cm, color='gray', linewidth=1, linestyle='--', alpha=0.5)
         ax.set_xlabel(r'$r$ [cm]')
-        ax.set_ylabel(r'$z$ [cm]')
+        if not use_right_layout:
+            if idx == 0:
+                ax.set_ylabel(r'$z$ [cm]')
+                ax.tick_params(labelleft=True)
+            else:
+                ax.set_ylabel('')
+                ax.tick_params(labelleft=False, labelright=False)
+        else:
+            ax.yaxis.tick_right()
+            ax.yaxis.set_label_position("right")
+            ax.set_ylabel(r'$z$ [cm]')
+            ax.tick_params(labelleft=False, labelright=True)
         # ax.set_title(r'$t = ' + f'{t_closest:.2f}' + r'$ ns')
         print(f"Plotting time {t_closest:.2f} ns, t_target was {t_target:.2f} ns")
-        ax.set_ylim([0, L/2])
-        #ax.set_xlim([0.0, float(r_mesh[-1])])
-        ax.set_xlim([0.0, R_cm])
+        ax.set_ylim([0, 0.122])
+        if r_mesh[-1] > R_cm:
+            ax.set_xlim([0.0, float(r_mesh[-1])])
+        else:
+            ax.set_xlim([0.0, R_cm])
         ax.set_aspect('equal', adjustable='box')
-        # ax.legend(fontsize=9, loc='upper right')
 
     title_fontsize = 12 if n_plots == 1 else 16
     # plt.suptitle(
@@ -846,7 +869,11 @@ def plot_temperature_heatmap_2D_series_model(
         ax.axhline(y=L, color='gray', linewidth=1, linestyle='--', alpha=0.5)
         ax.axvline(x=R_cm, color='gray', linewidth=1, linestyle='--', alpha=0.5)
         ax.set_xlabel(r'$r$ [cm]')
-        ax.set_ylabel(r'$z$ [cm]')
+        if idx == 0:
+            ax.set_ylabel(r'$z$ [cm]')
+        else:
+            ax.set_ylabel('')
+            ax.tick_params(labelleft=False)
         ax.set_title(f't = {t_eval:.2f} ns')
         ax.set_ylim([0, L/2])
         ax.set_xlim([0, R_cm])

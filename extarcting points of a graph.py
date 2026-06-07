@@ -272,7 +272,7 @@ def main() -> None:
     # This script is located at: article1/extarcting points of a graph.py
     # Image is at: article1/image.png
     script_dir = Path(__file__).resolve().parent
-    image_path = script_dir / "Data_new/French/SiO2_copper/article/front/curvature.png"
+    image_path = script_dir / "Figures_new/Moore/C8H7Cl/2D_shape/article_simulation.png"
 
     sampler = ClickSampler(image_path=image_path)
     sampler.run()

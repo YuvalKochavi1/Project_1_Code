@@ -310,7 +310,7 @@ elif Material == "SiO2_copper":
 
 # self similarity model fudge factors - gold
 f_gold = 3.4 * 10**13          # fudge factor for sigma (new model) [erg/g]
-g_gold = 1 / 7200 * 100
+g_gold = 1 / 7200
 alpha_gold = 1.5       # opacity exponent
 beta_gold = 1.6       # beta exponent
 lambda_param_gold = 0.2
@@ -415,7 +415,7 @@ def make_r_two_block(R_foam, gold_width, Nr_foam, Nr_gold, dr0=None):
 
 # Radial grid for 2D cylindrical (Gold extension)
 Nr_gold = 100
-w_Au = 50e-4
+w_Au = 20e-4
 dr0_gold = w_Au / 3000
 r_gold, r_gold_info = make_r_two_block(R_cm, w_Au, Nr, Nr_gold, dr0=dr0_gold)
 
