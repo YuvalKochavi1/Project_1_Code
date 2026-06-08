@@ -650,7 +650,7 @@ def plot_temperature_heatmap_2D(
         #ax.plot(r_mesh_foam, z_F_radial, linewidth=3, color='cyan', label='Front z_F(r,t)', linestyle='--')
 
         # Add colorbar
-        use_right_layout = (Material == "C8H7Cl") or (Material == "SiO2" and ablation)
+        use_right_layout = (Material == "C8H7Cl") or (Material == "SiO2" and ablation) or (Material == "C8H8")
         if not use_right_layout:
             cbar = plt.colorbar(pcm, ax=ax, pad=0.02, fraction=0.046)
             if cmap_settings['cbar_ticks'] is not None:
@@ -681,8 +681,8 @@ def plot_temperature_heatmap_2D(
             ax.tick_params(labelleft=False, labelright=True)
         # ax.set_title(r'$t = ' + f'{t_closest:.2f}' + r'$ ns')
         print(f"Plotting time {t_closest:.2f} ns, t_target was {t_target:.2f} ns")
-        ax.set_ylim([0, 0.122])
-        if r_mesh[-1] > R_cm:
+        ax.set_ylim([0, L/2])
+        if r_mesh[-1] > R_cm and Material != "C8H8":
             ax.set_xlim([0.0, float(r_mesh[-1])])
         else:
             ax.set_xlim([0.0, R_cm])

@@ -150,7 +150,63 @@ def plot_simulation_vs_model_each_time(sim_data, model_data, output_dir):
     out_path = output_dir / "simulation_vs_model_each_time.png"
     fig.savefig(out_path, dpi=180, bbox_inches="tight")
     plt.close(fig)
-    return [out_path]
+
+    saved_paths = [out_path]
+    for idx, t_model in enumerate(model_times):
+        future = available_sim_times[available_sim_times >= t_model]
+        t_sim = float(future[0]) if len(future) > 0 else float(available_sim_times[np.argmin(np.abs(available_sim_times - t_model))])
+        z_sim = sim_profiles[t_sim]
+
+        matched = None
+        for name, entry in model_files.items():
+            m = re.search(r"t([\d.]+)ns", name)
+            if not m:
+                continue
+            if abs(float(m.group(1)) - t_model) < 1e-6:
+                matched = entry
+                break
+
+        # Create a single plot
+        fig_single, ax_single = plt.subplots(figsize=(4, 6))
+        ax_single.plot(sim_r, z_sim, color="blue", linestyle="--", linewidth=2.2, label="Simulation")
+        if matched is not None:
+            ax_single.plot(matched["r_cm"], matched["z_F_radial_cm"], color="red", linewidth=2.5, label="Model")
+
+        # Determine y limits based on time
+        if abs(t_model - 0.5) < 1e-3:
+            y_limits = [0.001, 0.006]
+        elif abs(t_model - 1.0) < 1e-3:
+            y_limits = [0.007, 0.012]
+        elif abs(t_model - 1.3) < 1e-3:
+            y_limits = [0.010, 0.015]
+        else:
+            y_limits = [0, L/2]
+
+        ax_single.set_xlim([0, R_cm])
+        ax_single.set_ylim(y_limits)
+        ax_single.set_aspect("equal", adjustable="box")
+        ax_single.set_title("Wave front")
+        ax_single.grid(True, alpha=0.3)
+        ax_single.set_xlabel(r"$r$ [cm]")
+        ax_single.set_ylabel(r"$z_F$ [cm]")
+        ax_single.legend(loc="best", fontsize=9)
+
+
+        # Save as simulation_vs_model_t{t_model:.2f}ns.png
+        single_out_path = output_dir / f"simulation_vs_model_t{t_model:.2f}ns.png"
+        fig_single.savefig(single_out_path, dpi=180, bbox_inches="tight")
+
+        # Save as Ji-Yan_{t_str}ns.png
+        t_str = f"{t_model:g}"
+        jiyan_out_path = output_dir / f"Ji-Yan_{t_str}ns.png"
+        fig_single.savefig(jiyan_out_path, dpi=180, bbox_inches="tight")
+
+        plt.close(fig_single)
+        saved_paths.append(single_out_path)
+        saved_paths.append(jiyan_out_path)
+
+    return saved_paths
+
 
 
 def simulation_front_position_load():

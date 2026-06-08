@@ -697,26 +697,24 @@ def compare_with_article_2_exp7_17(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Vacuum", lam_eff_power=1)
     analytic_positions_no_marshak = front_series["analytic_positions_no_marshak"]
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
-    analytic_positions_gold = front_series["analytic_positions_gold_loss"]
-    analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    analytic_positions_vacuum_lost = front_series["analytic_positions_gold_loss"]
+    analytic_positions_2D_lam_eff = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Vacuum', lam_eff = True, power=1)[0]  # stored_t is ns
     Ts_1D = front_series["Ts_1D"]
-    Ts_2D = front_series["Ts_2D"]
     E_marshak = front_series["E_marshak"]
     E_vacuum_loss = front_series["E_gold_loss"]
     bessel_data_2D = front_series["bessel_data_gold_loss"]
 
     plt.figure(figsize = (8, 6))
-    # power_law = (4 + alpha - beta) / 4
-    # analytic_positions_vacuum_lost = analytic_positions_vacuum_lost * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    # analytic_positions_marshak = analytic_positions_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    # analytic_positions_no_marshak = analytic_positions_no_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    # analytic_positions_2D = analytic_positions_2D * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    # analytic_positions_2D_lam_eff = analytic_positions_2D_lam_eff * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    power_law = (4 + alpha - beta) / 4
+    analytic_positions_vacuum_lost = analytic_positions_vacuum_lost * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    analytic_positions_marshak = analytic_positions_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    analytic_positions_no_marshak = analytic_positions_no_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    analytic_positions_2D_lam_eff = analytic_positions_2D_lam_eff * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
     
     plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
-        analytic_positions_2D=analytic_positions_gold,
+        analytic_positions_2D=analytic_positions_vacuum_lost,
         analytic_positions_no_marshak=analytic_positions_no_marshak,
         analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
     )
@@ -766,7 +764,7 @@ def compare_with_article_2_exp7_17(times_to_store):
         {
             "front_position": {
                 "Marshak": analytic_positions_marshak,
-                "Vacuum Loss": analytic_positions_gold,
+                "Vacuum Loss": analytic_positions_vacuum_lost,
             }
         },
         DATA_DIR / "1.5 model" / "analytic_positions.csv",
@@ -780,7 +778,7 @@ def compare_with_article_2_exp7_17(times_to_store):
     })
 
     plt.figure(figsize=(8, 6))
-    plot_standard_surface_temperature_models(times_to_store, Ts_1D=Ts_1D, Ts_2D=Ts_2D)
+    plot_standard_surface_temperature_models(times_to_store, Ts_1D=Ts_1D)
 
     df = pd.read_csv(article_temperature_path("T_drive.csv"))
     # Adjust column names if needed
@@ -798,7 +796,7 @@ def compare_with_article_2_exp7_17(times_to_store):
 
     save_figure("Temperatures - compare Ji-Yan.png", model1_5=True)
 
-    plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_gold,
+    plot_temperature_heatmap_2D(bessel_data_2D, analytic_positions_vacuum_lost,
                     Ts_1D, times_to_store, times_ns=[0.5, 1, 1.3],
                     ablation=False, title_suffix="(vacuum)", flattop=False)
     
@@ -1320,7 +1318,7 @@ def run_2D_shape_eff_lam_sweep():
 if __name__ == "__main__":
     times_to_store = np.linspace(0.01, 3, 1000)
     #plot_albedo_z0_vs_time(times_to_store, mode="marshak_wall_loss", vary_rho=False, lam_eff=False, power=1.5, wall_material="Be")
-    plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=False)
+    # plot_albedo_z0_vs_time(times_to_store, mode="marshak_ablation", vary_rho=True, lam_eff=False)
     times_to_store = compare_for_material()  # times_to_store will be set inside the function based on the material
     #compare_with_marshak_results()
     #R_of_t_z(times_to_store=times_to_store)

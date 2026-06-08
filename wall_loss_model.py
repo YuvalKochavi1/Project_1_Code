@@ -163,7 +163,7 @@ class WallLossModel:
         """Wall energy loss for copper in hJ/mm^2 (Eq. 11 parameterization)."""
         if t_exposed <= 0:
             return 0.0
-        #return 1.58 * T0**3.4 * (t_exposed * 1e9)**0.61
+        return 1.58 * T0**3.4 * (t_exposed * 1e9)**0.61
         return 0.4 * T0**3.78 * (t_exposed * 1e9)**0.5
 
     @staticmethod

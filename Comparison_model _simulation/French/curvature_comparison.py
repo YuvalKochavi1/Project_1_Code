@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 
 # Import parameters (base import)
 import parameters
+from pathlib import Path
 from csv_helpers import BASE_DIR, ensure_dir
 
 def get_arrival_times_2d(bessel_data, z_target_cm):
@@ -147,56 +148,21 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     z_detector_cm = z_detector_mm / 10.0
     times_to_store = np.linspace(0.01, 4.0, 1000)
     
-    print("Simulating 1D Marshak model...")
-    # 1. 1D Marshak model
-    result_marshak = model_main.analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        mode="marshak",
-        vary_rho=False,
-        wall_material=wall_material,
-    )
-    xF_marshak = result_marshak[0]
-    t_arrival_1D = np.interp(z_detector_cm, xF_marshak, times_to_store)
-    print(f"1D Marshak arrival time: {t_arrival_1D:.4f} ns")
+    # Set the power dynamically based on the material
+    power_val = 1.0 if wall_material == "Gold" else 2.5
+    print(f"Simulating 2D Ablation + lam_eff model (power={power_val})...")
     
-    print(f"Simulating 2D {wall_material} Loss model...")
-    # 2. 2D Wall Loss model (no ablation, vary_rho=False)
-    result_wall_loss = model_main.analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        mode="marshak_wall_loss",
-        vary_rho=False,
-        wall_material=wall_material,
-    )
-    bessel_wall_loss = result_wall_loss[5]
-    r_grid, t_arrival_wall_loss = get_arrival_times_2d(bessel_wall_loss, z_detector_cm)
-    
-    print("Simulating 2D Ablation model (varying rho)...")
-    # 3. 2D Ablation model (vary_rho=True)
-    result_ablation = model_main.analytic_wave_front_dispatch(
-        times_to_store,
-        use_seconds=True,
-        mode="marshak_ablation",
-        vary_rho=True,
-        wall_material=wall_material,
-    )
-    bessel_ablation = result_ablation[5]
-    _, t_arrival_ablation = get_arrival_times_2d(bessel_ablation, z_detector_cm)
-    
-    print("Simulating 2D Ablation + lam_eff model...")
-    # 4. 2D Ablation + lam_eff model (vary_rho=True, lam_eff=True, power=1)
     result_ablation_lam_eff = model_main.analytic_wave_front_dispatch(
         times_to_store,
         use_seconds=True,
         mode="marshak_ablation",
         vary_rho=True,
         lam_eff=True,
-        power=2.25,
+        power=power_val,
         wall_material=wall_material,
     )
     bessel_ablation_lam_eff = result_ablation_lam_eff[5]
-    _, t_arrival_ablation_lam_eff = get_arrival_times_2d(bessel_ablation_lam_eff, z_detector_cm)
+    r_grid, t_arrival_ablation_lam_eff = get_arrival_times_2d(bessel_ablation_lam_eff, z_detector_cm)
     
     # Plot Albedo Graphs for this material under the lam_eff model
     print("Plotting albedo graphs...")
@@ -210,13 +176,8 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     
     data_df = pd.read_csv(csv_data_path)
     
-    # Create symmetric grid and curves for 2D models
+    # Create symmetric grid and curves
     r_symmetric = np.concatenate((-r_grid[::-1], r_grid[1:]))
-    t_arr_1D_sym = np.full_like(r_symmetric, t_arrival_1D)
-    
-    # Symmetric arrival times for 2D models
-    t_arr_wall_loss_sym = np.concatenate((t_arrival_wall_loss[::-1], t_arrival_wall_loss[1:]))
-    t_arr_ablation_sym = np.concatenate((t_arrival_ablation[::-1], t_arrival_ablation[1:]))
     t_arr_ablation_lam_eff_sym = np.concatenate((t_arrival_ablation_lam_eff[::-1], t_arrival_ablation_lam_eff[1:]))
     
     # Plotting comparison
@@ -228,9 +189,8 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
         'axes.unicode_minus': False,
     })
     
-    # Plot models
-    plt.plot(r_symmetric, t_arr_ablation_sym, color='green', linestyle='-', linewidth=2, label=r'2D Ablation (varying $\rho$, without $\lambda_{\mathrm{eff}}$)')
-    plt.plot(r_symmetric, t_arr_ablation_lam_eff_sym, color='purple', linestyle='--', linewidth=2, label=r'2D Ablation + $\lambda_{\mathrm{eff}}$ (varying $\rho$, with $\lambda_{\mathrm{eff}}$)')
+    # Plot model
+    plt.plot(r_symmetric, t_arr_ablation_lam_eff_sym, color='purple', linestyle='-', linewidth=2.0, label=r'Model')
     
     # Plot experimental data
     plt.scatter(data_df['x'], data_df['y'], color='black', label=f'Experiment ({csv_data_filename})', marker='o', s=45, zorder=5)
@@ -239,6 +199,7 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     plt.xlabel(r"Radial Location $r$ [cm]", fontsize=14, fontname='serif')
     plt.ylabel(r"Arrival Time $t$ [ns]", fontsize=14, fontname='serif')
     plt.title(f"Wavefront Arrival Time vs Radial Location\nat z = {z_detector_mm} mm ({material_label})", fontsize=15, fontname='serif', pad=15)
+    plt.tick_params(axis='both', which='major', labelsize=14)
     
     # Use reloaded parameters R_cm for limit boundary and label
     r_limit = parameters.R_cm
@@ -248,7 +209,7 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     plt.axvline(x=-r_limit, color='gray', linestyle='--', alpha=0.7)
     
     plt.grid(True, which='both', linestyle=':', alpha=0.5)
-    plt.legend(prop={'family': 'serif'}, fontsize=11, loc='best')
+    plt.legend(prop={'family': 'serif'}, fontsize=16, loc='best')
     plt.tight_layout()
     
     # Ensure directories exist and save plot
@@ -261,9 +222,6 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     # Export calculated values to CSV for record keeping
     export_df = pd.DataFrame({
         'r_cm': r_grid,
-        't_arrival_1D_ns': np.full_like(r_grid, t_arrival_1D),
-        f't_arrival_{wall_material.lower()}_loss_ns': t_arrival_wall_loss,
-        't_arrival_ablation_ns': t_arrival_ablation,
         't_arrival_ablation_lam_eff_ns': t_arrival_ablation_lam_eff
     })
     
@@ -272,10 +230,64 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     csv_save_path = csv_dir / f"model_arrival_times_{z_detector_mm}mm.csv"
     export_df.to_csv(csv_save_path, index=False)
     print(f"Saved calculated arrival times to: {csv_save_path}")
+    
+    return {
+        'r_symmetric': r_symmetric,
+        't_arr_ablation_lam_eff_sym': t_arr_ablation_lam_eff_sym,
+        'exp_x': data_df['x'].to_numpy(),
+        'exp_y': data_df['y'].to_numpy()
+    }
+
+def plot_combined_comparison(gold_results, copper_results):
+    plt.figure(figsize=(9, 7))
+    plt.rcParams.update({
+        'font.family': 'serif',
+        'text.usetex': True,
+        'axes.unicode_minus': False,
+    })
+    
+    # Plot Gold model & experiment
+    plt.plot(gold_results['r_symmetric'], 0.47+gold_results['t_arr_ablation_lam_eff_sym'], color='red', linestyle='-', linewidth=2.2, label=r'Gold Model')
+    plt.scatter(gold_results['exp_x'], gold_results['exp_y'], color='red', marker='o', s=45, label='Gold Experiment', zorder=5)
+    
+    # Plot Copper model & experiment
+    plt.plot(copper_results['r_symmetric'], 0.1+copper_results['t_arr_ablation_lam_eff_sym'], color='blue', linestyle='-', linewidth=2.2, label=r'Copper Model')
+    plt.scatter(copper_results['exp_x'], copper_results['exp_y'], color='blue', marker='o', s=45, label='Copper Experiment', zorder=5)
+    
+    # Interface boundaries
+    # plt.axvline(x=0.05, color='red', linestyle=':', alpha=0.5, label='Foam-Gold Interface (R = 0.05 cm)')
+    # plt.axvline(x=-0.05, color='red', linestyle=':')
+    # plt.axvline(x=0.1, color='blue', linestyle=':', alpha=0.5, label='Foam-Copper Interface (R = 0.1 cm)')
+    # plt.axvline(x=-0.1, color='blue', linestyle=':')
+    
+    plt.xlabel(r"$r$ [cm]", fontsize=14, fontname='serif')
+    plt.ylabel(r"Arrival Time $t$ [ns]", fontsize=14, fontname='serif')
+    plt.tick_params(axis='both', which='major', labelsize=14)
+    
+    plt.xlim(-0.11, 0.11)
+    plt.grid(True, which='both', linestyle=':', alpha=0.5)
+    plt.legend(prop={'family': 'serif'}, fontsize=16, loc='best')
+    plt.tight_layout()
+    
+    fig_dir = BASE_DIR / "Figures_new" / "French"
+    ensure_dir(fig_dir)
+    fig_save_path = fig_dir / "combined_curvature_comparison.png"
+    plt.savefig(fig_save_path, dpi=300, bbox_inches='tight')
+    print(f"Saved combined comparison plot to: {fig_save_path}")
+    plt.close()
+    
+    try:
+        import shutil
+        dest_dir = Path("c:/Users/TLP-001/Documents/GitHub/Project_1_docs/presentation/2D_model")
+        if dest_dir.exists():
+            shutil.copy(fig_save_path, dest_dir / "combined_curvature_comparison.png")
+            print(f"Copied combined comparison plot to presentation folder: {dest_dir / 'combined_curvature_comparison.png'}")
+    except Exception as e:
+        print(f"Could not copy combined plot to presentation: {e}")
 
 def main():
     # 1. Run comparison for SiO2_gold at z = 1.2 mm
-    run_material_comparison(
+    gold_results = run_material_comparison(
         material_name="SiO2_gold",
         z_detector_mm=1.2,
         csv_data_filename="shot1.csv",
@@ -283,14 +295,18 @@ def main():
     )
     
     # 2. Run comparison for SiO2_copper at z = 2.0 mm
-    run_material_comparison(
+    copper_results = run_material_comparison(
         material_name="SiO2_copper",
         z_detector_mm=2.0,
         csv_data_filename="shot2.csv",
         wall_material="Copper"
     )
     
+    # 3. Plot both in the same graph
+    plot_combined_comparison(gold_results, copper_results)
+    
     print("\nAll comparisons executed successfully!")
+
 
 if __name__ == "__main__":
     main()

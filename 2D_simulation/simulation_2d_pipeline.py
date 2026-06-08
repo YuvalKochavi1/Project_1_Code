@@ -22,7 +22,7 @@ from simulation_2d_plots import (
 
 heatmap_times = (1e-9, 2e-9, 2.5e-9)  # default; overridden per-material below
 
-Material = "SiO2"
+Material = "C8H8"
 CoatingMaterial = "Gold"
 if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
@@ -56,8 +56,8 @@ def create_simulation(
     material: str = Material,
     coating_material: str = "Gold",
     R_foam: float | None = None,
-    Nz: int = 260,
-    Nr_foam: int = 260,
+    Nz: int = 320,
+    Nr_foam: int = 320,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
