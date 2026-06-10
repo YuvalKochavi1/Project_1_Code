@@ -832,12 +832,14 @@ def compare_with_french_gold(times_to_store):
     export_analytic_positions_csv(
         times_to_store,
         {
-            "HR": analytic_positions_non_marshak,
-            "marshak": analytic_positions_marshak,
-            "gold_loss": analytic_positions_gold_loss,
-            "ablation_const_rho": analytic_positions_ablation_const_rho,
-            "ablation_varying_rho": analytic_positions_ablation_varying_rho,
-            "ablation_varying_rho_lam_eff": analytic_positions_ablation_varying_rho_lam_eff,
+            "front_position": {
+                "HR": analytic_positions_non_marshak,
+                "marshak": analytic_positions_marshak,
+                "gold_loss": analytic_positions_gold_loss,
+                "ablation_const_rho": analytic_positions_ablation_const_rho,
+                "ablation_varying_rho": analytic_positions_ablation_varying_rho,
+                "ablation_varying_rho_lam_eff": analytic_positions_ablation_varying_rho_lam_eff,
+            }
         },
         DATA_DIR / "1.5 model" / "analytic_positions_french_gold.csv",
     )
@@ -932,32 +934,34 @@ def R_of_t_z(times_to_store=None, show_plot=True, verbose=True):
         print(f"data_of_R[t2_5]: {data_of_R[t2_5]}, at t={t2_5} ns")
 
     plt.figure(figsize=(8, 6))
-    plt.plot(z, data_of_R[t1], label="Radius R(z,t=10)", color='blue')
+    plt.plot(z, data_of_R[t1], label=f"1 ns", color='blue')
     df = pd.read_csv(article_radius_path("1.csv"))
     # Adjust column names if needed
     z_csv = df["x"].to_numpy()
     R_csv = df["y"].to_numpy()
-    plt.plot(z_csv/10, R_csv/10, linestyle="--", label="1 ns", color='black')
+    # plt.plot(z_csv/10, R_csv/10, linestyle="--", label=f"t={t1}", color='black')
 
-    plt.plot(z, data_of_R[t2], label="Radius R(z,t=11)", color='red')
+    plt.plot(z, data_of_R[t2], label=f"2 ns", color='red')
     df = pd.read_csv(article_radius_path("2.csv"))
     # Adjust column names if needed
     z_csv = df["x"].to_numpy()
     R_csv = df["y"].to_numpy()
-    plt.plot(z_csv/10, R_csv/10, linestyle="--", label="2 ns", color='black')
+    # plt.plot(z_csv/10, R_csv/10, linestyle="--", label=f"t={t2}", color='black')
 
-    plt.plot(z, data_of_R[t2_5], label="Radius R(z,t=11.5)", color='blue')
+    plt.plot(z, data_of_R[t2_5], label=f"2.5 ns", color='green')
     df = pd.read_csv(article_radius_path("2.5.csv"))
     # Adjust column names if needed
     z_csv = df["x"].to_numpy()
     R_csv = df["y"].to_numpy()
-    plt.plot(z_csv/10, R_csv/10, linestyle="--", label="2.5 ns", color='black')
+    # plt.plot(z_csv/10, R_csv/10, linestyle="--", label=f"t={t2_5}", color='black')
 
-    plt.xlabel(r"$z$ [cm]")
-    plt.ylabel(r"$R(z)$ [cm]")
-    plt.title(fr"Radius $R$ vs Position $z$ — {Material}")
+    plt.xlabel(r"$z$ [cm]", fontsize=18, fontname='serif')
+    plt.ylabel(r"$R(z)$ [cm]", fontsize=18, fontname='serif')
+    plt.tick_params(axis='both', which='major', labelsize=14)
     plt.grid(True)
-    plt.legend()
+    plt.legend(prop={'family': 'serif', 'size': 15})
+    plt.ylim(0.06,0.081)
+    plt.tight_layout()
     save_figure("Radius_high_SiO2.png", model1_5=True)
 
     return data_of_R

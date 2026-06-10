@@ -14,6 +14,7 @@ Key References:
   - Equations (9)-(14): Front position, ablation, and wall loss models
 """
 
+from IPython.core import pylabtools
 from parameters import *
 from pathlib import Path
 from eigen_bessel_solver import kappa_roots
@@ -188,7 +189,7 @@ def _update_flux_and_energy(i, dt_i, base_flux, area, ablation, wall_loss, A, F,
     return E_wall_erg
 
 
-def _update_vary_rho_terms(i, dt_i, Ts_prev, xF_prev, R_array, t_sec, p, K, eps, In, C_changing_rho, Z1_changing_rho, new_rho,  lam_eff, power, R_average_for_lambda_geom, g_eff_array, lambda_eff_array):
+def _update_vary_rho_terms(i, dt_i, Ts_prev, xF_prev, R_array, t_sec, p, K, eps, In, C_changing_rho, Z1_changing_rho, new_rho,  lam_eff, power, R_average_for_lambda_geom, g_eff_array, lambda_eff_array, lambda_R_array):
     new_rho[i] = AblationModel.compute_rho_effective(R_cm, R_array, xF_prev)
 
     if not lam_eff:
@@ -204,6 +205,7 @@ def _update_vary_rho_terms(i, dt_i, Ts_prev, xF_prev, R_array, t_sec, p, K, eps,
         lambda_geom = 2 * R_average
         lambda_eff = ((lambda_geom ** (-power) + lambda_ross ** (-power))) ** (-1 / power)
         lambda_eff_array[i] = lambda_eff
+        lambda_R_array[i] = lambda_ross
         g_eff = g * (lambda_eff / lambda_ross)
         g_eff_array[i] = g_eff
         w_i = g_eff_array[i] / g
@@ -528,6 +530,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
     E_1D[0]  = 0.0
     g_eff_array = np.full_like(t_sec, g, dtype=float)
     lambda_eff_array = np.full_like(t_sec, 0, dtype=float)
+    lambda_R_array = np.full_like(t_sec, 0, dtype=float)
     E_wall_array_erg[0] = 0.0
     data_of_R = {t: np.full_like(z, R_cm) for t in t_sec}  # store R(t) data if ablation
     wall_penetration_depth_cm_profile = np.zeros_like(z, dtype=float)
@@ -573,6 +576,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
             lambda_geom = 2*R_cm
             lambda_eff = ((lambda_geom**(-power) + lambda_ross**(-power)))**(-1/power)
             lambda_eff_array[i] = lambda_eff
+            lambda_R_array[i] = lambda_ross
             g_eff = g * lambda_eff / lambda_ross
             g_eff_array[i] = g_eff
              # weight for the integral
@@ -603,7 +607,7 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
 
         # ---- If vary_rho: update rho_eff and C_changing_rho and Z1 ----
         if vary_rho and ablation:
-            _update_vary_rho_terms(i, dt_i, Ts_prev, z_F_rcm[i-1], R_array, t_sec, p, K, eps, In, C_changing_rho, Z1_changing_rho, new_rho, lam_eff, power, R_average_for_lambda_geom, g_eff_array,lambda_eff_array,)
+            _update_vary_rho_terms(i, dt_i, Ts_prev, z_F_rcm[i-1], R_array, t_sec, p, K, eps, In, C_changing_rho, Z1_changing_rho, new_rho, lam_eff, power, R_average_for_lambda_geom, g_eff_array,lambda_eff_array,lambda_R_array,)
         
         # ---- Solve Eq. (A.3) for H ----
         E2 = E[i] ** 2
@@ -647,6 +651,44 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
     # I will keep EXACTLY your conversion factors to preserve your downstream plots.
     E_total_hJ = E * 1e-9 * area
     E_wall_hJ_array = E_wall_array_erg * 1e-9
+
+    #plot lamda_r, and lam_eff as a function of time (also put the 2*R_cm)
+    if lam_eff:
+        # Calculate lambda_geom over time
+        lambda_geom = np.zeros_like(t_sec)
+        for idx in range(len(t_sec)):
+            if R_average_for_lambda_geom and ablation and (t_sec[idx] in data_of_R):
+                xF_index = np.searchsorted(z, xF[idx])
+                R_average = np.mean(data_of_R[t_sec[idx]][:xF_index + 1]) if xF_index > 0 else data_of_R[t_sec[idx]][0]
+                lambda_geom[idx] = 2.0 * R_average
+            else:
+                lambda_geom[idx] = 2.0 * R_cm
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            lambda_eff_1 = (lambda_geom**(-1.0) + lambda_R_array**(-1.0))**(-1.0)
+            lambda_eff_2 = (lambda_geom**(-2.0) + lambda_R_array**(-2.0))**(-0.5)
+            lambda_eff_5 = (lambda_geom**(-5.0) + lambda_R_array**(-5.0))**(-0.2)
+
+        # Convert t_sec to ns for plotting if it is in seconds
+        t_ns_plot = t_sec * 1e9 if t_sec[-1] < 1e-5 else t_sec
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(t_ns_plot[1:], lambda_eff_1[1:], label=r"$\lambda_{\mathrm{eff}}$ ($n=1$)", linestyle="-")
+        plt.plot(t_ns_plot[1:], lambda_eff_2[1:], label=r"$\lambda_{\mathrm{eff}}$ ($n=2$)", linestyle="-")
+        plt.plot(t_ns_plot[1:], lambda_eff_5[1:], label=r"$\lambda_{\mathrm{eff}}$ ($n=5$)", linestyle="-")
+        plt.plot(t_ns_plot[1:], lambda_R_array[1:], label=r"$\lambda_{\mathrm{R}}$ (Rosseland)", linestyle="--", color='green')
+        plt.plot(t_ns_plot[1:], lambda_geom[1:], label=r"$2R$ (Geometric)", linestyle="--", color='red')
+        plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
+        plt.ylabel(r"$\lambda$ [cm]", fontsize=18, fontname='serif')
+        plt.tick_params(axis='both', which='major', labelsize=18)
+        plt.legend(prop={'family': 'serif', 'size': 16})
+        plt.tight_layout()
+        try:
+            from csv_helpers import save_figure
+            save_figure("lambda_eff_vs_time.png", model1_5=True)
+        except Exception as e:
+            print(f"Warning: could not save lambda_eff plot: {e}")
+        plt.show()
 
     xF_out, Ts_out, E_out, Ew_out, data_of_R = _restore_marshak_outputs(xF, Ts, E_total_hJ, E_wall_hJ_array, order, t_sec_in, data_of_R, t_sec,)
     return xF_out, Ts_out, E_out, Ew_out, data_of_R, bessel_data
