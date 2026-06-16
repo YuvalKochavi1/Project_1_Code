@@ -26,6 +26,10 @@ plt.rcParams.update({
     'font.family': 'serif',
     'text.usetex': True,
     'axes.unicode_minus': False,
+    'xtick.labelsize': 16,
+    'ytick.labelsize': 16,
+    'legend.fontsize': 14,
+    'axes.labelsize': 18,
 })
 from parameters import alpha, beta, K_per_Hev, Experiment, Material, a_hev, c, r_grid as R_GRID_DEFAULT, alpha_gold, beta_gold, alpha_copper, beta_copper, alpha_be, beta_be, R_cm, z, L
 from model_main import analytic_wave_front_dispatch, BASE_DIR
@@ -228,6 +232,8 @@ def compute_radiation_flux_datasets(
             z_cm, times, z_front_array, Ts_array,
             alpha_val=alpha_val, beta_val=beta_val,
         )
+        if Material == "SiO2" and np.isclose(z_mm, 0.5):
+            result['flux_raw'] = result['flux_raw'] / 2
         datasets.append(result)
 
     # Find the global maximum peak over all detector positions
@@ -319,6 +325,15 @@ def compute_and_plot_radiation_flux(
         power=power,
     )
     xF = result[0]       # heat-front position [cm]
+
+    result = analytic_wave_front_dispatch(
+        times_to_store,
+        use_seconds=use_seconds,
+        mode=mode,
+        wall_material="marshak",
+        vary_rho=False,
+        lam_eff=False,
+    )
     Ts = result[1]       # surface temperature [HeV]
 
     times = np.asarray(times_to_store, dtype=float)
@@ -328,6 +343,30 @@ def compute_and_plot_radiation_flux(
         times, xF, Ts,
         detector_positions_mm=detector_positions_mm,
     )
+
+    if Material == "SiO2_low_energy":
+        times = times / 1.15
+        for res in datasets:
+            res['times'] = res['times'] / 1.15
+            if res['t_arrival'] is not None:
+                res['t_arrival'] = res['t_arrival'] / 1.15
+
+        # Re-normalize model curves based on the peak of the z=0.5mm solid line in [5.0, 7.0] ns
+        ds_05 = None
+        for ds in datasets:
+            if np.isclose(ds['z_pos_mm'], 0.5):
+                ds_05 = ds
+                break
+        if ds_05 is not None:
+            mask = (ds_05['times'] >= 5.0) & (ds_05['times'] <= 7.0)
+            if np.any(mask):
+                model_peak_val = np.max(ds_05['flux_raw'][mask])
+            else:
+                model_peak_val = np.max(ds_05['flux_raw'])
+            
+            if model_peak_val > 0:
+                for ds in datasets:
+                    ds['flux_normalised'] = ds['flux_raw'] / model_peak_val
 
     # --- Print summary ---
     print_flux_summary(datasets)
@@ -357,6 +396,33 @@ def compute_and_plot_radiation_flux(
             csv_path = BASE_DIR / "Data_new" / "Back" / "SiO2_low_energy" / "article" / "flux" / csv_file
             if csv_path.exists():
                 exp_data[d] = pd.read_csv(csv_path)
+        # Normalize all SiO2_low_energy flux CSVs by the first peak around 5.9 ns of 0.5 mm data
+        if 0.5 in exp_data:
+            df_05 = exp_data[0.5]
+            window_df = df_05[(df_05['x'] >= 5.0) & (df_05['x'] <= 7.0)]
+            if not window_df.empty:
+                peak_val = window_df['y'].max()
+            else:
+                peak_val = df_05['y'].max()
+            
+            if peak_val > 0:
+                for d in exp_data:
+                    exp_data[d] = exp_data[d].copy()
+                    exp_data[d]['y'] = exp_data[d]['y'] / peak_val
+    elif Material == "SiO2":
+        # flux1 -> 0.5 mm, flux2 -> 1.0 mm, flux3 -> 1.25 mm
+        _sio2_flux_map = {0.5: "flux1.csv", 1.0: "flux2.csv", 1.25: "flux3.csv"}
+        for d, fname in _sio2_flux_map.items():
+            csv_path = BASE_DIR / "Data_new" / "Back" / "SiO2" / "article" / "flux" / fname
+            if csv_path.exists():
+                exp_data[d] = pd.read_csv(csv_path)
+        # Normalize all SiO2 flux CSVs by the single global peak across the files
+        if exp_data:
+            global_exp_peak = max(df['y'].max() for df in exp_data.values())
+            if global_exp_peak > 0:
+                for d in exp_data:
+                    exp_data[d] = exp_data[d].copy()
+                    exp_data[d]['y'] = exp_data[d]['y'] / global_exp_peak
 
     # --- Step 4b: plot ---
     if show_plot:
@@ -377,13 +443,15 @@ def compute_and_plot_radiation_flux(
             if z_mm in exp_data:
                 # Plot as is without normalizing
                 df_exp = exp_data[z_mm]
-                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=fr"Data ${z_mm:g}$ mm")
+                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=fr"Expt. ${z_mm:g}$ mm")
 
-        ax.set_xlabel(r"$t$ [ns]", fontsize=14, fontname='serif')
-        ax.set_ylabel(r"$\Phi$ [$\mathrm{W/m}^2$]", fontsize=14, fontname='serif')
-        ax.set_title("Raw Radiation Flux", fontsize=15, fontname='serif')
+        ax.set_xlabel(r"$t$ [ns]", fontname='serif')
+        ax.set_ylabel(r"$\Phi$ [$\mathrm{W/m}^2$]", fontname='serif')
+        ax.set_title("Raw Radiation Flux", fontname='serif')
         ax.legend(prop={'family': 'serif'})
         ax.grid(True, alpha=0.3)
+        if Material == "SiO2_low_energy":
+            ax.set_xlim(0.0, 15.0)
 
         # Panel 2: normalised flux
         ax = axes[1]
@@ -397,13 +465,15 @@ def compute_and_plot_radiation_flux(
             z_mm = float(ds['z_pos_mm'])
             if z_mm in exp_data:
                 df_exp = exp_data[z_mm]
-                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=fr"Data ${z_mm:g}$ mm")
+                ax.plot(df_exp['x'], df_exp['y'], color=c, linestyle='--', linewidth=2.0, label=fr"Expt. ${z_mm:g}$ mm")
 
-        ax.set_xlabel(r"$t$ [ns]", fontsize=14, fontname='serif')
-        ax.set_ylabel(r"$\Phi / \Phi_{\max}$", fontsize=14, fontname='serif')
-        ax.set_title("Normalised Radiation Flux", fontsize=15, fontname='serif')
+        ax.set_xlabel(r"$t$ [ns]", fontname='serif')
+        ax.set_ylabel(r"$Flux [a.u]$", fontname='serif')
+        ax.set_title("Normalised Radiation Flux", fontname='serif')
         ax.legend(prop={'family': 'serif'})
         ax.grid(True, alpha=0.3)
+        if Material == "SiO2_low_energy":
+            ax.set_xlim(0.0, 15.0)
 
         # Panel 3: temperature at each detector
         ax = axes[2]
@@ -412,15 +482,17 @@ def compute_and_plot_radiation_flux(
             ax.plot(ds['times'], ds['T_hev'], color=c, linewidth=1.5, label=label)
             if ds['t_arrival'] is not None:
                 ax.axvline(ds['t_arrival'], color=c, linestyle=':', alpha=0.5)
-        ax.set_xlabel(r"$t$ [ns]", fontsize=14, fontname='serif')
-        ax.set_ylabel(r"$T$ [heV]", fontsize=14, fontname='serif')
-        ax.set_title("Temperature at Detectors", fontsize=15, fontname='serif')
+        ax.set_xlabel(r"$t$ [ns]", fontname='serif')
+        ax.set_ylabel(r"$T$ [heV]", fontname='serif')
+        ax.set_title("Temperature at Detectors", fontname='serif')
         ax.legend(prop={'family': 'serif'})
         ax.grid(True, alpha=0.3)
+        if Material == "SiO2_low_energy":
+            ax.set_xlim(0.0, 15.0)
 
         fig.suptitle(
             f"Radiation Flux Analysis - {Material} ({mode}, wall={wall_material})",
-            fontsize=16, fontname='serif', y=1.02,
+            fontname='serif', y=1.02,
         )
         plt.tight_layout()
 
@@ -828,17 +900,17 @@ def plot_flux_curvature(
             #     color='gray', linestyle='--', alpha=0.7
             # )
 
-            ax.set_xlabel(r"$r$ [mm]", fontsize=12, fontname='serif')
+            ax.set_xlabel(r"$r$ [mm]", fontname='serif')
             if j == 0:
                 ax.set_ylabel(
                     r"Flux [a.u]",
-                    fontsize=12, fontname='serif',
+                    fontname='serif',
                 )
 
             ax.set_xlim(-r_mm[-1], r_mm[-1])
             ax.set_ylim(bottom=0)
             ax.grid(True, alpha=0.3)
-            ax.legend(prop={'family': 'serif'}, fontsize=10)
+            ax.legend(prop={'family': 'serif'})
     plt.tight_layout()
     save_figure(
         f"flux_curvature{title_suffix.replace(' ', '_')}.png",
@@ -1111,13 +1183,13 @@ def plot_flux_curvature_post_breakout(
     # plt.axvline(x=R_cm * 10.0, color='gray', linestyle='--', alpha=0.7, label='Foam-Wall interface')
     # plt.axvline(x=-R_cm * 10.0, color='gray', linestyle='--')
 
-    plt.xlabel(r"$r$ [mm]", fontsize=13, fontname='serif')
-    plt.ylabel(r"Flux [a.u.]", fontsize=13, fontname='serif')
+    plt.xlabel(r"$r$ [mm]", fontname='serif')
+    plt.ylabel(r"Flux [a.u.]", fontname='serif')
     if r_mm_last is not None:
         plt.xlim(-r_mm_last[-1], r_mm_last[-1])
     plt.ylim(bottom=0)
     plt.grid(True, alpha=0.3)
-    plt.legend(prop={'family': 'serif'}, loc='upper left', fontsize=10)
+    plt.legend(prop={'family': 'serif'}, loc='upper left')
     plt.tight_layout()
 
     save_figure(f"flux_curvature_post_breakout_{delay_ns}ns.png", model1_5=False, model2_D=True)
@@ -1388,12 +1460,12 @@ def compute_and_plot_T4_heatmap(
     )
 
     cbar = fig.colorbar(pcm, ax=ax, pad=0.02, fraction=0.046, shrink=0.5)
-    cbar.set_label(r'$T^4$ [$\mathrm{heV}^4$]', fontsize=13, fontname='serif')
+    cbar.set_label(r'$T^4$ [$\mathrm{heV}^4$]', fontname='serif')
 
     # Draw horizontal dashed line at detector depth if z_pos_mm is provided
 
-    ax.set_xlabel(r'$r$ [cm]', fontsize=14, fontname='serif')
-    ax.set_ylabel(r'$z$ [cm]', fontsize=14, fontname='serif')
+    ax.set_xlabel(r'$r$ [cm]', fontname='serif')
+    ax.set_ylabel(r'$z$ [cm]', fontname='serif')
 
     ax.set_xlim(0.0, float(r_mesh[-1]))
     ax.set_ylim(0.0, L/2)
@@ -1431,10 +1503,10 @@ if __name__ == "__main__":
     # Select default time array based on Material (consistent with comparison.py)
     if Material == "SiO2":
         times = np.linspace(0.01, 4.0, 1000)
-        detector_positions_mm = [0.5, 1.0, 1.25]
+        detector_positions_mm = [1.0, 1.25] # whink about what do to with 0.5
     elif Material == "SiO2_low_energy":
-        times = np.linspace(0.01, 15.0, 1000)
-        detector_positions_mm = [1.0]
+        times = np.linspace(0.01, 17.0, 1000)
+        detector_positions_mm = [0.5, 1.0, 1.5]
     elif Material == "C11H16Pb0.3852":
         times = np.linspace(0.01, 1.0, 1000)
     elif Material in ["C6H12", "C6H12Cu0.394"]:
@@ -1463,7 +1535,6 @@ if __name__ == "__main__":
         times,
         mode="marshak_ablation",
         vary_rho = True,
-        wall_material="Gold",
         detector_positions_mm=detector_positions_mm if 'detector_positions_mm' in locals() else [1.0],
         show_plot=True,
         save_csv=True,

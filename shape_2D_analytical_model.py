@@ -696,13 +696,13 @@ def plot_temperature_heatmap_2D(
     # )
     fig.subplots_adjust(wspace=wspace if n_plots > 1 else 0.2)
     # plt.tight_layout(pad=0.6, w_pad=0.2)
-
+    plt.show()
     save_figure(f'temperature_heatmap_2D{title_suffix}.png', model2_D=True, dpi=150, bbox_inches='tight')
     if show_plot:
         backend = plt.get_backend().lower()
         if 'agg' not in backend:
             plt.show()
-    plt.close()
+    #plt.close()
 
 
 #########################################
