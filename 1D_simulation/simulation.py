@@ -95,9 +95,9 @@ class GoldFoam1DSimulation:
         self.simulation_unit_system = simulation_unit_system if simulation_unit_system_override is None else simulation_unit_system_override
         self.kind_of_D_face = kind_of_D_face if kind_of_D_face_override is None else kind_of_D_face_override
 
-        self.Lz = float(L/6 if lz is None else lz)
+        self.Lz = float(L if lz is None else lz)
         self.gold_width = float(w_Au if gold_block_width is None else gold_block_width)
-        self.Nz_foam = int(100 if nz is None else nz)
+        self.Nz_foam = int(300 if nz is None else nz)
         if self.Nz_foam < 2:
             raise ValueError("nz must be >= 2")
 
@@ -189,12 +189,28 @@ class GoldFoam1DSimulation:
             right_T = 300.0 / K_per_Hev
         return self.a * left_T**4, self.a * right_T**4
 
-    def implicit_step(self, E, UR, *, t=0.0, dt_local=None, marshak_boundary=False):
+    def implicit_step(
+        self,
+        E,
+        UR,
+        *,
+        t=0.0,
+        dt_local=None,
+        marshak_boundary=False,
+        right_boundary="dirichlet_cold",
+    ):
         if dt_local is None:
             dt_local = self.dt
 
         N = E.size
-        n_int = N - 1 if marshak_boundary else N - 2
+        if right_boundary not in {"dirichlet_cold", "marshak_vacuum"}:
+            raise ValueError("right_boundary must be 'dirichlet_cold' or 'marshak_vacuum'")
+
+        right_marshak_vacuum = right_boundary == "marshak_vacuum"
+        if right_marshak_vacuum and not marshak_boundary:
+            raise ValueError("right_boundary='marshak_vacuum' requires marshak_boundary=True")
+
+        n_int = N if right_marshak_vacuum else (N - 1 if marshak_boundary else N - 2)
         E_left, E_right = self._boundary_energy(t)
         Tn = (UR / self.a) ** 0.25
         Dn = self.D_of_T(Tn)
@@ -228,20 +244,26 @@ class GoldFoam1DSimulation:
 
             for k in range(1, n_int):
                 i = k
-                D_imh = D_face[i - 1]
-                D_iph = D_face[i]
                 h_w = widths[i - 1]
-                h_e = widths[i]
-                denom = h_w + h_e
-                a_i = -2.0 * D_imh / (denom * h_w)
-                c_i = -2.0 * D_iph / (denom * h_e)
-                b_i = (1.0 / dt_local) + 2.0 * D_imh / (denom * h_w) + 2.0 * D_iph / (denom * h_e) + coupling[i]
-                d_i = (E[i] / dt_local) + coupling[i] * UR[i]
-                diag[k] = b_i
-                rhs[k] = d_i
-                lower[k - 1] = a_i
-                if k < n_int - 1:
-                    upper[k] = c_i
+                if right_marshak_vacuum and i == N - 1:
+                    D_imh = D_face[i - 1]
+                    diag[k] = 1.0 + 2.0 * D_imh / (self.c * h_w)
+                    rhs[k] = 0.0
+                    lower[k - 1] = -2.0 * D_imh / (self.c * h_w)
+                else:
+                    D_imh = D_face[i - 1]
+                    D_iph = D_face[i]
+                    h_e = widths[i]
+                    denom = h_w + h_e
+                    a_i = -2.0 * D_imh / (denom * h_w)
+                    c_i = -2.0 * D_iph / (denom * h_e)
+                    b_i = (1.0 / dt_local) + 2.0 * D_imh / (denom * h_w) + 2.0 * D_iph / (denom * h_e) + coupling[i]
+                    d_i = (E[i] / dt_local) + coupling[i] * UR[i]
+                    diag[k] = b_i
+                    rhs[k] = d_i
+                    lower[k - 1] = a_i
+                    if k < n_int - 1:
+                        upper[k] = c_i
         else:
             for k in range(n_int):
                 i = k + 1
@@ -265,9 +287,10 @@ class GoldFoam1DSimulation:
             h_e = widths[1]
             rhs[0] -= (-2.0 * D_face[0] / ((h_w + h_e) * h_w)) * E_left
 
-        h_w = widths[-2]
-        h_e = widths[-1]
-        rhs[-1] -= (-2.0 * D_face[-1] / ((h_w + h_e) * h_e)) * E_right
+        if not right_marshak_vacuum:
+            h_w = widths[-2]
+            h_e = widths[-1]
+            rhs[-1] -= (-2.0 * D_face[-1] / ((h_w + h_e) * h_e)) * E_right
 
         for i in range(1, n_int):
             w = lower[i - 1] / diag[i - 1]
@@ -280,17 +303,29 @@ class GoldFoam1DSimulation:
             E_inner[i] = (rhs[i] - upper[i] * E_inner[i + 1]) / diag[i]
 
         E_new = E.copy()
-        E_new[-1] = E_right
-        if marshak_boundary:
+        if right_marshak_vacuum:
+            E_new[:] = E_inner
+        elif marshak_boundary:
+            E_new[-1] = E_right
             E_new[:-1] = E_inner
         else:
+            E_new[-1] = E_right
             E_new[0] = E_left
             E_new[1:-1] = E_inner
 
         UR_new = (A * E_new + UR) / (1.0 + A)
         return E_new, UR_new
 
-    def run(self, times_to_store, *, dtfac=0.05, dtmin=5e-15, dtmax=2e-13, marshak_boundary=False):
+    def run(
+        self,
+        times_to_store,
+        *,
+        dtfac=0.05,
+        dtmin=5e-15,
+        dtmax=2e-13,
+        marshak_boundary=False,
+        right_boundary="dirichlet_cold",
+    ):
         store_idx = 0
         stored_t, stored_Um, stored_Tm, stored_TR = [], [], [], []
         t = 0.0
@@ -306,7 +341,14 @@ class GoldFoam1DSimulation:
 
             Eold = self.E.copy()
             URold = self.UR.copy()
-            self.E, self.UR = self.implicit_step(self.E, self.UR, t=t, dt_local=dt_local, marshak_boundary=marshak_boundary)
+            self.E, self.UR = self.implicit_step(
+                self.E,
+                self.UR,
+                t=t,
+                dt_local=dt_local,
+                marshak_boundary=marshak_boundary,
+                right_boundary=right_boundary,
+            )
             t_next = t + dt_local
 
             Um = self.U_m_of_T(self.UR)

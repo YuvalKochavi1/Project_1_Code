@@ -51,7 +51,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = os.getenv("PHYSICS_MATERIAL", "SiO2_low_energy")  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = os.getenv("PHYSICS_MATERIAL", "SiO2")  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 Flattop_condition = True  # "flattop" or "gaussian"
 
 if Material == "SiO2":
@@ -294,7 +294,7 @@ elif Material == "Ta2O5":
     Nz = 800   # increase resolution because domain is much larger
 elif Material == "C8H7Cl" or Material == "SiO2_Moore":
     L = 0.28      
-    Nz = 500   # increase resolution because domain is much larger
+    Nz = 1000   # increase resolution because domain is much larger
 elif Material == "C15H20O6" or Material == "C15H20O6Au0.172":
     L = 0.12      
     Nz = 500   # increase resolution because domain is much larger
@@ -415,7 +415,7 @@ def make_r_two_block(R_foam, gold_width, Nr_foam, Nr_gold, dr0=None):
 
 # Radial grid for 2D cylindrical (Gold extension)
 Nr_gold = 100
-w_Au = 20e-4
+w_Au = 50e-4
 dr0_gold = w_Au / 3000
 r_gold, r_gold_info = make_r_two_block(R_cm, w_Au, Nr, Nr_gold, dr0=dr0_gold)
 
