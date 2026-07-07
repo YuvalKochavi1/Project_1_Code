@@ -14,7 +14,6 @@ Key References:
   - Equations (9)-(14): Front position, ablation, and wall loss models
 """
 
-from IPython.core import pylabtools
 from parameters import *
 from pathlib import Path
 from eigen_bessel_solver import kappa_roots

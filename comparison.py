@@ -9,6 +9,10 @@ plt.rcParams.update({
     'font.family': 'serif',
     'text.usetex': True,
     'axes.unicode_minus': False,
+    'font.size': 16,
+    'legend.fontsize': 14,
+    'xtick.labelsize': 18,
+    'ytick.labelsize': 18,
 })
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
 print(f"Data directory: {DATA_DIR}")
@@ -508,6 +512,7 @@ def compare_with_article_2_exp4_14(times_to_store):
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
     analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    analytic_positions_gold_loss = front_series["analytic_positions_gold_loss"]
     plt.figure(figsize=(8, 6))
     # fit data to analytical
     power_law = (4 + alpha - beta) / 4
@@ -519,6 +524,7 @@ def compare_with_article_2_exp4_14(times_to_store):
     plot_standard_front_analytic_models(
         times_to_store,
         analytic_positions_marshak=analytic_positions_marshak,
+        analytic_positions_gold_loss=analytic_positions_gold_loss,
         analytic_positions_2D=analytic_positions_2D,
         analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
         analytic_positions_no_marshak=analytic_positions_no_marshak,

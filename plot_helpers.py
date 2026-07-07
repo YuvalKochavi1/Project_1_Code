@@ -68,10 +68,24 @@ def plot_standard_front_analytic_models(
 ):
     plot_analytic_if_available(
         times_to_store,
+        analytic_positions_no_marshak,
+        label=r"$\mathrm{HR}$",
+        linestyle="-",
+        color='green',
+    )
+    plot_analytic_if_available(
+        times_to_store,
         analytic_positions_marshak,
-        label=r"Model $x_F(t)$ (Marshak BC)",
+        label=r"Model $x_F(t)$ - Marshak BC",
         linestyle="-",
         color='blue',
+    )
+    plot_analytic_if_available(
+        times_to_store,
+        analytic_positions_gold_loss,
+        label=fr"Model $x_F(t)$ - {wall_material} Loss",
+        linestyle="-",
+        color='orange',
     )
     plot_analytic_if_available(
         times_to_store,
@@ -86,20 +100,6 @@ def plot_standard_front_analytic_models(
         label=fr"Model $x_F(t)$ - 2D effects + $\lambda_{{\mathrm{{eff}}}}$",
         linestyle="-",
         color='red',
-    )
-    plot_analytic_if_available(
-        times_to_store,
-        analytic_positions_no_marshak,
-        label=r"$\mathrm{HR}$",
-        linestyle="-",
-        color='green',
-    )
-    plot_analytic_if_available(
-        times_to_store,
-        analytic_positions_gold_loss,
-        label=fr"Model $x_F(t)$ ({wall_material} Loss)",
-        linestyle="-",
-        color='orange',
     )
     plot_analytic_if_available(
         times_to_store,
