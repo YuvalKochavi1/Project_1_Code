@@ -54,3 +54,50 @@ class WavefrontHelpers:
         out = np.empty(original_size, dtype=float)
         out[order] = arr
         return out
+
+    @staticmethod
+    def compute_first_order_hr_profile(t_sec, xF_arr, Ts_arr, z_grid=None, C_val=None):
+        """
+        Computes the first-order corrected Hammer-Rosen temperature profile T(z, t)
+        and the profile parameter A(t) (Appendix A / Eqs. 22-23 of HR_corrected.tex).
+        """
+        eps, _, C_default, _ = WavefrontHelpers.compute_constants_for_wavefront()
+        if C_val is None:
+            C_val = C_default
+        if z_grid is None:
+            z_grid = z
+
+        N = len(t_sec)
+        N_x = len(z_grid)
+        n = 4.0 + alpha
+
+        H_arr = Ts_arr ** n
+        Hdot = np.zeros(N)
+        for i in range(1, N):
+            dt_i = t_sec[i] - t_sec[i - 1]
+            if dt_i > 0:
+                Hdot[i] = (H_arr[i] - H_arr[i - 1]) / dt_i
+        if N > 1 and (t_sec[1] - t_sec[0]) > 0:
+            Hdot[0] = (H_arr[1] - H_arr[0]) / (t_sec[1] - t_sec[0])
+
+        A_arr = np.zeros(N)
+        for i in range(N):
+            if H_arr[i] > 1e-100 and xF_arr[i] > 0 and C_val > 0:
+                H_1meps = H_arr[i] ** (1.0 - eps)
+                if H_1meps > 1e-100:
+                    A_arr[i] = (xF_arr[i] ** 2) / (C_val * H_1meps) * Hdot[i] / H_arr[i]
+
+        T_profile_leading = np.zeros((N, N_x))
+        T_profile_corrected = np.zeros((N, N_x))
+        for i in range(N):
+            if xF_arr[i] < 1e-30 or Ts_arr[i] < 1e-30:
+                continue
+            y = z_grid / xF_arr[i]
+            for j in range(N_x):
+                if y[j] < 1.0:
+                    T_profile_leading[i, j] = Ts_arr[i] * ((1.0 - y[j]) ** (1.0 / n))
+                    inner = (1.0 - y[j]) * (1.0 + (eps / 2.0) * (1.0 - A_arr[i]) * y[j])
+                    if inner > 0:
+                        T_profile_corrected[i, j] = Ts_arr[i] * (inner ** (1.0 / (n * (1.0 - eps))))
+        return A_arr, T_profile_leading, T_profile_corrected
+

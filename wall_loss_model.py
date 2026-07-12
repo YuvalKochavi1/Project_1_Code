@@ -153,7 +153,7 @@ class WallLossModel:
         if t_exposed <= 0:
             return 0.0
         #gold subsonic
-        return 0.59 * T0**3.35 * (t_exposed * 1e9)**0.59
+        #return 0.59 * T0**3.35 * (t_exposed * 1e9)**0.59
         #gold supersonic
         g0gold = 1/7200
         return 0.175 * ((g_gold/g0gold) ** 0.5) * (T0 ** 3.55) * ((t_exposed * 1e9) ** 0.5) 
@@ -163,7 +163,7 @@ class WallLossModel:
         """Wall energy loss for copper in hJ/mm^2 (Eq. 11 parameterization)."""
         if t_exposed <= 0:
             return 0.0
-        return 1.58 * T0**3.4 * (t_exposed * 1e9)**0.61
+        #return 1.58 * T0**3.4 * (t_exposed * 1e9)**0.61
         return 0.4 * T0**3.78 * (t_exposed * 1e9)**0.5
 
     @staticmethod

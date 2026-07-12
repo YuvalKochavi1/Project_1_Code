@@ -98,6 +98,42 @@ def henyey_temperature_array(z_pos_cm, z_front_array, Ts_array, alpha_val, beta_
     return T_hev
 
 
+def first_order_hr_temperature(z_pos_cm, z_front_cm, Ts_hev, A_val, alpha_val, beta_val):
+    """
+    Compute the first-order corrected Hammer-Rosen temperature at a single
+    spatial position *z_pos_cm* given the current front position *z_front_cm*,
+    surface temperature *Ts_hev* [HeV], profile parameter *A_val*, and exponents.
+    """
+    if z_front_cm <= 0.0 or z_pos_cm >= z_front_cm:
+        return 0.0
+
+    n = 4.0 + alpha_val
+    eps = beta_val / n
+    exponent = 1.0 / (n * (1.0 - eps))
+    y = max(z_pos_cm / z_front_cm, 0.0)
+    inner = (1.0 - y) * (1.0 + (eps / 2.0) * (1.0 - A_val) * y)
+    if inner <= 0.0:
+        return 0.0
+    return Ts_hev * (inner ** exponent)
+
+
+def first_order_hr_temperature_array(z_pos_cm, z_front_array, Ts_array, A_array, alpha_val, beta_val):
+    """
+    Vectorised version of *first_order_hr_temperature* over full time arrays.
+    """
+    n = 4.0 + alpha_val
+    eps = beta_val / n
+    exponent = 1.0 / (n * (1.0 - eps))
+    y = np.where(z_front_array > 0, z_pos_cm / z_front_array, 1.0)
+    y = np.clip(y, 0.0, None)
+    behind_front = z_front_array > z_pos_cm
+
+    inner = (1.0 - y) * (1.0 + (eps / 2.0) * (1.0 - A_array) * y)
+    valid = behind_front & (inner > 0.0)
+    T_hev = np.where(valid, Ts_array * (np.maximum(inner, 0.0) ** exponent), 0.0)
+    return T_hev
+
+
 # --------------------------------------------------------------------------
 # Arrival-time detection
 # --------------------------------------------------------------------------

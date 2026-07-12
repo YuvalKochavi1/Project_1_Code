@@ -3,6 +3,7 @@ from model_main import *
 from csv_helpers import *
 from plot_helpers import *
 from shape_2D_analytical_model import plot_2D_front_spatial, plot_temperature_heatmap_2D, plot_temperature_heatmap_2D_series_model
+import runpy
 
 # Font configuration: serif and LaTeX style math font
 plt.rcParams.update({
@@ -17,6 +18,31 @@ plt.rcParams.update({
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
 print(f"Data directory: {DATA_DIR}")
 FIGURES_OUTPUT_DIR = BASE_DIR / "Figures_new" / Experiment / Material 
+
+
+def _normalize_profile_mode(mode):
+    if isinstance(mode, bool):
+        return "flattop" if mode else "heyney"
+    key = str(mode).strip().lower().replace("_", " ")
+    key = " ".join(key.split())
+    if key in {"flattop", "flat top"}:
+        return "flattop"
+    if key in {"heyney", "henyey"}:
+        return "heyney"
+    if key in {"generalized heyney", "generalized henyey", "generalized"}:
+        return "generalized heyney"
+    raise ValueError(
+        f"Invalid Flattop_condition='{mode}'. Use one of: flattop, heyney, generalized heyney"
+    )
+
+
+def _profile_file_suffix(mode):
+    normalized = _normalize_profile_mode(mode)
+    if normalized == "flattop":
+        return "_flattop"
+    if normalized == "generalized heyney":
+        return "_generalized_heyney"
+    return ""
 
 def plot_energies(stored_t, total_energies, marshak_boundary=False, energy_lost_to_gold=False, ablation=False, vary_rho=False):
     # analytical_points = [analytical_total_energy(ti, rho, T_bath_hev  ) for ti in stored_t]
@@ -161,6 +187,25 @@ def Back_SiO2(times_to_store):
         output_csv_path = DATA_DIR / "1.5 model" / "analytic_positions_flattop.csv"
     else:
         output_csv_path = DATA_DIR / "1.5 model" / "analytic_positions.csv"
+    export_analytic_positions_csv(
+        times_to_store,
+        {
+            "front_position": {
+                "Marshak": analytic_positions_marshak,
+                "Ablation with varying rho": analytic_positions_2D,
+                "2D effects + lam_eff": analytic_positions_2D_lam_eff,
+                "Ablation with const rho": analytic_positions_ablation_const_rho,
+                "gold loss": analytic_position_gold_loss,
+                "No Marshak": analytic_positions_no_marshak,
+                "Vacuum loss": analytic_positions_vacuum_lost,
+                "Be Loss": analytic_position_Be_lost,
+                "Copper Loss": analytic_position_Cu_lost,
+            }
+        },
+        output_csv_path = output_csv_path,
+
+    )
+
     export_analytic_positions_csv(
         times_to_store,
         {
@@ -547,6 +592,28 @@ def compare_with_article_2_exp4_14(times_to_store):
     plt.legend()
     plt.tight_layout()
     save_figure("front_position - compare Back SiO2 low energy.png", model1_5=True)
+
+    output_csv_path = DATA_DIR / "1.5 model" / f"analytic_positions{_profile_file_suffix(Flattop_condition)}.csv"
+    export_analytic_positions_csv(
+        times_to_store,
+        {
+            "front_position": {
+                "Marshak": analytic_positions_marshak,
+                "Ablation with varying rho": analytic_positions_2D,
+                "2D effects + lam_eff": analytic_positions_2D_lam_eff,
+                "gold loss": analytic_positions_gold_loss,
+                "No Marshak": analytic_positions_no_marshak,
+            }
+        },
+        output_csv_path=output_csv_path,
+    )
+
+    comparison_script = BASE_DIR / "Comparison_model _simulation" / "Back" / "SiO2_low_energy" / "simulation_model_comparison.py"
+    if comparison_script.exists():
+        try:
+            runpy.run_path(str(comparison_script), run_name="__main__")
+        except Exception as exc:
+            print(f"Warning: low-energy comparison script failed: {exc}")
     
 def compare_with_article_2_exp5_15a(times_to_store):
     """Moore SiO2 experiment"""

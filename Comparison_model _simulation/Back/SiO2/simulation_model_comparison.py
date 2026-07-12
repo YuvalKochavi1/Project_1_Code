@@ -344,8 +344,8 @@ def plot_front_position(output_dir, wall_name, simulation_data, model_data, loss
         label="Simulation",
     )
     plt.plot(model_data["time_ns"], model_data["marshak"], color="orange", linestyle="-.", linewidth=2.8, label="Model (Marshak)")
-    # plt.plot(model_data["time_ns"], model_data["loss_regular"], color="red", linewidth=2.6, label="Model")
-    plt.plot(model_data["flattop_time_ns"], model_data["loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model")
+    plt.plot(model_data["time_ns"], model_data["loss_regular"], color="firebrick", linestyle="--", linewidth=2.4, label="Model (Henyey)")
+    plt.plot(model_data["flattop_time_ns"], model_data["loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model (flattop)")
     plt.xlabel(r"$t$ [ns]")
     plt.ylabel(r"$x_F$ [cm]")
     plt.ylim(0.0, 0.2)
@@ -389,8 +389,8 @@ def plot_front_surface(output_dir, wall_name, simulation_data, model_data):
         z_reg = model_data["regular"][time_ns]["z_F_radial_cm"] + offset
         z_flat = model_data["flattop"][time_ns]["z_F_radial_cm"] + offset
         
-        # ax.plot(model_data["regular"][time_ns]["r_cm"], z_reg, color="red", linewidth=2.6, label=f"Model t={time_ns:.1f} ns")
-        ax.plot(model_data["flattop"][time_ns]["r_cm"], z_flat, color="red", linestyle="-", linewidth=2.6, label=f"Model t={time_ns:.1f} ns")
+        ax.plot(model_data["regular"][time_ns]["r_cm"], z_reg, color="firebrick", linestyle="--", linewidth=2.4, label=f"Model Henyey t={time_ns:.1f} ns")
+        ax.plot(model_data["flattop"][time_ns]["r_cm"], z_flat, color="red", linestyle="-", linewidth=2.6, label=f"Model flattop t={time_ns:.1f} ns")
         ax.set_xlim([0, R_cm])
         ax.set_ylim([0, 0.2])
         ax.set_aspect("equal", adjustable="box")
@@ -412,34 +412,34 @@ def plot_energy(output_dir, wall_name, simulation_data, model_data):
     if wall_name != "Vacuum":
         plt.plot(simulation_data["time_ns"], simulation_data["coating_energy_hJ"], color="royalblue", linestyle="--", linewidth=2.8, label="Simulation coating energy")
     
-    # Model - Regular (Heyney)
+    # Model - Regular (Henyey)
     plt.plot(model_data["time_ns"], model_data["E_marshak"], color="orange", linestyle="-.", linewidth=2.8, label="Model E (Marshak)")
 
     if wall_name == "Be":
-        # Regular
-        # plt.plot(model_data["time_ns"], model_data["E_Be_loss"], color="red", linewidth=2.6, label="Model E Be loss")
-        # plt.plot(model_data["time_ns"], model_data["E_Be_wall_loss"], color="crimson", linewidth=2.6, label="Model E Be wall loss")
+        # Regular (Henyey)
+        plt.plot(model_data["time_ns"], model_data["E_Be_loss"], color="firebrick", linestyle="--", linewidth=2.4, label="Model E Be loss (Henyey)")
+        plt.plot(model_data["time_ns"], model_data["E_Be_wall_loss"], color="brown", linestyle="--", linewidth=2.4, label="Model E Be wall loss (Henyey)")
         # Flattop
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Be loss")
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_wall_loss_flattop"], color="crimson", linestyle="-", linewidth=2.6, label="Model E Be wall loss")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Be loss (flattop)")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_wall_loss_flattop"], color="crimson", linestyle="-", linewidth=2.6, label="Model E Be wall loss (flattop)")
     elif wall_name == "Vacuum":
-        # plt.plot(model_data["time_ns"], model_data["E_vacuum_loss"], color="red", linewidth=2.6, label="Model E Vacuum loss")
+        plt.plot(model_data["time_ns"], model_data["E_vacuum_loss"], color="firebrick", linestyle="--", linewidth=2.4, label="Model E Vacuum loss (Henyey)")
         # Flattop
-        plt.plot(model_data["flattop_time_ns"], model_data["E_vacuum_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Vacuum loss")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_vacuum_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Vacuum loss (flattop)")
     elif wall_name == "Copper":
-        # Regular
-        # plt.plot(model_data["time_ns"], model_data["E_Cu_loss"], color="red", linewidth=2.6, label="Model E Copper loss")
-        # plt.plot(model_data["time_ns"], model_data["E_Cu_wall_loss"], color="crimson", linewidth=2.6, label="Model E Copper wall loss")
+        # Regular (Henyey)
+        plt.plot(model_data["time_ns"], model_data["E_Cu_loss"], color="firebrick", linestyle="--", linewidth=2.4, label="Model E Copper loss (Henyey)")
+        plt.plot(model_data["time_ns"], model_data["E_Cu_wall_loss"], color="brown", linestyle="--", linewidth=2.4, label="Model E Copper wall loss (Henyey)")
         # Flattop
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Cu_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Copper loss")
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Cu_wall_loss_flattop"], color="crimson", linestyle="-", linewidth=2.6, label="Model E Copper wall loss")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Cu_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Copper loss (flattop)")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Cu_wall_loss_flattop"], color="crimson", linestyle="-", linewidth=2.6, label="Model E Copper wall loss (flattop)")
     else:
-        # Regular
-        # plt.plot(model_data["time_ns"], model_data["E_Gold_loss"], color="red", linewidth=2.6, label="Model E Gold loss")
-        # plt.plot(model_data["time_ns"], model_data["E_Gold_wall_loss"], color="crimson", linewidth=2.6, label="Model E Gold wall loss")
+        # Regular (Henyey)
+        plt.plot(model_data["time_ns"], model_data["E_Gold_loss"], color="firebrick", linestyle="--", linewidth=2.4, label="Model E Gold loss (Henyey)")
+        plt.plot(model_data["time_ns"], model_data["E_Gold_wall_loss"], color="brown", linestyle="--", linewidth=2.4, label="Model E Gold wall loss (Henyey)")
         # Flattop
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Gold loss")
-        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_wall_loss_flattop"], color="crimson", linestyle="-", linewidth=2.6, label="Model E Gold wall loss")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Gold loss (flattop)")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_wall_loss_flattop"], color="crimson", linestyle="-", linewidth=2.6, label="Model E Gold wall loss (flattop)")
 
     plt.xlabel(r"$t$ [ns]")
     plt.ylabel(r"$E$ [hJ]")

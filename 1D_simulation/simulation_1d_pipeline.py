@@ -24,7 +24,7 @@ DETECTOR_POSITIONS_MM = [0.5, 1.0, 1.25]
 
 def create_simulation(
     *,
-    nz: int = 400,
+    nz: int = 1000,
     lz: float | None = None,
     t_final: float | None = None,
     kind_of_D_face: str | None = None,

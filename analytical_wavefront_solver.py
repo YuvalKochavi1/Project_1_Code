@@ -11,12 +11,18 @@ class AnalyticalWavefrontSolver:
     while offering an object-oriented entry point.
     """
 
-    def __init__(self, no_marshak_fn, march_fn, wall_model=None, ablation_model=None, albedo_model=None):
+    def __init__(self, no_marshak_fn, march_fn, wall_model=None, ablation_model=None, albedo_model=None, fluence_fn=None):
         self.no_marshak_fn = no_marshak_fn
         self.march_fn = march_fn
         self.wall_model = wall_model or WallLossModel()
         self.ablation_model = ablation_model or AblationModel()
         self.albedo_model = albedo_model or AlbedoModel()
+        self.fluence_fn = fluence_fn
+
+    def analytic_wave_front_marshak_fluence(self, times_to_store, *, use_seconds=True, k=10):
+        if self.fluence_fn is None:
+            raise NotImplementedError("fluence_fn was not provided to AnalyticalWavefrontSolver")
+        return self.fluence_fn(times_to_store, use_seconds=use_seconds, k=k)
 
     def analytic_wave_front_no_marshak(self, times_to_store, *, use_seconds=True, lam_eff=False, power=2):
         return self.no_marshak_fn(
@@ -113,6 +119,7 @@ class AnalyticalWavefrontSolver:
         wall_material='Gold',
         lam_eff=False,
         power=2,
+        k=10,
         R_average_for_lambda_geom=False,
     ):
         if wall_material == 'Be':
@@ -136,4 +143,6 @@ class AnalyticalWavefrontSolver:
                 power=power,
                 R_average_for_lambda_geom=R_average_for_lambda_geom,
             )
+        if mode == "marshak_fluence":
+            return self.analytic_wave_front_marshak_fluence(times_to_store, use_seconds=use_seconds, k=k)
         raise ValueError(f"Unknown mode: {mode}")

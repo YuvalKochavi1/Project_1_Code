@@ -22,11 +22,14 @@ from simulation_2d_plots import (
 
 heatmap_times = (1e-9, 2e-9, 2.5e-9)  # default; overridden per-material below
 
-Material = "C8H8"
+Material = "SiO2_low_energy"
 CoatingMaterial = "Gold"
 if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
     heatmap_times = (1e-9, 2e-9, 2.5e-9)
+elif Material == "SiO2_low_energy":
+    Experiment = "Back"
+    heatmap_times = (2e-9, 6e-9, 10e-9)
 elif Material == "C8H8":
     Experiment = "Ji-Yan"
     heatmap_times = (0.5e-9, 1e-9, 1.3e-9)
@@ -51,13 +54,18 @@ mpl.rcParams["mathtext.fontset"] = "dejavusans"
 mpl.rcParams["mathtext.default"] = "regular"
 
 
+def _default_dtmax_for_material(material: str) -> float:
+    # Keep existing default for all materials, but allow larger max step for low-energy run.
+    return 2e-11 if str(material) == "SiO2_low_energy" else 2e-12
+
+
 def create_simulation(
     *,
     material: str = Material,
     coating_material: str = "Gold",
     R_foam: float | None = None,
-    Nz: int = 320,
-    Nr_foam: int = 320,
+    Nz: int = 150,
+    Nr_foam: int = 150,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -154,6 +162,21 @@ def create_simulation(
 
         t_final = 3e-9
         dt_init = 5e-15
+    
+    elif material == "SiO2_low_energy":
+        f = 8.4 * 10**13          # fudge factor for sigma (new model) [erg/g]
+        g = 1 / 9652      
+        alpha = 2.0     # opacity exponent
+        beta_exp = 1.23       # beta exponent
+        lambda_param = 0.61
+        mu = 0.1
+        rho = 0.01     # initial density (g/cm^3)
+        R_foam_default = 0.15      # radius of the foam cylinder (cm) - The diameter is 1.6 mm
+        Lz = 0.2
+        csv_path = BASE_DIR / "Data_new" / Experiment / Material / "article" / "Temperatures" / "T_drive.csv"
+        t_drive_ns, T_drive_eV = load_time_temp(csv_path)
+        t_final = 15e-9
+        dt_init = 5e-14
 
     else:
         raise ValueError(f"{material} is not supported in this function for now.")
@@ -275,7 +298,7 @@ def run_eff_lam_radius_sweep(
     store_start_frac: float = 0.01,
     dtfac: float = 0.05,
     dtmin: float | None = 5e-15,
-    dtmax: float | None = 2e-12,
+    dtmax: float | None = None,
     bc_r_outer: str = "marshak_wall",
     marshak_boundary: bool = True,
 ):
@@ -285,6 +308,9 @@ def run_eff_lam_radius_sweep(
     data_root = FIGURE_DATA_DIR_2D / "eff_lam"
     ensure_dir(figure_root)
     ensure_dir(data_root)
+
+    if dtmax is None:
+        dtmax = _default_dtmax_for_material(material)
 
     results = {}
 
@@ -444,7 +470,7 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
         store_start_frac=0.01,
         dtfac=0.05,
         dtmin=5e-15,
-        dtmax=2e-12,
+        dtmax=_default_dtmax_for_material(material),
         bc_r_outer="marshak_wall",
         marshak_boundary=True,
     )
