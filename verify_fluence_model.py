@@ -41,8 +41,8 @@ def run_verification():
     print("VERIFICATION OF COMPACT BATH-TEMPERATURE HR MARSHAK FLUENCE MODEL")
     print("=" * 70)
 
-    # 1. Define time vector (in ns) up to 2.5 ns
-    times_ns = np.linspace(0.01, 2.5, 250)
+    # 1. Define time vector (in ns) up to 4 ns
+    times_ns = np.linspace(0.01, 4, 1000)
 
     print("\n--- Running New Fluence Model ---")
     xF_fluence, Ts_fluence, T_lead, T_corr = analytic_wave_front_marshak_fluence(
@@ -77,6 +77,22 @@ def run_verification():
         stored_t_1d, stored_Um_1d, stored_Tm_1d, _ = sim_1d.run(times_ns * 1e-9, marshak_boundary=True)
 
     front_pos_1d, _, _ = sim_1d.compute_front_and_energy(stored_Um_1d, stored_Tm_1d)
+
+    # Optional gray (chi=1) run, if available.
+    gray_t = None
+    gray_front_pos = None
+    npz_gray_path = PROJECT_ROOT / "Data_new" / Experiment / Material / "1D_simulation" / "run_outputs_1d_gray.npz"
+    if npz_gray_path.exists():
+        try:
+            print(f"Loading gray 1D run from: {npz_gray_path}")
+            data_gray = np.load(npz_gray_path)
+            gray_t = np.asarray(data_gray["stored_t"], dtype=float)
+            gray_Um = np.asarray(data_gray["stored_Um"], dtype=float)
+            gray_Tm = np.asarray(data_gray["stored_Tm"], dtype=float)
+            sim_gray = GoldFoam1DSimulation(nz=gray_Tm.shape[1], lz=0.3, gold_block_width=0)
+            gray_front_pos, _, _ = sim_gray.compute_front_and_energy(gray_Um, gray_Tm)
+        except Exception as e:
+            print(f"Warning: failed to load gray run outputs: {e}")
 
     # 2. Compare xF and Ts (Fluence vs Marching)
     print("\n=== Comparison: Fluence Model vs Appendix A Marching ===")
@@ -130,10 +146,12 @@ def run_verification():
     
     # Figure 1: Front Position xF(t)
     plt.figure(figsize=(9, 6))
-    plt.plot(times_ns, xF_fluence, label="New Fluence Model (Compact)", color="blue", lw=2)
-    plt.plot(times_ns, xF_march, label="Appendix A Marching Model", color="orange", linestyle="--", lw=2)
+    # plt.plot(times_ns, xF_fluence, label="New Fluence Model (Compact)", color="blue", lw=2)
+    # plt.plot(times_ns, xF_march, label="Appendix A Marching Model", color="orange", linestyle="--", lw=2)
     plt.plot(times_ns, xF_no_marshak, label="No-Marshak ($T_s = T_b$)", color="green", linestyle=":", lw=2)
     plt.plot(stored_t_1d, front_pos_1d, label="1D Num. Sim. (no gold)", color="magenta", linestyle="-.", lw=2)
+    if gray_t is not None and gray_front_pos is not None:
+        plt.plot(gray_t, gray_front_pos, label="1D Num. Sim. (gray, $\\chi=1$)", color="gray", linestyle="-", lw=2)
     plt.xlabel("$t$ [ns]", fontsize=16)
     plt.ylabel("$x_F$ [cm]", fontsize=16)
     plt.title("Comparison of Heat-Front Position $x_F(t)$", fontsize=16)

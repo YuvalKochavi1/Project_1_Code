@@ -406,6 +406,11 @@ class GoldFoam1DSimulation:
     def save_outputs(self, stored_t, stored_Um, stored_Tm, stored_TR, *, marshak_boundary=True):
         os.makedirs(self.data_dir, exist_ok=True)
         suffix = "marshak" if marshak_boundary else "linear"
+        try:
+            if np.isclose(float(getattr(self, "chi", 0.0)), 1.0):
+                suffix = f"{suffix}_gray"
+        except (TypeError, ValueError):
+            pass
         pd.DataFrame(stored_Tm).to_csv(os.path.join(self.data_dir, f"stored_Tm_{suffix}.csv"), header=False, index=False)
         pd.DataFrame(stored_TR).to_csv(os.path.join(self.data_dir, f"stored_TR_{suffix}.csv"), header=False, index=False)
         pd.DataFrame(stored_Um).to_csv(os.path.join(self.data_dir, f"stored_Um_{suffix}.csv"), header=False, index=False)

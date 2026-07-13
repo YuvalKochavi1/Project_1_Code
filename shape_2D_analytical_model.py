@@ -103,8 +103,16 @@ def _normalize_color_option(color_option=None, color_style="default"):
 
 
 def _closest_time_data(bessel_data, target_time):
-    available_times = np.array(list(bessel_data.keys()))
-    t_closest = available_times[np.argmin(np.abs(available_times - target_time))]
+    numeric_times = []
+    for k in bessel_data.keys():
+        try:
+            numeric_times.append(float(k))
+        except (TypeError, ValueError):
+            continue
+    available_times = np.array(numeric_times, dtype=float)
+    if available_times.size == 0:
+        raise ValueError("bessel_data contains no numeric time keys.")
+    t_closest = float(available_times[np.argmin(np.abs(available_times - float(target_time)))])
     return t_closest, bessel_data[t_closest]
 
 def _load_simulated_front_csv(t_target):

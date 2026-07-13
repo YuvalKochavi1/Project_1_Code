@@ -20,22 +20,40 @@ All three curves are then normalised to [0, 1] for relative comparison.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Font configuration: serif and LaTeX style math font
 plt.rcParams.update({
     'font.family': 'serif',
     'text.usetex': True,
     'axes.unicode_minus': False,
-    'xtick.labelsize': 16,
-    'ytick.labelsize': 16,
-    'legend.fontsize': 14,
-    'axes.labelsize': 18,
+    'axes.grid': False,
+    'axes.edgecolor': 'black',
+    'axes.linewidth': 2.0,
+    'xtick.labelsize': 20,
+    'ytick.labelsize': 20,
+    'legend.fontsize': 13,
+    'axes.labelsize': 22,
+    'axes.titlesize': 22,
 })
 from parameters import alpha, beta, K_per_Hev, Experiment, Material, a_hev, c, r_grid as R_GRID_DEFAULT, alpha_gold, beta_gold, alpha_copper, beta_copper, alpha_be, beta_be, R_cm, z, L
 from model_main import analytic_wave_front_dispatch, BASE_DIR
 from csv_helpers import save_figure, save_series_csv
 from shape_2D_analytical_model import _compute_wall_heyney_horizontal_profile, _compute_temperature_mesh
 from scipy import special
+
+
+def _numeric_time_keys(snapshot_dict):
+    """Return sorted numeric time keys from a dict that may also contain metadata entries."""
+    if not snapshot_dict:
+        return np.array([], dtype=float)
+    numeric = []
+    for key in snapshot_dict.keys():
+        if isinstance(key, (int, float, np.integer, np.floating)):
+            numeric.append(float(key))
+    if not numeric:
+        return np.array([], dtype=float)
+    return np.array(sorted(numeric), dtype=float)
 
 # --------------------------------------------------------------------------
 # Physical constants
@@ -485,7 +503,7 @@ def compute_and_plot_radiation_flux(
         ax.set_ylabel(r"$\Phi$ [$\mathrm{W/m}^2$]", fontname='serif')
         ax.set_title("Raw Radiation Flux", fontname='serif')
         ax.legend(prop={'family': 'serif'})
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
         if Material == "SiO2_low_energy":
             ax.set_xlim(0.0, 15.0)
 
@@ -507,7 +525,7 @@ def compute_and_plot_radiation_flux(
         ax.set_ylabel(r"$Flux [a.u]$", fontname='serif')
         ax.set_title("Normalised Radiation Flux", fontname='serif')
         ax.legend(prop={'family': 'serif'})
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
         if Material == "SiO2_low_energy":
             ax.set_xlim(0.0, 15.0)
 
@@ -522,7 +540,7 @@ def compute_and_plot_radiation_flux(
         ax.set_ylabel(r"$T$ [heV]", fontname='serif')
         ax.set_title("Temperature at Detectors", fontname='serif')
         ax.legend(prop={'family': 'serif'})
-        ax.grid(True, alpha=0.3)
+        ax.grid(False)
         if Material == "SiO2_low_energy":
             ax.set_xlim(0.0, 15.0)
 
@@ -773,7 +791,9 @@ def compute_flux_curvature_datasets(
 
         # --- Find closest available time in bessel_data ---
         if bessel_data and len(bessel_data) > 0:
-            available = np.array(list(bessel_data.keys()), dtype=float)
+            available = _numeric_time_keys(bessel_data)
+            if available.size == 0:
+                raise ValueError("bessel_data contains no numeric time keys.")
             t_closest = float(available[np.argmin(np.abs(available - t_target))])
             snapshot = bessel_data[t_closest]
             r_grid_snap = np.asarray(snapshot['r_grid'], dtype=float)
@@ -945,7 +965,7 @@ def plot_flux_curvature(
 
             ax.set_xlim(-r_mm[-1], r_mm[-1])
             ax.set_ylim(bottom=0)
-            ax.grid(True, alpha=0.3)
+            ax.grid(False)
             ax.legend(prop={'family': 'serif'})
     plt.tight_layout()
     save_figure(
@@ -1047,7 +1067,10 @@ def plot_flux_curvature_post_breakout(
         #t_target = t_breakout + delay_ns
         
         # Find closest snapshot in bessel_data
-        available = np.array(list(bessel_data.keys()), dtype=float)
+        available = _numeric_time_keys(bessel_data)
+        if available.size == 0:
+            print("Error: bessel_data contains no numeric time keys. Cannot compute curvature.")
+            return
         t_closest = float(available[np.argmin(np.abs(available - t_target))])
         
         snapshot = bessel_data[t_closest]
@@ -1224,7 +1247,10 @@ def plot_flux_curvature_post_breakout(
     if r_mm_last is not None:
         plt.xlim(-r_mm_last[-1], r_mm_last[-1])
     plt.ylim(bottom=0)
-    plt.grid(True, alpha=0.3)
+    ax = plt.gca()
+    ax.grid(False, which='both', axis='both')
+    ax.xaxis.grid(False)
+    ax.yaxis.grid(False)
     plt.legend(prop={'family': 'serif'}, loc='upper left')
     plt.tight_layout()
 
@@ -1368,7 +1394,10 @@ def compute_and_plot_T4_heatmap(
         return
 
     # Find snapshot closest to time_snapshot_ns (e.g. 2.0 ns)
-    available = np.array(list(bessel_data.keys()), dtype=float)
+    available = _numeric_time_keys(bessel_data)
+    if available.size == 0:
+        print("Error: bessel_data contains no numeric time keys. Cannot compute T^4 heatmap.")
+        return
     t_closest = float(available[np.argmin(np.abs(available - time_snapshot_ns))])
     data = bessel_data[t_closest]
 
@@ -1483,7 +1512,7 @@ def compute_and_plot_T4_heatmap(
     T4_spatial = np.where(T4_spatial > 1e-10, T4_spatial, np.nan)
 
     # Plot
-    fig, ax = plt.subplots(figsize=(6, 7))
+    fig, ax = plt.subplots(figsize=(10, 8))
     ax.set_facecolor('white')
 
     pcm = ax.pcolormesh(
@@ -1495,8 +1524,11 @@ def compute_and_plot_T4_heatmap(
         vmin=0.0,
     )
 
-    cbar = fig.colorbar(pcm, ax=ax, pad=0.02, fraction=0.046, shrink=0.5)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.12)
+    cbar = fig.colorbar(pcm, cax=cax)
     cbar.set_label(r'$T^4$ [$\mathrm{heV}^4$]', fontname='serif')
+    cbar.ax.tick_params(labelsize=18)
 
     # Draw horizontal dashed line at detector depth if z_pos_mm is provided
 
@@ -1506,7 +1538,7 @@ def compute_and_plot_T4_heatmap(
     ax.set_xlim(0.0, float(r_mesh[-1]))
     ax.set_ylim(0.0, L/2)
     ax.set_aspect('equal', adjustable='box')
-    ax.grid(True, which='both', linestyle=':', alpha=0.3)
+    ax.grid(False)
 
     plt.tight_layout()
 

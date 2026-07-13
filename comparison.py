@@ -10,11 +10,15 @@ plt.rcParams.update({
     'font.family': 'serif',
     'text.usetex': True,
     'axes.unicode_minus': False,
+    'axes.grid': False,
+    'axes.edgecolor': 'black',
+    'axes.linewidth': 2.0,
     'font.size': 16,
     'legend.fontsize': 14,
     'xtick.labelsize': 18,
     'ytick.labelsize': 18,
 })
+
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
 print(f"Data directory: {DATA_DIR}")
 FIGURES_OUTPUT_DIR = BASE_DIR / "Figures_new" / Experiment / Material 
@@ -588,7 +592,7 @@ def compare_with_article_2_exp4_14(times_to_store):
     plt.xlabel(r"$t$ [ns]", fontsize = 18)
     plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.ylim(0,0.2)
-    plt.grid(True)
+    plt.grid(False)
     plt.legend()
     plt.tight_layout()
     save_figure("front_position - compare Back SiO2 low energy.png", model1_5=True)
@@ -997,10 +1001,18 @@ def R_of_t_z(times_to_store=None, show_plot=True, verbose=True):
     # plt.legend()
     # plt.show()
 
-    existing_keys = np.array(list(data_of_R.keys()))
-    t1 = existing_keys[np.argmin(np.abs(existing_keys - 1.0))]
-    t2 = existing_keys[np.argmin(np.abs(existing_keys - 2.0))]
-    t2_5 = existing_keys[np.argmin(np.abs(existing_keys - 2.5))]
+    numeric_keys = []
+    for k in data_of_R.keys():
+        try:
+            numeric_keys.append(float(k))
+        except (TypeError, ValueError):
+            continue
+    existing_keys = np.array(numeric_keys, dtype=float)
+    if existing_keys.size == 0:
+        raise ValueError("data_of_R contains no numeric time keys.")
+    t1 = float(existing_keys[np.argmin(np.abs(existing_keys - 1.0))])
+    t2 = float(existing_keys[np.argmin(np.abs(existing_keys - 2.0))])
+    t2_5 = float(existing_keys[np.argmin(np.abs(existing_keys - 2.5))])
     if verbose:
         print(f"data_of_R[t1]: {data_of_R[t1]}, at t={t1} ns")
         print(f"data_of_R[t2]: {data_of_R[t2]}, at t={t2} ns")
@@ -1254,7 +1266,7 @@ def compare_n_1(times_to_store):
 # Let's create a function that by getting a material name, it will run the appropriate comparison function for that material. This way we can easily switch between materials and their corresponding comparisons.
 def compare_for_material():
     if Material == "SiO2":
-        times_to_store = np.linspace(0.01, 3, 1000)
+        times_to_store = np.linspace(0.01, 4, 1000)
         Back_SiO2(times_to_store)
     elif Material == "C11H16Pb0.3852":
         times_to_store = np.linspace(0.01, 1, 1000)

@@ -22,9 +22,21 @@ SIGMA_SB_HEV = a_hev * 30.0 / 4.0
 DETECTOR_POSITIONS_MM = [0.5, 1.0, 1.25]
 
 
+def _gray_suffix_from_chi(chi_value):
+    """Return filename suffix for gray (chi=1) runs."""
+    try:
+        return "_gray" if np.isclose(float(chi_value), 1.0) else ""
+    except (TypeError, ValueError):
+        return ""
+
+
+def _gray_suffix_from_sim(sim):
+    return _gray_suffix_from_chi(getattr(sim, "chi", None))
+
+
 def create_simulation(
     *,
-    nz: int = 1000,
+    nz: int = 800,
     lz: float | None = None,
     t_final: float | None = None,
     kind_of_D_face: str | None = None,
@@ -91,7 +103,7 @@ def save_run_data(file_path, stored_t, stored_Um=None, stored_Tm=None, stored_TR
     return file_path
 
 
-def plot_run_outputs(sim, stored_t, stored_Tm, front_positions, foam_energies, gold_energies, material=None):
+def plot_run_outputs(sim, stored_t, stored_Tm, front_positions, foam_energies, gold_energies, material=None, filename_suffix=""):
     """Save a compact set of standard 1D run plots."""
     ensure_dir(FIGURES_DIR)
 
@@ -110,7 +122,7 @@ def plot_run_outputs(sim, stored_t, stored_Tm, front_positions, foam_energies, g
     if n_curves > 0:
         ax.legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(FIGURES_DIR / "temperature_profiles.png", dpi=200)
+    fig.savefig(FIGURES_DIR / f"temperature_profiles{filename_suffix}.png", dpi=200)
     plt.close(fig)
 
     #print the tempertures of all cells at finish time
@@ -150,7 +162,7 @@ def plot_run_outputs(sim, stored_t, stored_Tm, front_positions, foam_energies, g
     ax.set_title("Front Position vs Time")
     ax.grid(True)
     fig.tight_layout()
-    fig.savefig(FIGURES_DIR / "front_position.png", dpi=200)
+    fig.savefig(FIGURES_DIR / f"front_position{filename_suffix}.png", dpi=200)
     plt.close(fig)
 
     # 3) Total material energy vs time
@@ -193,7 +205,7 @@ def plot_run_outputs(sim, stored_t, stored_Tm, front_positions, foam_energies, g
     #ax.set_ylim(0, 0.05)
     ax.grid(True)
     fig.tight_layout()
-    fig.savefig(FIGURES_DIR / "total_energy.png", dpi=200)
+    fig.savefig(FIGURES_DIR / f"total_energy{filename_suffix}.png", dpi=200)
     plt.close(fig)
 
 
@@ -313,13 +325,13 @@ def compute_flux_datasets(sim, stored_t, stored_Tm, *, detector_positions_mm=Non
     return datasets
 
 
-def save_flux_datasets_csv(datasets, *, out_path=None):
+def save_flux_datasets_csv(datasets, *, out_path=None, filename_suffix=""):
     """Save flux datasets in long-form CSV format."""
     if not datasets:
         return None
 
     if out_path is None:
-        out_path = DATA_DIR / "flux_vs_time.csv"
+        out_path = DATA_DIR / f"flux_vs_time{filename_suffix}.csv"
 
     time_ns = []
     detector_mm = []
@@ -354,7 +366,7 @@ def save_flux_datasets_csv(datasets, *, out_path=None):
     return Path(out_path)
 
 
-def plot_flux_vs_time(datasets, *, out_dir=None, title_suffix=""):
+def plot_flux_vs_time(datasets, *, out_dir=None, title_suffix="", filename_suffix=""):
     """Plot raw and normalised flux alongside detector temperatures."""
     if not datasets:
         return
@@ -387,11 +399,11 @@ def plot_flux_vs_time(datasets, *, out_dir=None, title_suffix=""):
 
     fig.suptitle(f"1D Simulation Flux Analysis{title_suffix}", y=0.995)
     fig.tight_layout()
-    fig.savefig(out_dir / "flux_vs_time.png", dpi=200)
+    fig.savefig(out_dir / f"flux_vs_time{filename_suffix}.png", dpi=200)
     plt.close(fig)
 
 
-def compute_and_plot_flux_vs_time(sim, stored_t, stored_Tm, *, detector_positions_mm=None, out_dir=None, title_suffix=""):
+def compute_and_plot_flux_vs_time(sim, stored_t, stored_Tm, *, detector_positions_mm=None, out_dir=None, title_suffix="", filename_suffix=""):
     """Convenience wrapper that computes, prints, and plots 1D flux curves."""
     datasets = compute_flux_datasets(sim, stored_t, stored_Tm, detector_positions_mm=detector_positions_mm)
 
@@ -406,7 +418,7 @@ def compute_and_plot_flux_vs_time(sim, stored_t, stored_Tm, *, detector_position
         print(f"{ds['z_pos_mm']:8.1f}  {t_str:>14}  {peak_flux:16.4e}  {peak_T:14.4f}")
     print("=" * 72 + "\n")
 
-    plot_flux_vs_time(datasets, out_dir=out_dir, title_suffix=title_suffix)
+    plot_flux_vs_time(datasets, out_dir=out_dir, title_suffix=title_suffix, filename_suffix=filename_suffix)
     return datasets
 
 
@@ -414,24 +426,34 @@ def run_default_pipeline(*, material: str = Material):
     """Default 1D pipeline, shaped like the 2D run_default_pipeline API."""
     sim = create_simulation()
     sim.data_dir = str(DATA_DIR)
+    file_suffix = _gray_suffix_from_sim(sim)
     stored_t, stored_Um, stored_Tm, stored_TR = run_simulation(sim)
 
     ensure_dir(DATA_DIR)
-    save_run_data(DATA_DIR / "run_outputs_1d.npz", stored_t, stored_Um, stored_Tm, stored_TR)
+    save_run_data(DATA_DIR / f"run_outputs_1d{file_suffix}.npz", stored_t, stored_Um, stored_Tm, stored_TR)
     sim.save_outputs(stored_t, stored_Um, stored_Tm, stored_TR, marshak_boundary=True)
 
     front_positions, foam_energies, gold_energies = sim.compute_front_and_energy(stored_Um, stored_Tm)
-    plot_run_outputs(sim, stored_t, stored_Tm, front_positions, foam_energies, gold_energies, material=material)
-    flux_fig_dir = FIGURES_DIR / "flux"
-    flux_datasets = compute_and_plot_flux_vs_time(
+    plot_run_outputs(
         sim,
         stored_t,
         stored_Tm,
-        detector_positions_mm=DETECTOR_POSITIONS_MM,
-        out_dir=flux_fig_dir,
-        title_suffix=f" — {material}",
+        front_positions,
+        foam_energies,
+        gold_energies,
+        material=material,
+        filename_suffix=file_suffix,
     )
-    flux_csv_path = save_flux_datasets_csv(flux_datasets)
+    # flux_fig_dir = FIGURES_DIR / "flux"
+    # flux_datasets = compute_and_plot_flux_vs_time(
+    #     sim,
+    #     stored_t,
+    #     stored_Tm,
+    #     detector_positions_mm=DETECTOR_POSITIONS_MM,
+    #     out_dir=flux_fig_dir,
+    #     title_suffix=f" — {material}",
+    # )
+    # flux_csv_path = save_flux_datasets_csv(flux_datasets)
 
     return {
         "sim": sim,
@@ -442,8 +464,8 @@ def run_default_pipeline(*, material: str = Material):
         "front_positions": front_positions,
         "foam_energies": foam_energies,
         "gold_energies": gold_energies,
-        "flux_datasets": flux_datasets,
-        "flux_csv_path": flux_csv_path,
+        # "flux_datasets": flux_datasets,
+        # "flux_csv_path": flux_csv_path,
         "material": material,
         "data_dir": DATA_DIR,
         "figures_dir": FIGURES_DIR,
