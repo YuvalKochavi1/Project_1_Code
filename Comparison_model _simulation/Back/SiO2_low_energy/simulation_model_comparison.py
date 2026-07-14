@@ -1,17 +1,9 @@
-"""SiO2 low-energy (Back) comparison plots.
+"""SiO2 (Back) comparison plots for Be and Gold.
 
-This script compares model curves for two drive profiles and overlays the gold 2D simulation:
-- heyney
-- flattop
-
-It generates three figures (like the SiO2 comparison flow):
-- front_position.png
-- front_surface.png
-- energy.png
-
-Gold 2D simulation overlays are loaded from the low-energy data tree.
+This script writes one set of figures to `Be/` and one set to `Gold/`.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -29,255 +21,378 @@ import parameters as _parameters
 _parameters.Material = "SiO2_low_energy"
 _parameters.Experiment = "Back"
 
-import albedo_model as _albedo_model
-import model_main as _model_main
-from csv_helpers import export_analytic_positions_csv
+
 from model_main import BASE_DIR
-from plot_helpers import compute_standard_analytic_front_series
+from parameters import Experiment, L, R_cm, Material
 
-MODES = ["heyney", "flattop"]
-FRONT_TIMES_NS = [2.0, 6.0, 10.0]
+print(f"Experiment: {Experiment}, Material: {Material}")
 
-MODE_STYLE = {
-    "heyney": {"label": "Henyey", "color": "firebrick", "linestyle": "--", "lw": 2.4, "alt": "brown"},
-    "flattop": {"label": "flattop", "color": "red", "linestyle": "-", "lw": 2.6, "alt": "crimson"},
-}
+FRONT_TIMES_NS = [2, 6, 10]
 
 
-def _set_solver_mode(mode_name):
-    # Current model stack still has legacy bool checks in some paths.
-    # Keep booleans here so heyney/flattop differ physically in all old call sites.
-    if mode_name == "flattop":
-        flag = True
-    elif mode_name == "heyney":
-        flag = False
-    else:
-        raise ValueError(f"Unsupported mode: {mode_name}")
-
-    _parameters.Flattop_condition = flag
-    _model_main.Flattop_condition = flag
-    _albedo_model.Flattop_condition = flag
+def normalize_name(name):
+    return re.sub(r"[^a-z0-9]+", "", name.lower())
 
 
-def _profile_suffix(mode_name):
-    if mode_name == "flattop":
-        return "_flattop"
-    return ""
+def pick_column(df, *wanted_names):
+    normalized = {normalize_name(column): column for column in df.columns}
+    for wanted in wanted_names:
+        key = normalize_name(wanted)
+        if key in normalized:
+            return normalized[key]
+    raise ValueError(f"Could not find any of columns: {wanted_names}")
 
 
-def _numeric_snapshot_keys(snapshot_dict):
-    return sorted(
-        [key for key in snapshot_dict.keys() if isinstance(key, (int, float, np.floating, np.integer))],
-        key=float,
-    )
+def wall_configurations():
+    return [
+        {
+            "name": "Be",
+            "front_loss_column": "front_position (Be Loss)",
+            "simulation_front_position": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "front_vs_time"
+            / "front_position_vs_time_Be_r0.csv",
+            "simulation_front_surface": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "front_surface"
+            / "front_surface_profiles_be.csv",
+            "simulation_energy": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "energy_comparison"
+            / "simulated_energy_vs_time_be.csv",
+            "output_dir": Path(__file__).resolve().parent / "Be",
+        },
+        {
+            "name": "Gold",
+            "front_loss_column": "front_position (gold loss)",
+            "simulation_front_position": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "front_vs_time"
+            / "front_position_vs_time_Gold_r0.csv",
+            "simulation_front_surface": Path(BASE_DIR)
+            / "Data_new"
+            / "Back" 
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "front_surface"
+            / "front_surface_profiles_gold.csv",
+            "simulation_energy": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "energy_comparison"
+            / "simulated_energy_vs_time_gold.csv",
+            "output_dir": Path(__file__).resolve().parent / "Gold",
+        },
+        {
+            "name": "Gold_100",
+            "front_loss_column": "front_position (gold loss)",
+            "simulation_front_position": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation_100"
+            / "front_vs_time"
+            / "front_position_vs_time_Gold_r0.csv",
+            "simulation_front_surface": Path(BASE_DIR)
+            / "Data_new"
+            / "Back" 
+            / "SiO2_low_energy"
+            / "2D_simulation_100"
+            / "front_surface"
+            / "front_surface_profiles_gold.csv",
+            "simulation_energy": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation_100"
+            / "energy_comparison"
+            / "simulated_energy_vs_time_gold.csv",
+            "output_dir": Path(__file__).resolve().parent / "Gold_100",
+        },
+        {
+            "name": "Vacuum",
+            "front_loss_column": "front_position (Vacuum loss)",
+            "simulation_front_position": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "front_vs_time"
+            / "front_position_vs_time_Vacuum_r0.csv",
+            "simulation_front_surface": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "front_surface"
+            / "front_surface_profiles_vacuum.csv",
+            "simulation_energy": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "energy_comparison"
+            / "simulated_energy_vs_time_vacuum.csv",
+            "output_dir": Path(__file__).resolve().parent / "Vacuum",
+        },
+        {
+            "name": "Copper",
+            "front_loss_column": "front_position (Copper loss)",
+            "simulation_front_position": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "front_vs_time"
+            / "front_position_vs_time_Copper_r0.csv",
+            "simulation_front_surface": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "front_surface"
+            / "front_surface_profiles_copper.csv",
+            "simulation_energy": Path(BASE_DIR)
+            / "Data_new"
+            / "Back"
+            / "SiO2_low_energy"
+            / "2D_simulation"
+            / "energy_comparison"
+            / "simulated_energy_vs_time_copper.csv",
+            "output_dir": Path(__file__).resolve().parent / "Copper",
+            },
+    ]
 
 
-def _closest_snapshot(snapshot_dict, target_time_ns):
-    keys = _numeric_snapshot_keys(snapshot_dict)
-    if not keys:
-        raise ValueError("No numeric time keys found in bessel_data.")
-    key_arr = np.asarray(keys, dtype=float)
-    closest_key = float(key_arr[np.argmin(np.abs(key_arr - target_time_ns))])
-    return closest_key, snapshot_dict[closest_key]
-
-
-def _article_front_curves():
-    base = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "article" / "fronts"
-
-    def load_xy(name):
-        df = pd.read_csv(base / name)
-        return df["x"].to_numpy(dtype=float), 0.1 * df["y"].to_numpy(dtype=float)
-
-    t_hr, x_hr = load_xy("HR.csv")
-    t_1d, x_1d = load_xy("1D_model.csv")
-    t_2d, x_2d = load_xy("2D_model.csv")
-    t_exp, x_exp = load_xy("exp_results.csv")
-    return (t_hr, x_hr), (t_1d, x_1d), (t_2d, x_2d), (t_exp, x_exp)
-
-
-def _simulation_front_position():
-    csv_path = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "2D_simulation" / "front_vs_time" / "front_position_vs_time_Gold_r0.csv"
+def load_simulation_front_position(csv_path):
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Front-position CSV not found: {csv_path}")
     df = pd.read_csv(csv_path)
-    required = {"time_ns", "front_position_cm"}
+    required = {"time_ns", "front_position_mm", "front_position_cm"}
     missing = required.difference(df.columns)
     if missing:
-        raise ValueError(f"Gold front-position CSV must contain columns: {sorted(required)}")
+        raise ValueError(f"CSV must contain columns: {sorted(required)}")
     return {
         "time_ns": df["time_ns"].to_numpy(dtype=float),
+        "front_position_mm": df["front_position_mm"].to_numpy(dtype=float),
         "front_position_cm": df["front_position_cm"].to_numpy(dtype=float),
     }
 
 
-def _simulation_front_surface():
-    csv_path = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "2D_simulation" / "front_surface" / "front_surface_profiles_gold.csv"
+def load_model_front_position(wall_name, front_loss_column):
+    base_dir = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "1.5 model"
+    regular_path = base_dir / "analytic_positions.csv"
+    flattop_path = base_dir / "analytic_positions_flattop.csv"
+
+    if not regular_path.exists():
+        raise FileNotFoundError(f"Model front-position CSV not found: {regular_path}")
+    if not flattop_path.exists():
+        raise FileNotFoundError(f"Model front-position CSV not found: {flattop_path}")
+
+    regular = pd.read_csv(regular_path)
+    flattop = pd.read_csv(flattop_path)
+
+    marshak_regular = pick_column(regular, "front_position (Marshak)")
+    loss_regular = pick_column(regular, front_loss_column)
+    marshak_flattop = pick_column(flattop, "front_position (Marshak)")
+    loss_flattop = pick_column(flattop, front_loss_column)
+
+    return {
+        "time_ns": regular["time_ns"].to_numpy(dtype=float),
+        "marshak": regular[marshak_regular].to_numpy(dtype=float),
+        "loss_regular": regular[loss_regular].to_numpy(dtype=float),
+        "flattop_time_ns": flattop["time_ns"].to_numpy(dtype=float),
+        "marshak_flattop": flattop[marshak_flattop].to_numpy(dtype=float),
+        "loss_flattop": flattop[loss_flattop].to_numpy(dtype=float),
+        "wall_name": wall_name,
+    }
+
+
+def load_simulation_front_surface(csv_path):
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Front-surface CSV not found: {csv_path}")
     df = pd.read_csv(csv_path)
     if "r_cm" not in df.columns:
-        raise ValueError("Gold front-surface CSV must contain an 'r_cm' column")
-
+        raise ValueError("CSV must contain 'r_cm' column")
+    r_cm = df["r_cm"].to_numpy(dtype=float)
     profiles = {}
     for col in df.columns:
         if col == "r_cm":
             continue
-        if not col.startswith("zF_cm_t") or not col.endswith("ns"):
+        match = re.match(r"zF_cm_t([\d.]+)ns$", col)
+        if not match:
             continue
-        t_ns = float(col[len("zF_cm_t") : -2])
-        profiles[t_ns] = df[col].to_numpy(dtype=float)
-
+        profiles[float(match.group(1))] = df[col].to_numpy(dtype=float)
     if not profiles:
-        raise ValueError("No gold front-surface profiles found in the simulation CSV")
+        raise ValueError("No front-surface profile columns found.")
+    return {"r_cm": r_cm, "profiles": profiles}
 
-    return {"r_cm": df["r_cm"].to_numpy(dtype=float), "profiles": profiles}
+
+def load_model_front_surface(wall_name):
+    data_dir = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "2D_shape"
+    if not data_dir.exists():
+        raise FileNotFoundError(f"Model shape directory not found: {data_dir}")
+
+    regular_profiles = {}
+    flattop_profiles = {}
+    model_wall = "Gold" if wall_name == "Gold_100" else wall_name
+    for time_ns in FRONT_TIMES_NS:
+        regular_path = data_dir / f"front_shape_{model_wall}_t{time_ns:.2f}ns.csv"
+        flattop_path = data_dir / f"front_shape_{model_wall}_flattop_t{time_ns:.2f}ns.csv"
+
+        if not regular_path.exists():
+            raise FileNotFoundError(f"Model front-shape CSV not found: {regular_path}")
+        if not flattop_path.exists():
+            raise FileNotFoundError(f"Model front-shape CSV not found: {flattop_path}")
+
+        regular_df = pd.read_csv(regular_path)
+        flattop_df = pd.read_csv(flattop_path)
+        required = {"r_cm", "z_F_radial_cm"}
+        if not required.issubset(regular_df.columns):
+            raise ValueError(f"CSV must contain columns: {sorted(required)}")
+        if not required.issubset(flattop_df.columns):
+            raise ValueError(f"CSV must contain columns: {sorted(required)}")
+
+        regular_profiles[time_ns] = {
+            "r_cm": regular_df["r_cm"].to_numpy(dtype=float),
+            "z_F_radial_cm": regular_df["z_F_radial_cm"].to_numpy(dtype=float),
+        }
+        flattop_profiles[time_ns] = {
+            "r_cm": flattop_df["r_cm"].to_numpy(dtype=float),
+            "z_F_radial_cm": flattop_df["z_F_radial_cm"].to_numpy(dtype=float),
+        }
+
+    return {"regular": regular_profiles, "flattop": flattop_profiles}
 
 
-def _simulation_energy():
-    csv_path = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "2D_simulation" / "energy_comparison" / "simulated_energy_vs_time_gold.csv"
+def load_simulation_energy(csv_path):
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Energy CSV not found: {csv_path}")
     df = pd.read_csv(csv_path)
     required = {"time_ns", "foam_energy_hJ", "gold_energy_hJ"}
     missing = required.difference(df.columns)
     if missing:
-        raise ValueError(f"Gold energy CSV must contain columns: {sorted(required)}")
+        raise ValueError(f"Energy CSV must contain columns: {sorted(required)}")
     return {
         "time_ns": df["time_ns"].to_numpy(dtype=float),
         "foam_energy_hJ": df["foam_energy_hJ"].to_numpy(dtype=float),
-        "gold_energy_hJ": df["gold_energy_hJ"].to_numpy(dtype=float),
+        "coating_energy_hJ": df["gold_energy_hJ"].to_numpy(dtype=float),
     }
 
 
-def _compute_mode_series(times_ns, mode_name):
-    _set_solver_mode(mode_name)
-    front_series = compute_standard_analytic_front_series(times_ns, wall_material="Gold", lam_eff_power=1)
+def load_model_energy():
+    csv_path = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "2D_shape" / "simulated_energy_vs_time_SiO2_low_energy.csv"
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Model energy CSV not found: {csv_path}")
+    df = pd.read_csv(csv_path)
+    required = {"time_ns", "E_marshak", "E_gold_loss", "E_wall_gold_loss", "E_Be_loss", "E_Be_wall_loss", "E_vacuum_loss"}
+    missing = required.difference(df.columns)
+    if missing:
+        raise ValueError(f"Model energy CSV must contain columns: {sorted(required)}")
 
-    model_dir = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "1.5 model"
-    model_dir.mkdir(parents=True, exist_ok=True)
-    export_analytic_positions_csv(
-        times_ns,
-        {
-            "front_position": {
-                "Marshak": front_series["analytic_positions_marshak"],
-                "Ablation with varying rho": front_series["analytic_positions_2D"],
-                "2D effects + lam_eff": front_series["analytic_positions_2D_lam_eff"],
-                "gold loss": front_series["analytic_positions_gold_loss"],
-                "No Marshak": front_series["analytic_positions_no_marshak"],
-            }
-        },
-        output_csv_path=model_dir / f"analytic_positions{_profile_suffix(mode_name)}.csv",
-    )
+    flat_path = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "2D_shape" / "simulated_energy_vs_time_SiO2_low_energy_flattop.csv"
+    if not flat_path.exists():
+        raise FileNotFoundError(f"Model energy flattop CSV not found: {flat_path}")
+    fdf = pd.read_csv(flat_path)
+    missing_flat = required.difference(fdf.columns)
+    if missing_flat:
+        raise ValueError(f"Model energy flattop CSV must contain columns: {sorted(required)}")
 
     return {
-        "mode": mode_name,
-        "time_ns": np.asarray(times_ns, dtype=float),
-        "x_gold_loss": np.asarray(front_series["analytic_positions_gold_loss"], dtype=float),
-        "x_marshak": np.asarray(front_series["analytic_positions_marshak"], dtype=float),
-        "E_marshak": np.asarray(front_series["E_marshak"], dtype=float),
-        "E_gold_loss": np.asarray(front_series["E_gold_loss"], dtype=float),
-        "E_wall_gold_loss": np.asarray(front_series["E_W_gold_loss"], dtype=float),
-        "bessel_gold_loss": front_series["bessel_data_gold_loss"],
+        "time_ns": df["time_ns"].to_numpy(dtype=float),
+        "E_marshak": df["E_marshak"].to_numpy(dtype=float),
+        "E_Gold_loss": df["E_gold_loss"].to_numpy(dtype=float),
+        "E_Gold_wall_loss": df["E_wall_gold_loss"].to_numpy(dtype=float),
+        "E_Be_loss": df["E_Be_loss"].to_numpy(dtype=float),
+        "E_Be_wall_loss": df["E_Be_wall_loss"].to_numpy(dtype=float),
+        "E_Cu_loss": df["E_Cu_loss"].to_numpy(dtype=float),
+        "E_Cu_wall_loss": df["E_Cu_wall_loss"].to_numpy(np.dtype(float)),
+        "E_vacuum_loss": df["E_vacuum_loss"].to_numpy(dtype=float),
+        "flattop_time_ns": fdf["time_ns"].to_numpy(dtype=float),
+        "E_Gold_loss_flattop": fdf["E_gold_loss"].to_numpy(dtype=float),
+        "E_Gold_wall_loss_flattop": fdf["E_wall_gold_loss"].to_numpy(dtype=float),
+        "E_Be_loss_flattop": fdf["E_Be_loss"].to_numpy(dtype=float),
+        "E_Be_wall_loss_flattop": fdf["E_Be_wall_loss"].to_numpy(dtype=float),
+        "E_Cu_loss_flattop": fdf["E_Cu_loss"].to_numpy(dtype=float),
+        "E_Cu_wall_loss_flattop": fdf["E_Cu_wall_loss"].to_numpy(dtype=float),
+        "E_vacuum_loss_flattop": fdf["E_vacuum_loss"].to_numpy(dtype=float),
     }
 
 
-def plot_front_position(output_dir, mode_data):
-    (t_hr, x_hr), (t_1d, x_1d), (t_2d, x_2d), (t_exp, x_exp) = _article_front_curves()
-    sim = _simulation_front_position()
-
+def plot_front_position(output_dir, wall_name, simulation_data, model_data, loss_label):
     plt.figure(figsize=(8.2, 6.1))
     plt.plot(
-        sim["time_ns"],
-        sim["front_position_cm"],
-        color="navy",
+        simulation_data["time_ns"],
+        simulation_data["front_position_cm"],
+        color="blue",
         linestyle="--",
-        linewidth=2.5,
-        label="Simulation (Gold)",
+        linewidth=2.8,
+        label="Simulation",
     )
-    for entry in mode_data:
-        style = MODE_STYLE[entry["mode"]]
-        plt.plot(
-            entry["time_ns"],
-            entry["x_gold_loss"],
-            color=style["color"],
-            linestyle=style["linestyle"],
-            linewidth=style["lw"],
-            label=f"Model ({style['label']})",
-        )
-
-    # Article reference curves
-    plt.plot(t_hr, x_hr, color="black", linestyle=":", linewidth=2.0, label="Article HR")
-    plt.plot(t_1d, x_1d, color="black", linestyle="-.", linewidth=2.0, label="Article 1D")
-    plt.plot(t_2d, x_2d, color="gray", linestyle="--", linewidth=2.0, label="Article 2D")
-    plt.scatter(t_exp, x_exp, color="black", s=28, marker="o", label="Experiment")
-
+    plt.plot(model_data["time_ns"], model_data["marshak"], color="orange", linestyle="-.", linewidth=2.8, label="Model (Marshak)")
+    plt.plot(model_data["time_ns"], model_data["loss_regular"], color="firebrick", linestyle="--", linewidth=2.4, label="Model (Henyey)")
+    plt.plot(model_data["flattop_time_ns"], model_data["loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model (flattop)")
     plt.xlabel(r"$t$ [ns]")
     plt.ylabel(r"$x_F$ [cm]")
     plt.ylim(0.0, 0.2)
     plt.grid(True, alpha=0.3)
-    plt.legend(loc="best", fontsize=9)
+    plt.legend(loc="best")
     plt.tight_layout()
-
     out_path = output_dir / "front_position.png"
     plt.savefig(out_path, dpi=180, bbox_inches="tight")
     plt.close()
     return out_path
 
 
-def plot_front_surface(output_dir, mode_data):
-    sim = _simulation_front_surface()
+def plot_front_surface(output_dir, wall_name, simulation_data, model_data):
     n_plots = len(FRONT_TIMES_NS)
-    fig_height = 6.2
+    # Calculate optimal figure size so columns are closer and bigger
+    fig_height = 6.5
     axes_height = fig_height - 1.5
-    axes_width = axes_height * (_parameters.R_cm / 0.2)
-    wspace = 0.18
+    axes_width = axes_height * (R_cm / 0.2)
+    wspace = 0.15
     fig_width = 0.9 + 0.3 + (n_plots + (n_plots - 1) * wspace) * axes_width
-
+    
     fig, axes = plt.subplots(
-        1,
-        n_plots,
-        figsize=(fig_width, fig_height),
-        sharey=True,
-        gridspec_kw={"wspace": wspace},
+        1, 
+        n_plots, 
+        figsize=(fig_width, fig_height), 
+        sharey=True, 
+        gridspec_kw={"wspace": wspace}
     )
     if n_plots == 1:
         axes = [axes]
 
-    for idx, t_ns in enumerate(FRONT_TIMES_NS):
-        ax = axes[idx]
-
-        sim_profiles = sim["profiles"]
-        if t_ns in sim_profiles:
-            ax.plot(
-                sim["r_cm"],
-                sim_profiles[t_ns],
-                color="navy",
-                linestyle="--",
-                linewidth=2.5,
-                label=f"Simulation Gold t={t_ns:.1f} ns",
-            )
-
-        for entry in mode_data:
-            style = MODE_STYLE[entry["mode"]]
-            bessel = entry["bessel_gold_loss"]
-            if not bessel:
-                continue
-            _, snap = _closest_snapshot(bessel, t_ns)
-            r = np.asarray(snap.get("r_grid", []), dtype=float)
-            zf = np.asarray(snap.get("z_F_radial", []), dtype=float)
-            if r.size == 0 or zf.size == 0:
-                continue
-
-            ax.plot(
-                r,
-                zf,
-                color=style["color"],
-                linestyle=style["linestyle"],
-                linewidth=style["lw"],
-                label=f"Model {style['label']} t={t_ns:.1f} ns",
-            )
-
-        ax.set_xlim([0, _parameters.R_cm])
+    for index, time_ns in enumerate(FRONT_TIMES_NS):
+        ax = axes[index]
+        ax.plot(simulation_data["r_cm"], simulation_data["profiles"][time_ns], color="blue", linestyle="--", linewidth=2.6, label=f"Simulation t={time_ns:.1f} ns")
+        
+        z_reg = model_data["regular"][time_ns]["z_F_radial_cm"]
+        z_flat = model_data["flattop"][time_ns]["z_F_radial_cm"]
+        
+        ax.plot(model_data["regular"][time_ns]["r_cm"], z_reg, color="firebrick", linestyle="--", linewidth=2.4, label=f"Model Henyey t={time_ns:.1f} ns")
+        ax.plot(model_data["flattop"][time_ns]["r_cm"], z_flat, color="red", linestyle="-", linewidth=2.6, label=f"Model flattop t={time_ns:.1f} ns")
+        ax.set_xlim([0, R_cm])
         ax.set_ylim([0, 0.2])
         ax.set_aspect("equal", adjustable="box")
         ax.grid(True, alpha=0.3)
         ax.set_xlabel(r"$r$ [cm]")
         ax.legend(loc="best", fontsize=8)
-        if idx == 0:
+        if index == 0:
             ax.set_ylabel(r"$z_F$ [cm]")
 
     out_path = output_dir / "front_surface.png"
@@ -286,84 +401,76 @@ def plot_front_surface(output_dir, mode_data):
     return out_path
 
 
-def plot_energy(output_dir, mode_data):
-    sim = _simulation_energy()
+def plot_energy(output_dir, wall_name, simulation_data, model_data):
     plt.figure(figsize=(8.2, 6.1))
+    plt.plot(simulation_data["time_ns"], simulation_data["foam_energy_hJ"], color="blue", linestyle="--", linewidth=2.8, label="Simulation foam energy")
+    if wall_name != "Vacuum":
+        plt.plot(simulation_data["time_ns"], simulation_data["coating_energy_hJ"], color="royalblue", linestyle="--", linewidth=2.8, label="Simulation coating energy")
+    
+    # Model - Regular (Henyey)
+    plt.plot(model_data["time_ns"], model_data["E_marshak"], color="orange", linestyle="-.", linewidth=2.8, label="Model E (Marshak)")
 
-    plt.plot(
-        sim["time_ns"],
-        sim["foam_energy_hJ"],
-        color="navy",
-        linestyle="--",
-        linewidth=2.5,
-        label="Simulation Foam Energy",
-    )
-    plt.plot(
-        sim["time_ns"],
-        sim["gold_energy_hJ"],
-        color="teal",
-        linestyle=":",
-        linewidth=2.5,
-        label="Simulation Gold Energy",
-    )
-
-    # Marshak baseline from heyney run
-    heyney_data = next((x for x in mode_data if x["mode"] == "heyney"), None)
-    if heyney_data is not None:
-        plt.plot(
-            heyney_data["time_ns"],
-            heyney_data["E_marshak"],
-            color="orange",
-            linestyle="-.",
-            linewidth=2.8,
-            label="Model E (Marshak)",
-        )
-
-    for entry in mode_data:
-        style = MODE_STYLE[entry["mode"]]
-        plt.plot(
-            entry["time_ns"],
-            entry["E_gold_loss"],
-            color=style["color"],
-            linestyle=style["linestyle"],
-            linewidth=style["lw"],
-            label=f"Model E Gold loss ({style['label']})",
-        )
-        plt.plot(
-            entry["time_ns"],
-            entry["E_wall_gold_loss"],
-            color=style["alt"],
-            linestyle=style["linestyle"],
-            linewidth=style["lw"],
-            label=f"Model E Gold wall loss ({style['label']})",
-        )
+    if wall_name == "Be":
+        # Regular (Henyey)
+        plt.plot(model_data["time_ns"], model_data["E_Be_loss"], color="firebrick", linestyle="--", linewidth=2.4, label="Model E Be loss (Henyey)")
+        plt.plot(model_data["time_ns"], model_data["E_Be_wall_loss"], color="brown", linestyle="--", linewidth=2.4, label="Model E Be wall loss (Henyey)")
+        # Flattop
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Be loss (flattop)")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Be_wall_loss_flattop"], color="crimson", linestyle="-", linewidth=2.6, label="Model E Be wall loss (flattop)")
+    elif wall_name == "Vacuum":
+        plt.plot(model_data["time_ns"], model_data["E_vacuum_loss"], color="firebrick", linestyle="--", linewidth=2.4, label="Model E Vacuum loss (Henyey)")
+        # Flattop
+        plt.plot(model_data["flattop_time_ns"], model_data["E_vacuum_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Vacuum loss (flattop)")
+    elif wall_name == "Copper":
+        # Regular (Henyey)
+        plt.plot(model_data["time_ns"], model_data["E_Cu_loss"], color="firebrick", linestyle="--", linewidth=2.4, label="Model E Copper loss (Henyey)")
+        plt.plot(model_data["time_ns"], model_data["E_Cu_wall_loss"], color="brown", linestyle="--", linewidth=2.4, label="Model E Copper wall loss (Henyey)")
+        # Flattop
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Cu_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Copper loss (flattop)")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Cu_wall_loss_flattop"], color="crimson", linestyle="-", linewidth=2.6, label="Model E Copper wall loss (flattop)")
+    else:
+        # Regular (Henyey)
+        plt.plot(model_data["time_ns"], model_data["E_Gold_loss"], color="firebrick", linestyle="--", linewidth=2.4, label="Model E Gold loss (Henyey)")
+        plt.plot(model_data["time_ns"], model_data["E_Gold_wall_loss"], color="brown", linestyle="--", linewidth=2.4, label="Model E Gold wall loss (Henyey)")
+        # Flattop
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_loss_flattop"], color="red", linestyle="-", linewidth=2.6, label="Model E Gold loss (flattop)")
+        plt.plot(model_data["flattop_time_ns"], model_data["E_Gold_wall_loss_flattop"], color="crimson", linestyle="-", linewidth=2.6, label="Model E Gold wall loss (flattop)")
 
     plt.xlabel(r"$t$ [ns]")
     plt.ylabel(r"$E$ [hJ]")
     plt.grid(True, alpha=0.3)
-    plt.legend(loc="best", fontsize=9)
+    plt.legend(loc="best")
     plt.tight_layout()
-
     out_path = output_dir / "energy.png"
     plt.savefig(out_path, dpi=180, bbox_inches="tight")
     plt.close()
     return out_path
 
 
+def run_wall_comparison(config):
+    output_dir = config["output_dir"]
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    front_position_sim = load_simulation_front_position(config["simulation_front_position"])
+    front_position_model = load_model_front_position(config["name"], config["front_loss_column"])
+    front_position_out = plot_front_position(output_dir, config["name"], front_position_sim, front_position_model, config["front_loss_column"])
+
+    front_surface_sim = load_simulation_front_surface(config["simulation_front_surface"])
+    front_surface_model = load_model_front_surface(config["name"])
+    front_surface_out = plot_front_surface(output_dir, config["name"], front_surface_sim, front_surface_model)
+
+    energy_sim = load_simulation_energy(config["simulation_energy"])
+    energy_model = load_model_energy()
+    energy_out = plot_energy(output_dir, config["name"], energy_sim, energy_model)
+
+    print(f"[{config['name']}] saved: {front_position_out}")
+    print(f"[{config['name']}] saved: {front_surface_out}")
+    print(f"[{config['name']}] saved: {energy_out}")
+
+
 def main():
-    out_dir = Path(__file__).resolve().parent
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    times_ns = np.linspace(0.01, 15.0, 1000)
-    mode_data = [_compute_mode_series(times_ns, mode_name) for mode_name in MODES]
-
-    front_out = plot_front_position(out_dir, mode_data)
-    surface_out = plot_front_surface(out_dir, mode_data)
-    energy_out = plot_energy(out_dir, mode_data)
-
-    print(f"Saved: {front_out}")
-    print(f"Saved: {surface_out}")
-    print(f"Saved: {energy_out}")
+    for config in wall_configurations():
+        run_wall_comparison(config)
 
 
 if __name__ == "__main__":

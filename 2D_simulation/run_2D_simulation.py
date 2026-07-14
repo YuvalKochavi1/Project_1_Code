@@ -12,8 +12,8 @@ from simulation_2d_plots import *
 from simulation_2d_pipeline import *
 
 if __name__ == "__main__":
-    run_default_pipeline(material=Material, coating_material="Be")
-    # run_default_pipeline(material=Material, coating_material="Vacuum")
-    # run_default_pipeline(material="SiO2", coating_material="gold", gold_g_scale=1)
-    # run_default_pipeline(material="SiO2", coating_material="gold", gold_g_scale=100)
+    run_default_pipeline(material=Material, coating_material="Gold")
+    # run_default_pipeline(material=Material, coating_material="Be")
+    # run_default_pipeline(material=Material, coating_material="gold", gold_g_scale=1)
+    #run_default_pipeline(material=Material, coating_material="gold", gold_g_scale=100)
     #run_eff_lam_radius_sweep(material=Material)

@@ -612,7 +612,7 @@ def plot_temperature_heatmap_2D(
                         T_mesh_plot[i_z, r_mesh > shock_r] = np.nan
 
         # Save front shape and temperature mesh data before plotting
-        _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_closest, r_mesh_foam=r_mesh_foam, wall=wall, flattop=flattop)
+        _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_target, r_mesh_foam=r_mesh_foam, wall=wall, flattop=flattop)
 
         ax = axes[idx]
 

@@ -556,48 +556,85 @@ def compare_with_article_2_exp3_13a(times_to_store):
                     show_shock=False, wall="Vacuum", flattop=Flattop_condition)
 
 def compare_with_article_2_exp4_14(times_to_store):
-    front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=1)
-    analytic_positions_no_marshak = front_series["analytic_positions_no_marshak"]
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material='Gold', lam_eff_power=1)
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
+    analytic_positions_ablation_const_rho = front_series["analytic_positions_ablation_const_rho"]
     analytic_positions_2D = front_series["analytic_positions_2D"]
     analytic_positions_2D_lam_eff = front_series["analytic_positions_2D_lam_eff"]
-    analytic_positions_gold_loss = front_series["analytic_positions_gold_loss"]
+    analytic_positions_no_marshak = front_series["analytic_positions_no_marshak"]
+    Ts_2D = front_series["Ts_2D"]
+    Ts_ablation_const_rho = front_series["Ts_ablation_const_rho"]
+    Ts_gold_loss = front_series["Ts_marshak_gold_loss"]
+    Ts_lam_eff = front_series["Ts_2D_lam_eff"]
+    Ts_1D = front_series["Ts_1D"]
+    E_marshak = front_series["E_marshak"]
+    bessel_data_2D = front_series["bessel_data_2D"]
+    bessel_data_2D_lam_eff = front_series["bessel_data_2D_lam_eff"]
+    bessel_data_marshak = front_series["bessel_data_marshak"]
+    data_of_R = front_series["data_of_R_2D"]
+    analytic_positions_vacuum_lost, Ts_vacuum_lost, E_vacuum_loss, _, data_of_R, bessel_data_vacuum_loss = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Vacuum', lam_eff = False, power=1.5)  # stored_t is ns
+    analytic_position_Be_lost, Ts_Be_lost, E_Be_lost, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = False, power=4)  # stored_t is ns
+    analytic_position_Cu_lost, Ts_Cu_lost, E_Cu_lost, Ew_cu_out, data_of_R, Cu_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Copper', lam_eff = False, power=4)  # stored_t is ns
+    analytic_position_gold_loss, Ts_gold_loss, E_gold_loss, Ew_gold_out, data_of_R, gold_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = False, power=4)  # stored_t is ns
+
     plt.figure(figsize=(8, 6))
-    # fit data to analytical
-    power_law = (4 + alpha - beta) / 4
-    # analytic_positions_2D = analytic_positions_2D *(1-0.5**power_law) 
-    # analytic_positions_2D_lam_eff = analytic_positions_2D_lam_eff *(1-0.5**power_law)
-    # analytic_positions_marshak = analytic_positions_marshak *(1-0.5**power_law)
-    # analytic_positions_no_marshak = analytic_positions_no_marshak *(1-0.5**power_law)
-
     plot_standard_front_analytic_models(
-        times_to_store,
-        analytic_positions_marshak=analytic_positions_marshak,
-        analytic_positions_gold_loss=analytic_positions_gold_loss,
-        analytic_positions_2D=analytic_positions_2D,
+        times_to_store, 
+        analytic_positions_marshak=analytic_positions_marshak, 
+        analytic_positions_gold_loss=analytic_position_gold_loss,
         analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
+        analytic_positions_2D=analytic_positions_2D,
         analytic_positions_no_marshak=analytic_positions_no_marshak,
-    )
+        )
 
-    # plot_csv_curves([
-    #     {"path": article_front_path("HR.csv"), "y_scale": 10, "linestyle": "-.", "label": "HR", "color": "green"},
-    #     {"path": article_front_path("1D_model.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Model", "color": "blue"},
-    #     {"path": article_front_path("2D_model.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Model", "color": "pink"},
-    # ])
+    plot_csv_errorbar(article_front_path("exp_results.csv"), y_scale=10,xerr=0.1,fmt='o',capsize=4,elinewidth=1.5,markersize=10,label="Expt. data", color='black')
 
-    plot_csv_errorbars([
-        {"path": article_front_path("exp_results.csv"), "y_scale": 10, "label": "Expt.", "color": "black"},
-    ])
 
-    plt.xlabel(r"$t$ [ns]", fontsize = 18)
-    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
+    plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
+    plt.ylabel(r"$x_F$ [cm]", fontsize=18, fontname='serif')
     plt.ylim(0,0.2)
-    plt.grid(False)
-    plt.legend()
+    plt.grid(True)
+    plt.legend(prop={'family': 'serif'})
     plt.tight_layout()
-    save_figure("front_position - compare Back SiO2 low energy.png", model1_5=True)
 
-    output_csv_path = DATA_DIR / "1.5 model" / f"analytic_positions{_profile_file_suffix(Flattop_condition)}.csv"
+    save_figure("front_position - ablation varying rho (n=1.5).png", model1_5=True)
+    
+    # Plot energies
+    plt.figure(figsize=(8, 6))
+    plt.plot(times_to_store, E_marshak, label="E - Marshak BC", linestyle="-", color='blue')
+    plt.plot(times_to_store, E_gold_loss, label="E - Gold Loss", linestyle="-", color='green')
+    plt.plot(times_to_store, Ew_gold_out, label="E - Gold Wall Loss", linestyle="-", color='red')
+    
+    #save the simulated energy as a csv series
+    if Flattop_condition:
+        output_csv_path = DATA_DIR / "2D_shape" / f"simulated_energy_vs_time_{Material}_flattop.csv"
+    else:
+        output_csv_path = DATA_DIR / "2D_shape" / f"simulated_energy_vs_time_{Material}.csv"
+    ensure_dir(DATA_DIR / "energy_comparison")
+    save_series_csv(DATA_DIR / "2D_shape" / output_csv_path, {
+        "time_ns": np.asarray(times_to_store),
+        "E_marshak": E_marshak,
+        "E_gold_loss": E_gold_loss,
+        "E_wall_gold_loss": Ew_gold_out,
+        "E_vacuum_loss": E_vacuum_loss,
+        "E_Be_loss": E_Be_lost,
+        "E_Be_wall_loss": Ew_be_out,
+        "E_Cu_loss": E_Cu_lost,
+        "E_Cu_wall_loss": Ew_cu_out,
+    })
+    
+    plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
+    plt.ylabel(r"$E$ [hJ]", fontsize=18, fontname='serif')
+    plt.grid(True)
+    plt.legend(prop={'family': 'serif'})
+    plt.tight_layout()
+    save_figure("total_energy - Back_SiO2.png", model1_5=True)
+    
+    #save the analytic positions to csv
+    if Flattop_condition:
+        output_csv_path = DATA_DIR / "1.5 model" / "analytic_positions_flattop.csv"
+    else:
+        output_csv_path = DATA_DIR / "1.5 model" / "analytic_positions.csv"
     export_analytic_positions_csv(
         times_to_store,
         {
@@ -605,19 +642,52 @@ def compare_with_article_2_exp4_14(times_to_store):
                 "Marshak": analytic_positions_marshak,
                 "Ablation with varying rho": analytic_positions_2D,
                 "2D effects + lam_eff": analytic_positions_2D_lam_eff,
-                "gold loss": analytic_positions_gold_loss,
+                "Ablation with const rho": analytic_positions_ablation_const_rho,
+                "gold loss": analytic_position_gold_loss,
                 "No Marshak": analytic_positions_no_marshak,
+                "Vacuum loss": analytic_positions_vacuum_lost,
+                "Be Loss": analytic_position_Be_lost,
+                "Copper Loss": analytic_position_Cu_lost,
             }
         },
-        output_csv_path=output_csv_path,
+        output_csv_path = output_csv_path,
+
     )
 
-    comparison_script = BASE_DIR / "Comparison_model _simulation" / "Back" / "SiO2_low_energy" / "simulation_model_comparison.py"
-    if comparison_script.exists():
-        try:
-            runpy.run_path(str(comparison_script), run_name="__main__")
-        except Exception as exc:
-            print(f"Warning: low-energy comparison script failed: {exc}")
+    export_analytic_positions_csv(
+        times_to_store,
+        {
+            "front_position": {
+                "Marshak": analytic_positions_marshak,
+                "Ablation with varying rho": analytic_positions_2D,
+                "2D effects + lam_eff": analytic_positions_2D_lam_eff,
+                "Ablation with const rho": analytic_positions_ablation_const_rho,
+                "gold loss": analytic_position_gold_loss,
+                "No Marshak": analytic_positions_no_marshak,
+                "Vacuum loss": analytic_positions_vacuum_lost,
+                "Be Loss": analytic_position_Be_lost,
+                "Copper Loss": analytic_position_Cu_lost,
+            }
+        },
+        output_csv_path = output_csv_path,
+
+    )
+    
+    plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
+                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    ablation=True, title_suffix="(lam_eff)", color_option = "prr_back")
+    plot_temperature_heatmap_2D(gold_bessel_data, analytic_position_gold_loss,
+                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    ablation=False, title_suffix="(gold wall loss)", color_option = "default", wall = 'gold', flattop=Flattop_condition)
+    plot_temperature_heatmap_2D(bessel_data_vacuum_loss, analytic_positions_vacuum_lost,
+                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    ablation=False, title_suffix="(vacuum wall loss)", color_option = "default", wall = 'Vacuum', flattop=Flattop_condition)
+    plot_temperature_heatmap_2D(Be_bessel_data, analytic_position_Be_lost,
+                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    ablation=False, title_suffix="(Be wall loss)", color_option = "default", wall = 'Be', flattop=Flattop_condition)
+    plot_temperature_heatmap_2D(Cu_bessel_data, analytic_position_Cu_lost,
+                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    ablation=False, title_suffix="(Cu wall loss)", color_option = "default", wall = 'Copper', flattop=Flattop_condition)
     
 def compare_with_article_2_exp5_15a(times_to_store):
     """Moore SiO2 experiment"""
