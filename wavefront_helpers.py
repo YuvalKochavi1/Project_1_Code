@@ -101,3 +101,57 @@ class WavefrontHelpers:
                         T_profile_corrected[i, j] = Ts_arr[i] * (inner ** (1.0 / (n * (1.0 - eps))))
         return A_arr, T_profile_leading, T_profile_corrected
 
+    @staticmethod
+    def compute_optical_depth_and_mfp(xF, Ts, cutoff_fraction=0.9, use_user_formula=True):
+        r"""
+        Computes the optical depth (`tau`) and mean free path (`mean_free_path`) across
+        the spatial region [0, cutoff_fraction * xF] behind the wavefront using the
+        analytical Henyey self-similar temperature profile.
+
+        Parameters:
+        -----------
+        xF : float or np.ndarray
+            Wavefront penetration depth [cm]
+        Ts : float or np.ndarray
+            Surface temperature [HeV]
+        cutoff_fraction : float
+            Fraction of the wavefront to integrate over (default: 0.9)
+        use_user_formula : bool
+            If True (default):
+                tau = \int_0^{cutoff_fraction * xF} (1 / (kappa_R * rho)) dx
+                mean_free_path = (cutoff_fraction * xF) * tau
+            If False (standard physical definition):
+                tau = \int_0^{cutoff_fraction * xF} (kappa_R * rho) dx
+                mean_free_path = (cutoff_fraction * xF) / tau
+        
+        Returns:
+        --------
+        tau : float or np.ndarray
+        mean_free_path : float or np.ndarray
+        """
+        xF_arr = np.atleast_1d(np.asarray(xF, dtype=float))
+        Ts_arr = np.atleast_1d(np.asarray(Ts, dtype=float))
+
+        tau_out = np.zeros_like(xF_arr)
+        mfp_out = np.zeros_like(xF_arr)
+
+        mask = (xF_arr > 1e-30) & (Ts_arr > 1e-30)
+        if not np.any(mask):
+            if np.isscalar(xF) and np.isscalar(Ts):
+                return 0.0, 0.0
+            return tau_out, mfp_out
+
+        # Exponent for Henyey profile: T(u) = Ts * (1 - u)^(1 / (4 + alpha - beta))
+        # Rosseland mean free path: l_R(u) = g * T(u)^alpha * rho^(-lambda_param - 1)
+        #                           = l_0 * (1 - u)^gamma
+        gamma = alpha / (4.0 + alpha - beta)
+        l_0 = g * (Ts_arr[mask] ** alpha) * (rho ** (-lambda_param - 1.0))
+
+        # Physical optical depth: tau = int_0^{u_c * xF} (1 / l_R) dx = (xF / l_0) * [1 - (1 - u_c)^(1 - gamma)] / (1 - gamma)
+        tau_mask = (xF_arr[mask] / l_0) * (1.0 - (1.0 - cutoff_fraction) ** (1.0 - gamma)) / (1.0 - gamma)
+        tau_out[mask] = tau_mask
+        mfp_out[mask] = (cutoff_fraction * xF_arr[mask]) / np.maximum(tau_mask, 1e-100)
+
+        if np.isscalar(xF) and np.isscalar(Ts):
+            return float(tau_out[0]), float(mfp_out[0])
+        return tau_out, mfp_out

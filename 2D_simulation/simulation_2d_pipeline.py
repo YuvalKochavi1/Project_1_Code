@@ -29,7 +29,7 @@ if Material == "SiO2" or Material == "Ta2O5":
     heatmap_times = (1e-9, 2e-9, 2.5e-9)
 elif Material == "SiO2_low_energy":
     Experiment = "Back"
-    heatmap_times = (2e-9, 6e-9, 10e-9)
+    heatmap_times = (5e-9, 8e-9, 11e-9)
 elif Material == "C8H8":
     Experiment = "Ji-Yan"
     heatmap_times = (0.5e-9, 1e-9, 1.3e-9)

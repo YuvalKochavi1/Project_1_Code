@@ -689,7 +689,7 @@ def plot_temperature_heatmap_2D(
             ax.tick_params(labelleft=False, labelright=True)
         # ax.set_title(r'$t = ' + f'{t_closest:.2f}' + r'$ ns')
         print(f"Plotting time {t_closest:.2f} ns, t_target was {t_target:.2f} ns")
-        ax.set_ylim([0, L/2])
+        ax.set_ylim([0, L])
         if r_mesh[-1] > R_cm and Material != "C8H8":
             ax.set_xlim([0.0, float(r_mesh[-1])])
         else:

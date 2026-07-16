@@ -195,6 +195,7 @@ def _update_vary_rho_terms(i, dt_i, Ts_prev, xF_prev, R_array, t_sec, p, K, eps,
         In[i] = In[i - 1] + dt_i / 2 * (new_rho[i] ** p + new_rho[i - 1] ** p)
         C_changing_rho[i] = (K / t_sec[i]) * In[i]
     else:
+        _, mfp_val = WavefrontHelpers.compute_optical_depth_and_mfp(xF_prev, Ts_prev)
         lambda_ross = g * (Ts_prev ** alpha) * (rho ** (-lambda_param - 1))
         xF_index = np.searchsorted(z, xF_prev)
         if R_average_for_lambda_geom:
@@ -204,7 +205,7 @@ def _update_vary_rho_terms(i, dt_i, Ts_prev, xF_prev, R_array, t_sec, p, K, eps,
         lambda_geom = 2 * R_average
         lambda_eff = ((lambda_geom ** (-power) + lambda_ross ** (-power))) ** (-1 / power)
         lambda_eff_array[i] = lambda_eff
-        lambda_R_array[i] = lambda_ross
+        lambda_R_array[i] = mfp_val
         g_eff = g * (lambda_eff / lambda_ross)
         g_eff_array[i] = g_eff
         w_i = g_eff_array[i] / g
@@ -397,6 +398,7 @@ def _store_bessel_snapshot(
     J0_profile_approx = special.j0(kappa_0_approx * r_grid)
     z_F_radial = _compute_z_front_radial_snapshot(xF_i, J0_profile)
     z_F_radial_approx = _compute_z_front_radial_snapshot(xF_i, J0_profile_approx)
+    tau_step, mfp_step = WavefrontHelpers.compute_optical_depth_and_mfp(xF_i, Ts_surface_i)
 
     snapshot = {
         'r_grid': r_grid.copy(),
@@ -412,6 +414,8 @@ def _store_bessel_snapshot(
         'albedo_old': albedo_old,
         'albedo': albedo,
         'lambda_ross': lambda_ross,
+        'tau': tau_step,
+        'mfp': mfp_step,
         'T_input': T_input_i,
         'Ts_surface': Ts_surface_i,
     }
@@ -573,11 +577,12 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
         I_s[i] = I_s[i - 1] + 0.5 * (H_s[i - 1] + H_s[i]) * dt_i
 
         if lam_eff and (not vary_rho):
-            lambda_ross = g*(Ts[i-1]**alpha)*(rho**(-lambda_param-1))
+            _, mfp_val = WavefrontHelpers.compute_optical_depth_and_mfp(xF[i-1], Ts[i-1])
+            lambda_ross = g * (Ts[i-1] ** alpha) * (rho ** (-lambda_param - 1))
             lambda_geom = 2*R_cm
             lambda_eff = ((lambda_geom**(-power) + lambda_ross**(-power)))**(-1/power)
             lambda_eff_array[i] = lambda_eff
-            lambda_R_array[i] = lambda_ross
+            lambda_R_array[i] = mfp_val
             g_eff = g * lambda_eff / lambda_ross
             g_eff_array[i] = g_eff
              # weight for the integral
@@ -693,10 +698,13 @@ def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False
 
     xF_out, Ts_out, E_out, Ew_out, data_of_R = _restore_marshak_outputs(xF, Ts, E_total_hJ, E_wall_hJ_array, order, t_sec_in, data_of_R, t_sec,)
     A_arr, T_lead_out, T_corr_out = WavefrontHelpers.compute_first_order_hr_profile(t_sec, xF, Ts)
+    tau_arr, mfp_arr = WavefrontHelpers.compute_optical_depth_and_mfp(xF, Ts)
     if isinstance(bessel_data, dict):
         bessel_data['profile_A_t'] = WavefrontHelpers.restore_original_order(A_arr, order, t_sec_in.size)
         bessel_data['T_profile_leading'] = T_lead_out
         bessel_data['T_profile_corrected'] = T_corr_out
+        bessel_data['tau_t'] = WavefrontHelpers.restore_original_order(tau_arr, order, t_sec_in.size)
+        bessel_data['mfp_t'] = WavefrontHelpers.restore_original_order(mfp_arr, order, t_sec_in.size)
     return xF_out, Ts_out, E_out, Ew_out, data_of_R, bessel_data
 
 

@@ -442,7 +442,7 @@ def compare_with_article_2_exp3_13a(times_to_store):
         analytic_positions_2D=analytic_positions_2D,
         analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
         analytic_positions_no_marshak=analytic_positions_no_marshak,
-        # analytic_positions_gold_loss=analytic_positions_gold_loss,
+        analytic_positions_gold_loss=analytic_positions_gold_loss,
     )
     # if analytic_position_Be_lost is not None:
     #     plt.plot(
@@ -674,19 +674,19 @@ def compare_with_article_2_exp4_14(times_to_store):
     )
     
     plot_temperature_heatmap_2D(bessel_data_2D_lam_eff, analytic_positions_2D_lam_eff,
-                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    Ts_1D, times_to_store, times_ns=[5,8,11],
                     ablation=True, title_suffix="(lam_eff)", color_option = "prr_back")
     plot_temperature_heatmap_2D(gold_bessel_data, analytic_position_gold_loss,
-                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    Ts_1D, times_to_store, times_ns=[5,8,11],
                     ablation=False, title_suffix="(gold wall loss)", color_option = "default", wall = 'gold', flattop=Flattop_condition)
     plot_temperature_heatmap_2D(bessel_data_vacuum_loss, analytic_positions_vacuum_lost,
-                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    Ts_1D, times_to_store, times_ns=[5,8,11],
                     ablation=False, title_suffix="(vacuum wall loss)", color_option = "default", wall = 'Vacuum', flattop=Flattop_condition)
     plot_temperature_heatmap_2D(Be_bessel_data, analytic_position_Be_lost,
-                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    Ts_1D, times_to_store, times_ns=[5,8,11],
                     ablation=False, title_suffix="(Be wall loss)", color_option = "default", wall = 'Be', flattop=Flattop_condition)
     plot_temperature_heatmap_2D(Cu_bessel_data, analytic_position_Cu_lost,
-                    Ts_1D, times_to_store, times_ns=[2,6,10],
+                    Ts_1D, times_to_store, times_ns=[5,8,11],
                     ablation=False, title_suffix="(Cu wall loss)", color_option = "default", wall = 'Copper', flattop=Flattop_condition)
     
 def compare_with_article_2_exp5_15a(times_to_store):

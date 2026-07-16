@@ -1516,8 +1516,8 @@ def compute_and_plot_T4_heatmap(
     ax.set_facecolor('white')
 
     pcm = ax.pcolormesh(
-        R_mesh,
-        Z_mesh,
+        10 * R_mesh,
+        10 * Z_mesh,
         T4_spatial,
         shading='gouraud',
         cmap='Spectral_r',
@@ -1532,11 +1532,11 @@ def compute_and_plot_T4_heatmap(
 
     # Draw horizontal dashed line at detector depth if z_pos_mm is provided
 
-    ax.set_xlabel(r'$r$ [cm]', fontname='serif')
-    ax.set_ylabel(r'$z$ [cm]', fontname='serif')
+    ax.set_xlabel(r'$r$ [mm]', fontname='serif')
+    ax.set_ylabel(r'$z$ [mm]', fontname='serif')
 
-    ax.set_xlim(0.0, float(r_mesh[-1]))
-    ax.set_ylim(0.0, L/2)
+    ax.set_xlim(0.0, 10*float(r_mesh[-1]))
+    ax.set_ylim(0.0, 10*L/2)
     ax.set_aspect('equal', adjustable='box')
     ax.grid(False)
 
@@ -1552,10 +1552,10 @@ def compute_and_plot_T4_heatmap(
     if save_csv:
         out_dir = BASE_DIR / "Data_new" / Experiment / Material / "2D_shape" / "T4_spatial_heatmap"
         out_dir.mkdir(parents=True, exist_ok=True)
-        flat_r = R_mesh.flatten()
-        flat_z = Z_mesh.flatten()
+        flat_r = R_mesh.flatten() * 10.0  # cm → mm
+        flat_z = Z_mesh.flatten() * 10.0  # cm → mm
         flat_T4 = T4_spatial.flatten()
-        df = pd.DataFrame({"r_cm": flat_r, "z_cm": flat_z, "T4_hev4": flat_T4})
+        df = pd.DataFrame({"r_mm": flat_r, "z_mm": flat_z, "T4_hev4": flat_T4})
         csv_path = out_dir / f"T4_spatial_heatmap_{t_closest:.1f}ns.csv"
         df.to_csv(csv_path, index=False)
         print(f"Saved T^4 spatial heatmap data -> {csv_path}")

@@ -27,7 +27,7 @@ from parameters import Experiment, L, R_cm, Material
 
 print(f"Experiment: {Experiment}, Material: {Material}")
 
-FRONT_TIMES_NS = [1.0, 2.0, 2.5]
+FRONT_TIMES_NS = [5, 8, 11]
 
 
 def normalize_name(name):

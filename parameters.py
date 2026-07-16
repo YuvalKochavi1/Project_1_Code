@@ -52,7 +52,7 @@ def load_time_temp(csv_path):
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
 Material = os.getenv("PHYSICS_MATERIAL", "SiO2_low_energy")  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
-Flattop_condition = False  # True or False, whether to use flat-top temperature profile or not
+Flattop_condition = True  # True or False, whether to use flat-top temperature profile or not
 
 if Material == "SiO2":
     Experiment = "Back"
@@ -303,10 +303,10 @@ elif Material == "C8H8":
     Nz = 500   # increase resolution because domain is much larger
 elif Material == "SiO2_gold":
     L = 0.4      
-    Nz = 500   # increase resolution because domain is much larger
+    Nz = 1000   # increase resolution because domain is much larger
 elif Material == "SiO2_copper":
     L = 0.5      
-    Nz = 500   # increase resolution because domain is much larger
+    Nz = 1000   # increase resolution because domain is much larger
 
 # self similarity model fudge factors - gold
 f_gold = 3.4 * 10**13          # fudge factor for sigma (new model) [erg/g]

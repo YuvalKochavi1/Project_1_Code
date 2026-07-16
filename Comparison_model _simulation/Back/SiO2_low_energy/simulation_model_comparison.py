@@ -47,6 +47,7 @@ def wall_configurations():
     return [
         {
             "name": "Be",
+            "front_times_ns": [5, 8, 11],
             "front_loss_column": "front_position (Be Loss)",
             "simulation_front_position": Path(BASE_DIR)
             / "Data_new"
@@ -73,6 +74,7 @@ def wall_configurations():
         },
         {
             "name": "Gold",
+            "front_times_ns": FRONT_TIMES_NS,
             "front_loss_column": "front_position (gold loss)",
             "simulation_front_position": Path(BASE_DIR)
             / "Data_new"
@@ -99,6 +101,7 @@ def wall_configurations():
         },
         {
             "name": "Gold_100",
+            "front_times_ns": FRONT_TIMES_NS,
             "front_loss_column": "front_position (gold loss)",
             "simulation_front_position": Path(BASE_DIR)
             / "Data_new"
@@ -125,6 +128,7 @@ def wall_configurations():
         },
         {
             "name": "Vacuum",
+            "front_times_ns": FRONT_TIMES_NS,
             "front_loss_column": "front_position (Vacuum loss)",
             "simulation_front_position": Path(BASE_DIR)
             / "Data_new"
@@ -151,6 +155,7 @@ def wall_configurations():
         },
         {
             "name": "Copper",
+            "front_times_ns": FRONT_TIMES_NS,
             "front_loss_column": "front_position (Copper loss)",
             "simulation_front_position": Path(BASE_DIR)
             / "Data_new"
@@ -242,7 +247,10 @@ def load_simulation_front_surface(csv_path):
     return {"r_cm": r_cm, "profiles": profiles}
 
 
-def load_model_front_surface(wall_name):
+def load_model_front_surface(wall_name, front_times_ns=None):
+    if front_times_ns is None:
+        front_times_ns = FRONT_TIMES_NS
+
     data_dir = Path(BASE_DIR) / "Data_new" / "Back" / "SiO2_low_energy" / "2D_shape"
     if not data_dir.exists():
         raise FileNotFoundError(f"Model shape directory not found: {data_dir}")
@@ -250,7 +258,7 @@ def load_model_front_surface(wall_name):
     regular_profiles = {}
     flattop_profiles = {}
     model_wall = "Gold" if wall_name == "Gold_100" else wall_name
-    for time_ns in FRONT_TIMES_NS:
+    for time_ns in front_times_ns:
         regular_path = data_dir / f"front_shape_{model_wall}_t{time_ns:.2f}ns.csv"
         flattop_path = data_dir / f"front_shape_{model_wall}_flattop_t{time_ns:.2f}ns.csv"
 
@@ -358,8 +366,8 @@ def plot_front_position(output_dir, wall_name, simulation_data, model_data, loss
     return out_path
 
 
-def plot_front_surface(output_dir, wall_name, simulation_data, model_data):
-    n_plots = len(FRONT_TIMES_NS)
+def plot_front_surface(output_dir, wall_name, simulation_data, model_data, front_times_ns):
+    n_plots = len(front_times_ns)
     # Calculate optimal figure size so columns are closer and bigger
     fig_height = 6.5
     axes_height = fig_height - 1.5
@@ -377,7 +385,7 @@ def plot_front_surface(output_dir, wall_name, simulation_data, model_data):
     if n_plots == 1:
         axes = [axes]
 
-    for index, time_ns in enumerate(FRONT_TIMES_NS):
+    for index, time_ns in enumerate(front_times_ns):
         ax = axes[index]
         ax.plot(simulation_data["r_cm"], simulation_data["profiles"][time_ns], color="blue", linestyle="--", linewidth=2.6, label=f"Simulation t={time_ns:.1f} ns")
         
@@ -456,8 +464,9 @@ def run_wall_comparison(config):
     front_position_out = plot_front_position(output_dir, config["name"], front_position_sim, front_position_model, config["front_loss_column"])
 
     front_surface_sim = load_simulation_front_surface(config["simulation_front_surface"])
-    front_surface_model = load_model_front_surface(config["name"])
-    front_surface_out = plot_front_surface(output_dir, config["name"], front_surface_sim, front_surface_model)
+    front_times_ns = config.get("front_times_ns", FRONT_TIMES_NS)
+    front_surface_model = load_model_front_surface(config["name"], front_times_ns)
+    front_surface_out = plot_front_surface(output_dir, config["name"], front_surface_sim, front_surface_model, front_times_ns)
 
     energy_sim = load_simulation_energy(config["simulation_energy"])
     energy_model = load_model_energy()
