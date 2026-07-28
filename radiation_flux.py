@@ -25,6 +25,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 # Font configuration: serif and LaTeX style math font
 plt.rcParams.update({
     'font.family': 'serif',
+    'font.size': 20,
     'text.usetex': True,
     'axes.unicode_minus': False,
     'axes.grid': False,
@@ -873,11 +874,10 @@ def plot_flux_curvature(
         print("Warning: no data to plot for flux curvature.")
         return
 
-    colors = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4']
-
+    colors = ['#e6194b']
     fig, axes = plt.subplots(
         n_detectors, n_times,
-        figsize=(6 * n_times, 4.5 * n_detectors),
+        figsize=(10 * n_times, 8 * n_detectors),
         squeeze=False,
     )
 
@@ -920,7 +920,7 @@ def plot_flux_curvature(
                         
                         ax.scatter(
                             x_exp, y_exp_norm,
-                            color='black', marker='o', facecolors='none', s=45, linewidths=1.5,
+                            color='black', marker='o', facecolors='none', s=65, linewidths=1.5,
                             label='Experiment (Back et al.)', zorder=5
                         )
                     except Exception as e:

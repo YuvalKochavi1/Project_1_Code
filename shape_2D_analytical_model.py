@@ -18,6 +18,12 @@ from scipy import special
 from eigen_bessel_solver import kappa_roots
 from colormaps import VISIT_LIKE_CMAP, PAPER_CMAP, PRR_BACK_CMAP, PRR_MOORE_CMAP
 
+
+def _resolve_wall_output_name(wall, g_gold_scale=1.0):
+    if wall == "Gold" and np.isclose(float(g_gold_scale), 100.0):
+        return "Gold_100"
+    return wall
+
 def _resolve_colormap_settings(
     color_style="default",
     *,
@@ -239,12 +245,13 @@ def _compute_wall_heyney_horizontal_profile(
     return T_wall
 
 
-def _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_closest, r_mesh_foam=None, wall="Gold", flattop=False):
+def _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_closest, r_mesh_foam=None, wall="Gold", flattop=False, g_gold_scale=1.0):
     """Save front shape and temperature mesh data to CSV files."""
     from pathlib import Path
     
     output_data_dir = Path(BASE_DIR) / "Data_new" / Experiment / Material / "2D_shape"
     output_data_dir.mkdir(parents=True, exist_ok=True)
+    wall_output_name = _resolve_wall_output_name(wall, g_gold_scale=g_gold_scale)
     
     # If z_F_radial is on a different grid (foam grid), interpolate to r_mesh
     if r_mesh_foam is not None and len(r_mesh_foam) == len(z_F_radial):
@@ -258,21 +265,21 @@ def _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_closest, r_
         'z_F_radial_cm': z_F_radial_interp,
     })
     if flattop:
-        front_shape_df.to_csv(output_data_dir / f"front_shape_{wall}_flattop_t{t_closest:.2f}ns.csv", index=False)
+        front_shape_df.to_csv(output_data_dir / f"front_shape_{wall_output_name}_flattop_t{t_closest:.2f}ns.csv", index=False)
     else:   
-        front_shape_df.to_csv(output_data_dir / f"front_shape_{wall}_t{t_closest:.2f}ns.csv", index=False)
+        front_shape_df.to_csv(output_data_dir / f"front_shape_{wall_output_name}_t{t_closest:.2f}ns.csv", index=False)
     
     # Save temperature mesh
     T_mesh_df = pd.DataFrame(T_mesh_plot)
-    T_mesh_df.to_csv(output_data_dir / f"T_mesh_{wall}_t{t_closest:.2f}ns.csv", index=False, header=False)
+    T_mesh_df.to_csv(output_data_dir / f"T_mesh_{wall_output_name}_t{t_closest:.2f}ns.csv", index=False, header=False)
     # Save coordinate grids for reference
     coords_df = pd.DataFrame({
         'z_axis_cm': z_mesh,
     })
-    coords_df.to_csv(output_data_dir / f"z_coordinates_{wall}.csv", index=False)
+    coords_df.to_csv(output_data_dir / f"z_coordinates_{wall_output_name}.csv", index=False)
     
     r_coords_df = pd.DataFrame({'r_axis_cm': r_mesh})
-    r_coords_df.to_csv(output_data_dir / f"r_coordinates_{wall}.csv", index=False)
+    r_coords_df.to_csv(output_data_dir / f"r_coordinates_{wall_output_name}.csv", index=False)
 
 
 def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.0, 2.5]):
@@ -409,6 +416,7 @@ def plot_temperature_heatmap_2D(
     cbar_ticks=None,
     show_shock=True,
     flattop=False,
+    g_gold_scale=1.0,
 ):
     """
     Plot 2D temperature heatmaps T(r,z,t) = T_s(t) * (1 - z/z_F(r,t))^(1/(4+alpha-beta))
@@ -612,7 +620,7 @@ def plot_temperature_heatmap_2D(
                         T_mesh_plot[i_z, r_mesh > shock_r] = np.nan
 
         # Save front shape and temperature mesh data before plotting
-        _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_target, r_mesh_foam=r_mesh_foam, wall=wall, flattop=flattop)
+        _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_target, r_mesh_foam=r_mesh_foam, wall=wall, flattop=flattop, g_gold_scale=g_gold_scale)
 
         ax = axes[idx]
 

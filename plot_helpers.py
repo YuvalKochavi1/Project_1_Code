@@ -76,35 +76,35 @@ def plot_standard_front_analytic_models(
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_marshak,
-        label=r"Model $x_F(t)$ - Marshak BC",
+        label=r"Model - Marshak BC",
         linestyle="-",
         color='blue',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_gold_loss,
-        label=fr"Model $x_F(t)$ - {wall_material} Loss",
+        label=fr"Model - {wall_material} Loss",
         linestyle="-",
         color='orange',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_2D,
-        label=fr"Model $x_F(t)$ - 2D effects",
+        label=fr"Model - 2D effects",
         linestyle="-",
         color='black',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_2D_lam_eff,
-        label=fr"Model $x_F(t)$ - 2D effects + $\lambda_{{\mathrm{{eff}}}}$",
+        label=fr"Model - 2D effects + $\lambda_{{\mathrm{{eff}}}}$",
         linestyle="-",
         color='red',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_ablation_const_rho,
-        label=fr"Model $x_F(t)$ ({wall_material} Ablation Const $\rho$)",
+        label=fr"Model - ({wall_material} Ablation Const $\rho$)",
         linestyle="-",
         color='pink',
     )
@@ -134,12 +134,13 @@ def plot_standard_surface_temperature_models(times_to_store, *, Ts_1D=None, Ts_2
     )
 
 
-def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'Gold', lam_eff_power=1):
+def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'Gold', lam_eff_power=1, g_gold_scale=1.0):
     analytic_positions_no_marshak = analytic_wave_front_dispatch(
         times_to_store,
         use_seconds=True,
         wall_material=wall_material,
         mode="no_marshak",
+        g_gold_scale=g_gold_scale,
     )
     analytic_positions_marshak, Ts_1D, E_marshak, _, data_of_R_marshak, bessel_data = analytic_wave_front_dispatch(
         times_to_store,
@@ -147,6 +148,7 @@ def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'G
         wall_material=wall_material,
         mode="marshak",
         vary_rho=False,
+        g_gold_scale=g_gold_scale,
     )
     analytic_positions_2D, Ts_2D, E_out_2D, Ew_out_2D, data_of_R_2D, bessel_data_2D = analytic_wave_front_dispatch(
         times_to_store,
@@ -154,6 +156,7 @@ def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'G
         wall_material=wall_material,
         mode="marshak_ablation",
         vary_rho=True,
+        g_gold_scale=g_gold_scale,
     )
     analytic_positions_2D_lam_eff, Ts_2D_lam_eff, E_out_2D_lam_eff, Ew_out_2D_lam_eff, data_of_R_2D_lam_eff, bessel_data_2D_lam_eff = analytic_wave_front_dispatch(
         times_to_store,
@@ -163,6 +166,7 @@ def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'G
         vary_rho=True,
         lam_eff=True,
         power=lam_eff_power,
+        g_gold_scale=g_gold_scale,
     )
     analytic_wave_front_marshak_gold_loss, Ts_marshak_gold_loss, E_out_gold_loss, Ew_out_gold_loss, data_of_R_gold_loss, bessel_data_gold_loss = analytic_wave_front_dispatch(
         times_to_store,
@@ -170,6 +174,7 @@ def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'G
         wall_material=wall_material,
         mode="marshak_wall_loss",
         vary_rho=False,
+        g_gold_scale=g_gold_scale,
     )
     analytic_wave_front_ablation_const_rho, Ts_ablation_const_rho, E_out_ablation_const_rho, Ew_out_ablation_const_rho, data_of_R_ablation_const_rho, bessel_data_ablation_const_rho = analytic_wave_front_dispatch(
         times_to_store,
@@ -177,6 +182,7 @@ def compute_standard_analytic_front_series(times_to_store, *, wall_material = 'G
         wall_material=wall_material,
         mode="marshak_ablation",
         vary_rho=False,
+        g_gold_scale=g_gold_scale,
     )
     return {
         "analytic_positions_no_marshak": analytic_positions_no_marshak,

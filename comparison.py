@@ -3,7 +3,11 @@ from model_main import *
 from csv_helpers import *
 from plot_helpers import *
 from shape_2D_analytical_model import plot_2D_front_spatial, plot_temperature_heatmap_2D, plot_temperature_heatmap_2D_series_model
+from model_main import analytic_wave_front_dispatch
+from plot_helpers import compute_standard_analytic_front_series
+from csv_helpers import save_series_csv, export_analytic_positions_csv
 import runpy
+from pathlib import Path
 
 # Font configuration: serif and LaTeX style math font
 plt.rcParams.update({
@@ -22,6 +26,24 @@ plt.rcParams.update({
 DATA_DIR = BASE_DIR / "Data_new" / Experiment / Material
 print(f"Data directory: {DATA_DIR}")
 FIGURES_OUTPUT_DIR = BASE_DIR / "Figures_new" / Experiment / Material 
+
+# Global gold-opacity scale for analytical wall-loss runs.
+G_GOLD_SCALE = 1.0
+
+
+def _gold_scale_suffix(scale_value):
+    scale_float = float(scale_value)
+    if np.isclose(scale_float, 1.0):
+        return ""
+    return f"_g{scale_float:g}"
+
+
+def _with_gold_scale_suffix(path_like):
+    path_obj = Path(path_like)
+    suffix = _gold_scale_suffix(G_GOLD_SCALE)
+    if not suffix:
+        return path_obj
+    return path_obj.with_name(f"{path_obj.stem}{suffix}{path_obj.suffix}")
 
 
 def _normalize_profile_mode(mode):
@@ -99,10 +121,11 @@ def Back_SiO2(times_to_store):
     bessel_data_2D_lam_eff = front_series["bessel_data_2D_lam_eff"]
     bessel_data_marshak = front_series["bessel_data_marshak"]
     data_of_R = front_series["data_of_R_2D"]
-    analytic_positions_vacuum_lost, Ts_vacuum_lost, E_vacuum_loss, _, data_of_R, bessel_data_vacuum_loss = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Vacuum', lam_eff = True, power=1.5)  # stored_t is ns
-    analytic_position_Be_lost, Ts_Be_lost, E_Be_lost, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = True, power=4)  # stored_t is ns
-    analytic_position_Cu_lost, Ts_Cu_lost, E_Cu_lost, Ew_cu_out, data_of_R, Cu_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Copper', lam_eff = True, power=4)  # stored_t is ns
-    analytic_position_gold_loss, Ts_gold_loss, E_gold_loss, Ew_gold_out, data_of_R, gold_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = True, power=4)  # stored_t is ns
+    analytic_positions_vacuum_lost, Ts_vacuum_lost, E_vacuum_loss, _, data_of_R, bessel_data_vacuum_loss = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Vacuum', lam_eff = True, power=0.9)  # stored_t is ns
+    analytic_position_Be_lost, Ts_Be_lost, E_Be_lost, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = True, power=1.2)  # stored_t is ns
+    analytic_position_Cu_lost, Ts_Cu_lost, E_Cu_lost, Ew_cu_out, data_of_R, Cu_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Copper', lam_eff = True, power=1.3)  # stored_t is ns
+    analytic_position_gold_loss, Ts_gold_loss, E_gold_loss, Ew_gold_out, data_of_R, gold_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = True, power=1.7)  # stored_t is ns
+    # analytic_position_gold_100_lost, Ts_gold_100_lost, E_gold_100_lost, Ew_gold_100_out, data_of_R, gold_100_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = True, power=4, g_gold_scale=100)  # stored_t is ns
 
     plt.figure(figsize=(8, 6))
     plot_standard_front_analytic_models(
@@ -177,6 +200,8 @@ def Back_SiO2(times_to_store):
         "E_Be_wall_loss": Ew_be_out,
         "E_Cu_loss": E_Cu_lost,
         "E_Cu_wall_loss": Ew_cu_out,
+        # "E_gold_100_loss": E_gold_100_lost,
+        # "E_gold_100_wall_loss": Ew_gold_100_out,
     })
     
     plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
@@ -204,6 +229,7 @@ def Back_SiO2(times_to_store):
                 "Vacuum loss": analytic_positions_vacuum_lost,
                 "Be Loss": analytic_position_Be_lost,
                 "Copper Loss": analytic_position_Cu_lost,
+                # "Gold 100 Loss": analytic_position_gold_100_lost,
             }
         },
         output_csv_path = output_csv_path,
@@ -219,6 +245,7 @@ def Back_SiO2(times_to_store):
                 "2D effects + lam_eff": analytic_positions_2D_lam_eff,
                 "Ablation with const rho": analytic_positions_ablation_const_rho,
                 "gold loss": analytic_position_gold_loss,
+                # "Gold 100 Loss": analytic_position_gold_100_lost,
                 "No Marshak": analytic_positions_no_marshak,
                 "Vacuum loss": analytic_positions_vacuum_lost,
                 "Be Loss": analytic_position_Be_lost,
@@ -276,6 +303,9 @@ def Back_SiO2(times_to_store):
     plot_temperature_heatmap_2D(Cu_bessel_data, analytic_position_Cu_lost,
                     Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
                     ablation=False, title_suffix="(Cu wall loss)", color_option = "default", wall = 'Copper', flattop=Flattop_condition)
+    # plot_temperature_heatmap_2D(gold_100_bessel_data, analytic_position_gold_100_lost,
+    #                 Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
+    #                 ablation=False, title_suffix="(gold 100 wall loss)", color_option = "default", wall = 'Gold', flattop=Flattop_condition, g_gold_scale=100)
     
     # plot_2D_front_spatial(bessel_data_gold_loss, analytic_positions_energy_lost_gold,
     #                 times_to_store, times_ns=[2.0])
@@ -444,13 +474,13 @@ def compare_with_article_2_exp3_13a(times_to_store):
         analytic_positions_no_marshak=analytic_positions_no_marshak,
         analytic_positions_gold_loss=analytic_positions_gold_loss,
     )
-    # if analytic_position_Be_lost is not None:
-    #     plt.plot(
-    #         times_to_store, analytic_position_Be_lost,
-    #         linestyle="-",
-    #         label="Analytic x_F(t) (Be Lost)",
-    #         color='cyan'
-    #     )
+    if analytic_position_Be_lost is not None:
+        plt.plot(
+            times_to_store, analytic_position_Be_lost,
+            linestyle="-",
+            label="Analytic x_F(t) (Be Lost)",
+            color='cyan'
+        )
     plot_csv_errorbars([
         {"path": article_front_path("exp_results_gold.csv"), "y_scale": 10, "xerr": 0.03, "label": "Expt. Gold", "color": "black"},
         {"path": article_front_path("exp_results_be.csv"), "y_scale": 10, "xerr": 0.03, "label": "Expt. Be", "color": "orange"},
@@ -577,6 +607,8 @@ def compare_with_article_2_exp4_14(times_to_store):
     analytic_position_Cu_lost, Ts_Cu_lost, E_Cu_lost, Ew_cu_out, data_of_R, Cu_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Copper', lam_eff = False, power=4)  # stored_t is ns
     analytic_position_gold_loss, Ts_gold_loss, E_gold_loss, Ew_gold_out, data_of_R, gold_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = False, power=4)  # stored_t is ns
 
+    analytic_position_gold_100_loss, Ts_gold_100_loss, E_gold_100_loss, Ew_gold_100_out, data_of_R, gold_100_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = False, power=4, g_gold_scale = 100)  # stored_t is ns
+
     plt.figure(figsize=(8, 6))
     plot_standard_front_analytic_models(
         times_to_store, 
@@ -621,6 +653,8 @@ def compare_with_article_2_exp4_14(times_to_store):
         "E_Be_wall_loss": Ew_be_out,
         "E_Cu_loss": E_Cu_lost,
         "E_Cu_wall_loss": Ew_cu_out,
+        "E_gold_100_loss": E_gold_100_loss,
+        "E_gold_100_wall_loss": Ew_gold_100_out,
     })
     
     plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
@@ -648,6 +682,8 @@ def compare_with_article_2_exp4_14(times_to_store):
                 "Vacuum loss": analytic_positions_vacuum_lost,
                 "Be Loss": analytic_position_Be_lost,
                 "Copper Loss": analytic_position_Cu_lost,
+                "Gold 100 Loss": analytic_position_gold_100_loss,
+                "Gold 100 Wall Loss": Ew_gold_100_out,
             }
         },
         output_csv_path = output_csv_path,
@@ -667,6 +703,8 @@ def compare_with_article_2_exp4_14(times_to_store):
                 "Vacuum loss": analytic_positions_vacuum_lost,
                 "Be Loss": analytic_position_Be_lost,
                 "Copper Loss": analytic_position_Cu_lost,
+                "Gold 100 Loss": analytic_position_gold_100_loss,
+                "Gold 100 Wall Loss": Ew_gold_100_out,
             }
         },
         output_csv_path = output_csv_path,
@@ -688,6 +726,9 @@ def compare_with_article_2_exp4_14(times_to_store):
     plot_temperature_heatmap_2D(Cu_bessel_data, analytic_position_Cu_lost,
                     Ts_1D, times_to_store, times_ns=[5,8,11],
                     ablation=False, title_suffix="(Cu wall loss)", color_option = "default", wall = 'Copper', flattop=Flattop_condition)
+    plot_temperature_heatmap_2D(gold_100_bessel_data, analytic_position_gold_100_loss,
+                    Ts_1D, times_to_store, times_ns=[5,8,11],
+                    ablation=False, title_suffix="(gold 100 wall loss)", color_option = "default", wall = 'Gold', flattop=Flattop_condition, g_gold_scale=100)
     
 def compare_with_article_2_exp5_15a(times_to_store):
     """Moore SiO2 experiment"""
@@ -1059,6 +1100,168 @@ def compare_with_french_copper(times_to_store):
                     Ts_1D, times_to_store, times_ns=[2.5,3,3.8],
                     ablation=True, title_suffix="(copper)", flattop=Flattop_condition)
 
+def compare_with_french_gold_17_6(times_to_store):
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Gold", lam_eff_power=0.6)
+    analytic_positions_ablation_varying_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    analytic_positions_gold_loss = front_series["analytic_positions_gold_loss"]
+    analytic_positions_marshak = front_series["analytic_positions_marshak"]
+    analytic_positions_non_marshak = front_series["analytic_positions_no_marshak"]
+    analytic_positions_ablation_varying_rho = front_series["analytic_positions_2D"]
+
+    bessel_data_gold = front_series["bessel_data_2D_lam_eff"]
+    Ts_1D = front_series["Ts_1D"]
+    analytic_positions_ablation_varying_rho_lam_eff_no_tag = front_series["analytic_positions_2D_lam_eff"]
+    power_law = (4 + alpha - beta) / 4
+    analytic_positions_gold_loss = analytic_positions_gold_loss * (1 - 0.065**power_law)
+    analytic_positions_marshak = analytic_positions_marshak * (1 - 0.065**power_law)
+    analytic_positions_ablation_varying_rho = analytic_positions_ablation_varying_rho * (1 - 0.065**power_law)
+    analytic_positions_ablation_varying_rho_lam_eff = analytic_positions_ablation_varying_rho_lam_eff * (1 - 0.065**power_law)
+    
+    plt.figure(figsize=(8, 6))
+    plot_standard_front_analytic_models(
+        times_to_store,
+        analytic_positions_marshak=analytic_positions_marshak,
+        analytic_positions_2D=analytic_positions_ablation_varying_rho,
+        analytic_positions_no_marshak=analytic_positions_non_marshak,
+        analytic_positions_gold_loss=analytic_positions_gold_loss,
+        analytic_positions_2D_lam_eff=analytic_positions_ablation_varying_rho_lam_eff,
+    )
+    #plot analytic positions with no tag for comparison
+    plt.plot(times_to_store, analytic_positions_ablation_varying_rho_lam_eff_no_tag, linestyle="--", label="2D Model (lam_eff) - no tag", color='orange')
+    # plot this Data_new\French2022\SiO2_gold17.6\front\front.csv
+    df = pd.read_csv(article_front_path("shot2.csv"))
+    # Adjust column names if needed
+    t_csv = np.array(df["x"], dtype=float, copy=True)
+    t_csv -= t_csv[0]  # Normalize time to start from zero
+    x_csv = np.array(df["y"], dtype=float, copy=True)
+    x_csv -= x_csv[0]  # Normalize position to start from zero
+    plt.plot(t_csv, x_csv/10, linestyle="--", label="Expt. shot 2", color='black')
+
+    df = pd.read_csv(article_front_path("shot5.csv"))
+    # Adjust column names if needed
+    t_csv = np.array(df["x"], dtype=float, copy=True)
+    t_csv -= t_csv[0]  # Normalize time to start from zero
+    x_csv = np.array(df["y"], dtype=float, copy=True)
+    x_csv -= x_csv[0]  # Normalize position to start from zero
+    plt.plot(t_csv, x_csv/10, linestyle="--", label="Expt. shot 5", color='blue')
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
+    plt.ylim(0,0.15)
+    plt.xlim(0,5)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    save_figure("front_position - gold coating (density 17.6).png", model1_5=True)
+
+    #save the analytic positions to a csv for later use
+    export_analytic_positions_csv(
+        times_to_store,
+        {
+            "front_position": {
+                "Marshak": analytic_positions_marshak,
+                "HR": analytic_positions_non_marshak,
+                "gold loss": analytic_positions_gold_loss,
+                "ablation_varying_rho": analytic_positions_ablation_varying_rho,
+                "ablation_varying_rho_lam_eff": analytic_positions_ablation_varying_rho_lam_eff,
+            }
+        },
+        DATA_DIR / "1.5 model" / "analytic_positions.csv",
+    )
+
+    #plot the temperatures T_d, T_s
+    plt.figure(figsize=(8, 6))
+    plot_standard_surface_temperature_models(times_to_store, Ts_1D=Ts_1D)
+    #what about the T_drive from the article? plot it as well
+    df = pd.read_csv(article_temperature_path("T_drive.csv"))
+    # Adjust column names if needed
+    t_csv = np.array(df["x"], dtype=float, copy=True)
+    t_csv -= t_csv[0]  # Normalize time to start from zero
+    x_csv = np.array(df["y"], dtype=float, copy=True)
+    plt.plot(t_csv, x_csv, linestyle="--", label="T_D (Drive)", color='green')
+    plt.legend()
+    plt.tight_layout()
+    save_figure("surface_temperature - gold coating (density 17.6).png", model1_5=True)
+
+
+def compare_with_french_gold_39_4(times_to_store):
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Gold", lam_eff_power=1)
+    analytic_positions_ablation_varying_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
+    analytic_positions_gold_loss = front_series["analytic_positions_gold_loss"]
+    analytic_positions_marshak = front_series["analytic_positions_marshak"]
+    analytic_positions_non_marshak = front_series["analytic_positions_no_marshak"]
+    analytic_positions_ablation_varying_rho = front_series["analytic_positions_2D"]
+
+    bessel_data_gold = front_series["bessel_data_2D_lam_eff"]
+    Ts_1D = front_series["Ts_1D"]
+    power_law = (4 + alpha - beta) / 4
+    analytic_positions_gold_loss = analytic_positions_gold_loss * (1 - 0.1**power_law)
+    analytic_positions_marshak = analytic_positions_marshak * (1 - 0.1**power_law)
+    analytic_positions_ablation_varying_rho = analytic_positions_ablation_varying_rho * (1 - 0.1**power_law)
+    analytic_positions_ablation_varying_rho_lam_eff = analytic_positions_ablation_varying_rho_lam_eff * (1 - 0.1**power_law)
+    
+    plt.figure(figsize=(8, 6))
+    plot_standard_front_analytic_models(
+        times_to_store,
+        analytic_positions_marshak=analytic_positions_marshak,
+        analytic_positions_2D=analytic_positions_ablation_varying_rho,
+        analytic_positions_no_marshak=analytic_positions_non_marshak,
+        analytic_positions_gold_loss=analytic_positions_gold_loss,
+        analytic_positions_2D_lam_eff=analytic_positions_ablation_varying_rho_lam_eff,
+    )
+    # plot this Data_new\French2022\SiO2_gold17.6\front\front.csv
+    df = pd.read_csv(article_front_path("shot1.csv"))
+    # Adjust column names if needed
+    t_csv = np.array(df["x"], dtype=float, copy=True)
+    t_csv -= t_csv[0]  # Normalize time to start from zero
+    x_csv = np.array(df["y"], dtype=float, copy=True)
+    x_csv -= x_csv[0]  # Normalize position to start from zero
+    plt.plot(t_csv, x_csv/10, linestyle="--", label="Expt. shot 1", color='black')
+
+    df = pd.read_csv(article_front_path("shot4.csv"))
+    # Adjust column names if needed
+    t_csv = np.array(df["x"], dtype=float, copy=True)
+    t_csv -= t_csv[0]  # Normalize time to start from zero
+    x_csv = np.array(df["y"], dtype=float, copy=True)
+    x_csv -= x_csv[0]  # Normalize position to start from zero
+    plt.plot(t_csv, x_csv/10, linestyle="--", label="Expt. shot 4", color='green')
+
+    plt.xlabel(r"$t$ [ns]", fontsize = 18)
+    plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
+    plt.ylim(0,0.15)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    save_figure("front_position - gold coating (density 39.4).png", model1_5=True)
+
+    #save the analytic positions to a csv for later use
+    export_analytic_positions_csv(
+        times_to_store,
+        {
+            "front_position": {
+                "Marshak": analytic_positions_marshak,
+                "HR": analytic_positions_non_marshak,
+                "gold loss": analytic_positions_gold_loss,
+                "ablation_varying_rho": analytic_positions_ablation_varying_rho,
+                "ablation_varying_rho_lam_eff": analytic_positions_ablation_varying_rho_lam_eff,
+            }
+        },
+        DATA_DIR / "1.5 model" / "analytic_positions.csv",
+    )
+
+    #plot the temperatures T_d, T_s
+    plt.figure(figsize=(8, 6))
+    plot_standard_surface_temperature_models(times_to_store, Ts_1D=Ts_1D)
+    #what about the T_drive from the article? plot it as well
+    df = pd.read_csv(article_temperature_path("T_drive.csv"))
+    # Adjust column names if needed
+    t_csv = np.array(df["x"], dtype=float, copy=True)
+    t_csv -= t_csv[0]  # Normalize time to start from zero
+    x_csv = np.array(df["y"], dtype=float, copy=True)
+    plt.plot(t_csv, x_csv, linestyle="--", label="T_D (Drive)", color='green')
+    plt.legend()
+    plt.tight_layout()
+    save_figure("surface_temperature - gold coating (density 17.6).png", model1_5=True)
+
 def R_of_t_z(times_to_store=None, show_plot=True, verbose=True):
     dispatch_out = analytic_wave_front_dispatch(times_to_store, use_seconds=True, mode="marshak_ablation", vary_rho=True)  # stored_t is ns
     data_of_R = dispatch_out[4]
@@ -1368,6 +1571,12 @@ def compare_for_material():
     elif Material == "SiO2_copper":
         times_to_store = np.linspace(0.01, 4, 1000)
         compare_with_french_copper(times_to_store)
+    elif Material == "SiO2_gold17.6":
+        times_to_store = np.linspace(0.01, 6, 1000)
+        compare_with_french_gold_17_6(times_to_store)
+    elif Material == "SiO2_gold39.4":
+            times_to_store = np.linspace(0.01, 6, 1000)
+            compare_with_french_gold_39_4(times_to_store)
     else:
         print(f"No comparison function defined for material: {Material}")
         return None

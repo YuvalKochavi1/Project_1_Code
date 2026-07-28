@@ -1,6 +1,8 @@
 from wall_loss_model import WallLossModel
 from ablation_model import AblationModel
 from albedo_model import AlbedoModel
+import parameters as parameters_module
+import wall_loss_model as wall_loss_model_module
 
 
 class AnalyticalWavefrontSolver:
@@ -121,28 +123,37 @@ class AnalyticalWavefrontSolver:
         power=2,
         k=10,
         R_average_for_lambda_geom=False,
+        g_gold_scale=1.0,
     ):
         if wall_material == 'Be':
             vary_rho = False
             if mode == "marshak_ablation":
                 mode = "marshak_wall_loss"
 
-        if mode == "no_marshak":
-            return self.analytic_wave_front_no_marshak(times_to_store, use_seconds=use_seconds, lam_eff=lam_eff, power=power)
-        if mode == "marshak":
-            return self.analytic_wave_front_marshak(times_to_store, use_seconds=use_seconds, wall_material=wall_material, lam_eff=lam_eff, power=power)
-        if mode == "marshak_wall_loss":
-            return self.analytic_wave_front_marshak_gold_loss(times_to_store, use_seconds=use_seconds, wall_material=wall_material, lam_eff=lam_eff, power=power)
-        if mode == "marshak_ablation":
-            return self.analytic_wave_front_marshak_ablation(
-                times_to_store,
-                use_seconds=use_seconds,
-                vary_rho=vary_rho,
-                wall_material=wall_material,
-                lam_eff=lam_eff,
-                power=power,
-                R_average_for_lambda_geom=R_average_for_lambda_geom,
-            )
-        if mode == "marshak_fluence":
-            return self.analytic_wave_front_marshak_fluence(times_to_store, use_seconds=use_seconds, k=k)
-        raise ValueError(f"Unknown mode: {mode}")
+        original_g_gold = parameters_module.g_gold
+        scaled_g_gold = original_g_gold * float(g_gold_scale)
+        parameters_module.g_gold = scaled_g_gold
+        wall_loss_model_module.g_gold = scaled_g_gold
+        try:
+            if mode == "no_marshak":
+                return self.analytic_wave_front_no_marshak(times_to_store, use_seconds=use_seconds, lam_eff=lam_eff, power=power)
+            if mode == "marshak":
+                return self.analytic_wave_front_marshak(times_to_store, use_seconds=use_seconds, wall_material=wall_material, lam_eff=lam_eff, power=power)
+            if mode == "marshak_wall_loss":
+                return self.analytic_wave_front_marshak_gold_loss(times_to_store, use_seconds=use_seconds, wall_material=wall_material, lam_eff=lam_eff, power=power)
+            if mode == "marshak_ablation":
+                return self.analytic_wave_front_marshak_ablation(
+                    times_to_store,
+                    use_seconds=use_seconds,
+                    vary_rho=vary_rho,
+                    wall_material=wall_material,
+                    lam_eff=lam_eff,
+                    power=power,
+                    R_average_for_lambda_geom=R_average_for_lambda_geom,
+                )
+            if mode == "marshak_fluence":
+                return self.analytic_wave_front_marshak_fluence(times_to_store, use_seconds=use_seconds, k=k)
+            raise ValueError(f"Unknown mode: {mode}")
+        finally:
+            parameters_module.g_gold = original_g_gold
+            wall_loss_model_module.g_gold = original_g_gold

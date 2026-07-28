@@ -13,6 +13,13 @@ plt.rcParams.update({
     'font.family': 'serif',
     'text.usetex': True,
     'axes.unicode_minus': False,
+    'axes.grid': False,
+    'axes.edgecolor': 'black',
+    'axes.linewidth': 2.0,
+    'font.size': 25,
+    'legend.fontsize': 25,
+    'xtick.labelsize': 25,
+    'ytick.labelsize': 25,
 })
 
 import tqdm
@@ -51,7 +58,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = os.getenv("PHYSICS_MATERIAL", "SiO2_low_energy")  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = os.getenv("PHYSICS_MATERIAL", "SiO2_gold17.6")  # "SiO2", "Gold", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 Flattop_condition = True  # True or False, whether to use flat-top temperature profile or not
 
 if Material == "SiO2":
@@ -174,7 +181,14 @@ if Material == "SiO2_low_energy":
     R_cm = 0.15      # radius of the foam cylinder (cm) - The diameter is 1.6 mm
     csv_path = article_temperature_path("T_drive.csv")
     t_array_TD, T_array_TD = load_time_temp(csv_path)
-    # T_array_TD = 100 * T_array_TD
+    #plot TD as a function of time
+    # plt.figure(figsize=(8, 6))
+    # plt.plot(t_array_TD, T_array_TD, label='T$_{drive}$', color='black')
+    # plt.xlabel('Time (ns)')
+    # plt.ylabel('Temperature (eV)')
+    # plt.legend()
+    # plt.show()
+    # # T_array_TD = 100 * T_array_TD
     #lambda_ross = 0.11 # Rosseland mean free path (cm) at maximum temperature (1.8 Hev)
 
 elif Material == "C15H20O6":
@@ -252,6 +266,39 @@ if Material == "SiO2_copper":
     t_array_TD, T_array_TD = load_time_temp(csv_path)
     #lambda_ross = 0.866 # Rosseland mean free path (cm) at maximum temperature (1.78 Hev)
 
+if Material == "SiO2_gold17.6":
+    Experiment = "French2022"
+    # self similarity model fudge factors - Foam (the first article and the first part of the second article)
+    f = 8.77 * 10**13          # fudge factor for sigma (new model) [erg/g]
+    g = 1 / 9175      
+    alpha = 3.53     # opacity exponent
+    beta = 1.1       # beta exponent
+    lambda_param = 0.75
+    mu = 0.09
+    rho = 0.0176     # initial density (g/cm^3)
+    R_cm = 0.07      # radius of the foam cylinder (cm) - The diameter is 2 mm
+    csv_path = article_temperature_path("T_drive.csv")
+    t_array_TD, T_array_TD = load_time_temp(csv_path)
+    T_array_TD = 100 * T_array_TD 
+    t_array_TD = t_array_TD - t_array_TD[0]+0.01
+
+if Material == "SiO2_gold39.4":
+    Experiment = "French2022"
+    # self similarity model fudge factors - Foam (the first article and the first part of the second article)
+    f = 8.77 * 10**13          # fudge factor for sigma (new model) [erg/g]
+    g = 1 / 9175      
+    alpha = 3.53     # opacity exponent
+    beta = 1.1       # beta exponent
+    lambda_param = 0.75
+    mu = 0.09
+    rho = 0.0394     # initial density (g/cm^3)
+    R_cm = 0.07      # radius of the foam cylinder (cm) - The diameter is 2 mm
+    csv_path = article_temperature_path("T_drive.csv")
+    t_array_TD, T_array_TD = load_time_temp(csv_path)
+    T_array_TD = 100 * T_array_TD 
+    t_array_TD = t_array_TD - t_array_TD[0]+0.01
+
+
 T_material_0_Kelvin = 300.0
 eV_joule = 1.60218e-19  # J/eV
 erg_per_joule = 1.0e7   # erg/J
@@ -306,6 +353,9 @@ elif Material == "SiO2_gold":
     Nz = 1000   # increase resolution because domain is much larger
 elif Material == "SiO2_copper":
     L = 0.5      
+    Nz = 1000   # increase resolution because domain is much larger
+elif Material == "SiO2_gold17.6" or Material == "SiO2_gold39.4":
+    L = 0.4      
     Nz = 1000   # increase resolution because domain is much larger
 
 # self similarity model fudge factors - gold

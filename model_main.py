@@ -160,7 +160,7 @@ def _compute_ablation_step(i, t_sec, dt_i, t_heat, Ts_prev, xF_prev, wall_materi
     A_i = np.pi * R_array[0] ** 2
 
     if wall_material in ('Gold', 'Copper'):
-        dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i],dt_i,t_heat,R_cm,Ts_prev,xF_prev,flat_top_profile=True,wall=wall_material,)
+        dE_wall_hJ = WallLossModel.compute_wall_energy_loss(t_sec[i],dt_i,t_heat,R_cm,Ts_prev,xF_prev,flat_top_profile=Flattop_condition,wall=wall_material,)
 
     return R_array, A_i, dE_wall_hJ
 
@@ -462,7 +462,7 @@ def _restore_marshak_outputs(xF, Ts, E_total_hJ, E_wall_hJ_array, order, t_sec_i
     return xF_out, Ts_out, E_out, Ew_out, data_of_R_ns
 
 def _marshak_appendixA_march(times_to_store,*, use_seconds=True, wall_loss=False, ablation=False,
- vary_rho=False, flat_top_profile=True, wall_material='Gold', lam_eff=False, power=2, R_average_for_lambda_geom=True,):
+ vary_rho=False, flat_top_profile=Flattop_condition, wall_material='Gold', lam_eff=False, power=2, R_average_for_lambda_geom=True,):
     """
     Shared engine for Marshak boundary iteration (Appendix A).
     March in time:
@@ -1090,6 +1090,7 @@ def analytic_wave_front_dispatch(
     power=2,
     k=10,
     R_average_for_lambda_geom=False,
+    g_gold_scale=1.0,
 ):
     """
     mode options:
@@ -1109,6 +1110,7 @@ def analytic_wave_front_dispatch(
         power=power,
         k=k,
         R_average_for_lambda_geom=R_average_for_lambda_geom,
+        g_gold_scale=g_gold_scale,
     )
 
 ######################################################################################
