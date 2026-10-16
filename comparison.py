@@ -619,13 +619,12 @@ def compare_with_article_2_exp4_14(times_to_store):
         analytic_positions_no_marshak=analytic_positions_no_marshak,
         )
 
-    plot_csv_errorbar(article_front_path("exp_results.csv"), y_scale=10,xerr=0.1,fmt='o',capsize=4,elinewidth=1.5,markersize=10,label="Expt. data", color='black')
+    plot_csv_errorbar(article_front_path("exp_results.csv"), y_scale=10,xerr=0.1,fmt='o',capsize=4,elinewidth=1.5,markersize=6,label="Expt. data", color='black')
 
 
     plt.xlabel(r"$t$ [ns]", fontsize=18, fontname='serif')
     plt.ylabel(r"$x_F$ [cm]", fontsize=18, fontname='serif')
     plt.ylim(0,0.2)
-    plt.grid(True)
     plt.legend(prop={'family': 'serif'})
     plt.tight_layout()
 
@@ -992,7 +991,6 @@ def compare_with_article_2_exp7_17(times_to_store):
 def compare_with_french_gold(times_to_store):
     front_series = compute_standard_analytic_front_series(times_to_store, lam_eff_power=1)
     analytic_positions_ablation_varying_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
-    analytic_positions_ablation_const_rho = front_series["analytic_positions_ablation_const_rho"]
     analytic_positions_gold_loss = front_series["analytic_positions_gold_loss"]
     analytic_positions_marshak = front_series["analytic_positions_marshak"]
     analytic_positions_non_marshak = front_series["analytic_positions_no_marshak"]
@@ -1005,10 +1003,10 @@ def compare_with_french_gold(times_to_store):
         analytic_positions_2D=analytic_positions_ablation_varying_rho,
         analytic_positions_no_marshak=analytic_positions_non_marshak,
         analytic_positions_gold_loss=analytic_positions_gold_loss,
-        analytic_positions_ablation_const_rho=analytic_positions_ablation_const_rho,
         analytic_positions_2D_lam_eff=analytic_positions_ablation_varying_rho_lam_eff,
     )
-    
+    plt.scatter(3.4, 0.12, color='black', label='Experimental Point')
+
     plt.xlabel(r"$t$ [ns]", fontsize = 18)
     plt.ylim(0,0.3)
     plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
@@ -1024,7 +1022,6 @@ def compare_with_french_gold(times_to_store):
                 "HR": analytic_positions_non_marshak,
                 "marshak": analytic_positions_marshak,
                 "gold_loss": analytic_positions_gold_loss,
-                "ablation_const_rho": analytic_positions_ablation_const_rho,
                 "ablation_varying_rho": analytic_positions_ablation_varying_rho,
                 "ablation_varying_rho_lam_eff": analytic_positions_ablation_varying_rho_lam_eff,
             }
@@ -1033,7 +1030,7 @@ def compare_with_french_gold(times_to_store):
     )
 
 def compare_with_french_copper(times_to_store):
-    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Copper", lam_eff_power=2)
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Copper", lam_eff_power=2.5)
     analytic_positions_ablation_varying_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     analytic_positions_ablation_const_rho = front_series["analytic_positions_ablation_const_rho"]
     analytic_positions_copper_loss = front_series["analytic_positions_gold_loss"]
@@ -1053,14 +1050,15 @@ def compare_with_french_copper(times_to_store):
         analytic_positions_2D=analytic_positions_ablation_varying_rho,
         analytic_positions_no_marshak=analytic_positions_non_marshak,
         analytic_positions_gold_loss=analytic_positions_copper_loss,
-        analytic_positions_ablation_const_rho=analytic_positions_ablation_const_rho,
         analytic_positions_2D_lam_eff=analytic_positions_ablation_varying_rho_lam_eff,
     )
+
+    # add a point in 3.5 ns and 1.2 mm 
+    plt.scatter(3.05, 0.2, color='black', label='Experimental Point')
 
     plt.xlabel(r"$t$ [ns]", fontsize = 18)
     plt.ylabel(r"$x_F$ [cm]", fontsize = 18)
     plt.ylim(0,0.25)
-    plt.title(fr"Wave Front Position $x_F$ vs Time $t$ — {Material} (Figure 16)", fontsize = 18)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -1110,7 +1108,7 @@ def compare_with_french_gold_17_6(times_to_store):
 
     bessel_data_gold = front_series["bessel_data_2D_lam_eff"]
     Ts_1D = front_series["Ts_1D"]
-    analytic_positions_ablation_varying_rho_lam_eff_no_tag = front_series["analytic_positions_2D_lam_eff"]
+    #analytic_positions_ablation_varying_rho_lam_eff_no_tag = front_series["analytic_positions_2D_lam_eff"]
     power_law = (4 + alpha - beta) / 4
     analytic_positions_gold_loss = analytic_positions_gold_loss * (1 - 0.065**power_law)
     analytic_positions_marshak = analytic_positions_marshak * (1 - 0.065**power_law)
@@ -1127,7 +1125,7 @@ def compare_with_french_gold_17_6(times_to_store):
         analytic_positions_2D_lam_eff=analytic_positions_ablation_varying_rho_lam_eff,
     )
     #plot analytic positions with no tag for comparison
-    plt.plot(times_to_store, analytic_positions_ablation_varying_rho_lam_eff_no_tag, linestyle="--", label="2D Model (lam_eff) - no tag", color='orange')
+    #plt.plot(times_to_store, analytic_positions_ablation_varying_rho_lam_eff_no_tag, linestyle="--", label="2D Model (lam_eff) - no tag", color='orange')
     # plot this Data_new\French2022\SiO2_gold17.6\front\front.csv
     df = pd.read_csv(article_front_path("shot2.csv"))
     # Adjust column names if needed

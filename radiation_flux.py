@@ -25,17 +25,17 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 # Font configuration: serif and LaTeX style math font
 plt.rcParams.update({
     'font.family': 'serif',
-    'font.size': 20,
+    'font.size': 22,
     'text.usetex': True,
     'axes.unicode_minus': False,
     'axes.grid': False,
     'axes.edgecolor': 'black',
     'axes.linewidth': 2.0,
-    'xtick.labelsize': 20,
-    'ytick.labelsize': 20,
-    'legend.fontsize': 13,
-    'axes.labelsize': 22,
-    'axes.titlesize': 22,
+    'xtick.labelsize': 22,
+    'ytick.labelsize': 22,
+    'legend.fontsize': 18,
+    'axes.labelsize': 24,
+    'axes.titlesize': 24,
 })
 from parameters import alpha, beta, K_per_Hev, Experiment, Material, a_hev, c, r_grid as R_GRID_DEFAULT, alpha_gold, beta_gold, alpha_copper, beta_copper, alpha_be, beta_be, R_cm, z, L
 from model_main import analytic_wave_front_dispatch, BASE_DIR
@@ -1536,7 +1536,7 @@ def compute_and_plot_T4_heatmap(
     ax.set_ylabel(r'$z$ [mm]', fontname='serif')
 
     ax.set_xlim(0.0, 10*float(r_mesh[-1]))
-    ax.set_ylim(0.0, 10*L/2)
+    ax.set_ylim(0.0, 10*L)
     ax.set_aspect('equal', adjustable='box')
     ax.grid(False)
 
@@ -1574,7 +1574,7 @@ if __name__ == "__main__":
         detector_positions_mm = [1.0, 1.25] # whink about what do to with 0.5
     elif Material == "SiO2_low_energy":
         times = np.linspace(0.01, 17.0, 1000)
-        detector_positions_mm = [0.5, 1.0, 1.5]
+        detector_positions_mm = [1.0]
     elif Material == "C11H16Pb0.3852":
         times = np.linspace(0.01, 1.0, 1000)
     elif Material in ["C6H12", "C6H12Cu0.394"]:

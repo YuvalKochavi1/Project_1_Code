@@ -3,6 +3,38 @@ from model_main import analytic_wave_front_dispatch
 import matplotlib.pyplot as plt
 from csv_helpers import *
 from shape_2D_analytical_model import _closest_time_data
+from parameters import Material
+
+
+def _smooth_tail_from_time(x_vals, y_vals, start_time_ns=3.5, window=11):
+    """Smooth y-values only for x >= start_time_ns using a moving average."""
+    if y_vals is None:
+        return y_vals
+
+    x_vals = np.asarray(x_vals, dtype=float)
+    y_vals = np.asarray(y_vals, dtype=float)
+    if x_vals.size != y_vals.size or x_vals.size == 0:
+        return y_vals
+
+    tail_mask = x_vals >= float(start_time_ns)
+    if np.count_nonzero(tail_mask) < 3:
+        return y_vals
+
+    # Keep kernel odd and valid for the available tail length.
+    tail_len = int(np.count_nonzero(tail_mask))
+    k = int(max(3, min(window, tail_len)))
+    if k % 2 == 0:
+        k -= 1
+    if k < 3:
+        return y_vals
+
+    y_out = y_vals.copy()
+    y_tail = y_out[tail_mask]
+    pad = k // 2
+    y_pad = np.pad(y_tail, (pad, pad), mode="edge")
+    kernel = np.ones(k, dtype=float) / float(k)
+    y_out[tail_mask] = np.convolve(y_pad, kernel, mode="valid")
+    return y_out
 
 def plot_analytic_if_available(x_vals, y_vals, *, label, linestyle="--", color=None):
     """Helper function to plot analytic curves if the data is available (i.e., not None). This is used to conditionally plot the analytic curves in the comparison plots without needing to check for None every time we call this function."""
@@ -96,7 +128,9 @@ def plot_standard_front_analytic_models(
     )
     plot_analytic_if_available(
         times_to_store,
-        analytic_positions_2D_lam_eff,
+        _smooth_tail_from_time(times_to_store, analytic_positions_2D_lam_eff, start_time_ns=3.5, window=11)
+        if Material == "SiO2_copper"
+        else analytic_positions_2D_lam_eff,
         label=fr"Model - 2D effects + $\lambda_{{\mathrm{{eff}}}}$",
         linestyle="-",
         color='red',

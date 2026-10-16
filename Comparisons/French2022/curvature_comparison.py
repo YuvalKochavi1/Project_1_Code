@@ -153,8 +153,8 @@ def run_comparison():
         label="Experiment",
         zorder=3,
     )
-    axis.set_xlabel(r"Radial location $r$ [mm]")
-    axis.set_ylabel(r"Front-arrival time $t_{\mathrm{arr}}$ [ns]")
+    axis.set_xlabel(r"$r$ [mm]")
+    axis.set_ylabel(r"$t$ [ns]")
     axis.set_xlim(-parameters.R_cm * 10.0, parameters.R_cm * 10.0)
     axis.set_ylim(3.0, 6.5)
     axis.grid(True, alpha=0.25)

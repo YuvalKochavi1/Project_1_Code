@@ -212,20 +212,20 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     })
     
     # Plot model
-    plt.plot(r_symmetric, t_arr_ablation_lam_eff_sym, color='purple', linestyle='-', linewidth=2.0, label=r'Model')
+    plt.plot(10*r_symmetric, t_arr_ablation_lam_eff_sym, color='purple', linestyle='-', linewidth=2.0, label=r'Model')
     
     # Plot experimental data
-    plt.scatter(data_df['x'], data_df['y'], color='black', label=f'Experiment ({csv_data_filename})', marker='o', s=45, zorder=5)
+    plt.scatter(10*data_df['x'], data_df['y'], color='black', label=f'Experiment ({csv_data_filename})', marker='o', s=45, zorder=5)
     
     # Customize the plot
-    plt.xlabel(r"Radial Location $r$ [cm]", fontsize=22, fontname='serif')
+    plt.xlabel(r"Radial Location $r$ [mm]", fontsize=22, fontname='serif')
     plt.ylabel(r"Arrival Time $t$ [ns]", fontsize=22, fontname='serif')
     plt.title(f"Wavefront Arrival Time vs Radial Location\nat z = {z_detector_mm} mm ({material_label})", fontsize=24, fontname='serif', pad=18)
     plt.tick_params(axis='both', which='major', labelsize=20)
     
     # Use reloaded parameters R_cm for limit boundary and label
     r_limit = parameters.R_cm
-    plt.xlim(-r_limit - 0.01, r_limit + 0.01)
+    plt.xlim(10*(-r_limit - 0.01), 10*(r_limit + 0.01))
     
     plt.axvline(x=r_limit, color='gray', linestyle='--', alpha=0.7, label=fr'Foam-{wall_material} Interface ($R = {r_limit}$ cm)')
     plt.axvline(x=-r_limit, color='gray', linestyle='--', alpha=0.7)
@@ -268,7 +268,7 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     }
 
 def plot_combined_comparison(gold_results, copper_results):
-    plt.figure(figsize=(5, 8))
+    plt.figure(figsize=(8, 6))
     plt.rcParams.update({
         'font.family': 'serif',
         'text.usetex': True,
@@ -276,12 +276,12 @@ def plot_combined_comparison(gold_results, copper_results):
     })
     
     # Plot Gold model & experiment
-    plt.plot(gold_results['r_symmetric'], 0.47+gold_results['t_arr_ablation_lam_eff_sym'], color='red', linestyle='-', linewidth=2.2, label=r'Gold Model')
-    plt.scatter(gold_results['exp_x'], gold_results['exp_y'], color='red', marker='o', s=45, label='Gold Experiment', zorder=5)
+    plt.plot(10*gold_results['r_symmetric'], 0.47+gold_results['t_arr_ablation_lam_eff_sym'], color='red', linestyle='-', linewidth=2.2, label=r'Gold Model')
+    plt.scatter(10*gold_results['exp_x'], gold_results['exp_y'], color='red', marker='o', s=45, label='Gold Experiment', zorder=5)
     
     # Plot Copper model & experiment
-    plt.plot(copper_results['r_symmetric'], 0.165+copper_results['t_arr_ablation_lam_eff_sym'], color='blue', linestyle='-', linewidth=2.2, label=r'Copper Model')
-    plt.scatter(-copper_results['exp_x'], copper_results['exp_y'], color='blue', marker='o', s=45, label='Copper Experiment', zorder=5)
+    plt.plot(10*copper_results['r_symmetric'], 0.165+copper_results['t_arr_ablation_lam_eff_sym'], color='blue', linestyle='-', linewidth=2.2, label=r'Copper Model')
+    plt.scatter(10*copper_results['exp_x'], copper_results['exp_y'], color='blue', marker='o', s=45, label='Copper Experiment', zorder=5)
     
     # Interface boundaries
     # plt.axvline(x=0.05, color='red', linestyle=':', alpha=0.5, label='Foam-Gold Interface (R = 0.05 cm)')
@@ -289,7 +289,7 @@ def plot_combined_comparison(gold_results, copper_results):
     # plt.axvline(x=0.1, color='blue', linestyle=':', alpha=0.5, label='Foam-Copper Interface (R = 0.1 cm)')
     # plt.axvline(x=-0.1, color='blue', linestyle=':')
     
-    plt.xlabel(r"$r$ [cm]", fontsize=22, fontname='serif')
+    plt.xlabel(r"$r$ [mm]", fontsize=22, fontname='serif')
     plt.ylabel(r"Arrival Time $t$ [ns]", fontsize=22, fontname='serif')
     plt.tick_params(axis='both', which='major', labelsize=20)
 
@@ -297,7 +297,7 @@ def plot_combined_comparison(gold_results, copper_results):
     for spine in ax.spines.values():
         spine.set_linewidth(spine.get_linewidth() * 2.0)
     
-    plt.xlim(0, 0.11)
+    plt.xlim(10*(-0.11), 10*(0.11))
     ax.grid(False)
     ax.xaxis.grid(False, which='both')
     ax.yaxis.grid(False, which='both')

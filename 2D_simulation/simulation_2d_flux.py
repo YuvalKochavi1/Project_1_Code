@@ -827,7 +827,10 @@ def plot_flux_curvature_post_breakout(
 
     # --- Pre-load experimental Data to calculate global normalisation factor (Ta2O5)
     exp_ta2o5 = {}
+    exp_ta2o5_be_curve = None
     y_norm = 1.0
+    coating_name = str(getattr(sim, "outer_material", "")).strip().lower()
+    use_be_curve_for_ta2o5 = (material == "Ta2O5" and coating_name == "be")
     if material == "Ta2O5":
         base_ta_path = PROJECT_ROOT / "Data_new" / "Back" / "Ta2O5" / "article" / "flux_curvature"
         file_mapping = {0.25: "1new.csv", 0.5: "2new.csv", 0.75: "3new.csv", 1.0: "4new.csv"}
@@ -847,7 +850,17 @@ def plot_flux_curvature_post_breakout(
             y_norm = df_ref.loc[idx_closest, 'y']
             print(f"Ta2O5 normalization factor from 1new.csv at x ~ 0: {y_norm}")
 
+        if use_be_curve_for_ta2o5:
+            be_curve_path = base_ta_path / "be_curve.csv"
+            if be_curve_path.exists():
+                try:
+                    exp_ta2o5_be_curve = pd.read_csv(be_curve_path)
+                except Exception as e:
+                    print(f"Error loading be_curve.csv: {e}")
+
     r_mm_last = None
+    model_export_frames = []
+    be_exp_export_frame = None
     for idx, (z_mm, t_breakout, t_closest, flux_raw, T_radial_hev) in enumerate(raw_profiles):
         r_mm = sim.r * 10.0
         r_mm_last = r_mm
@@ -856,12 +869,58 @@ def plot_flux_curvature_post_breakout(
             
         r_sym = np.concatenate((-r_mm[::-1], r_mm[1:]))
         flux_sym = np.concatenate((flux_norm[::-1], flux_norm[1:]))
+
+        model_export_frames.append(
+            pd.DataFrame(
+                {
+                    "source": "model",
+                    "material": material,
+                    "coating": getattr(sim, "outer_material", ""),
+                    "z_mm": float(z_mm),
+                    "t_breakout_ns": float(t_breakout),
+                    "t_plot_ns": float(t_closest),
+                    "r_mm": r_sym,
+                    "flux_norm": flux_sym,
+                }
+            )
+        )
         
         label = f"z = {z_mm:.2f} mm ($t_{{br}} = {t_breakout:.2f}$ ns, plot $t = {t_closest:.2f}$ ns)"
         plt.plot(r_sym, flux_sym, color=colors[idx % len(colors)], linewidth=2.2, label=label)
 
         # Plot Ta2O5 experimental data
         if material == "Ta2O5":
+            if (
+                use_be_curve_for_ta2o5
+                and abs(z_mm - 0.5) < 1e-3
+                and exp_ta2o5_be_curve is not None
+            ):
+                x_exp = exp_ta2o5_be_curve['x'].to_numpy()
+                y_exp = exp_ta2o5_be_curve['y'].to_numpy()
+                idx_closest = int(np.argmin(np.abs(x_exp)))
+                y_center = y_exp[idx_closest] if y_exp.size > 0 else 0.0
+                y_exp_norm = y_exp / y_center if y_center > 0 else y_exp
+                plt.plot(
+                    x_exp, y_exp_norm,
+                    color=colors[idx % len(colors)], linestyle='--', linewidth=2.0,
+                    label="Experiment Be (0.5 mm)",
+                    zorder=6,
+                )
+
+                be_exp_export_frame = pd.DataFrame(
+                    {
+                        "source": "experiment_be",
+                        "material": material,
+                        "coating": getattr(sim, "outer_material", ""),
+                        "z_mm": 0.5,
+                        "t_breakout_ns": float(t_breakout),
+                        "t_plot_ns": float(t_closest),
+                        "r_mm": x_exp,
+                        "flux_norm": y_exp_norm,
+                    }
+                )
+                continue
+
             for z_key, df_exp in exp_ta2o5.items():
                 if abs(z_mm - z_key) < 1e-3:
                     x_exp = df_exp['x'].to_numpy()
@@ -898,6 +957,18 @@ def plot_flux_curvature_post_breakout(
         save_path = out_dir / f"flux_curvature_post_breakout_{delay_ns}ns.png"
         plt.savefig(save_path, dpi=250, bbox_inches='tight')
         print(f"Saved figure -> {save_path}")
+
+        export_frames = []
+        if model_export_frames:
+            export_frames.extend(model_export_frames)
+        if be_exp_export_frame is not None:
+            export_frames.append(be_exp_export_frame)
+
+        if export_frames:
+            export_df = pd.concat(export_frames, ignore_index=True)
+            export_csv = out_dir / f"flux_curvature_post_breakout_{delay_ns}ns_data.csv"
+            export_df.to_csv(export_csv, index=False)
+            print(f"Saved post-breakout comparison data -> {export_csv}")
 
     if show_plot:
         plt.show()

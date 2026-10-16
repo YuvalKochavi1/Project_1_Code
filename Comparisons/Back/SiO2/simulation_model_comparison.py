@@ -452,12 +452,12 @@ def plot_front_surface(output_dir, wall_name, simulation_data, model_data, front
         # if wall_name == "Gold_100":
         #     offset = 0.008
         z_reg = model_data["regular"][time_ns]["z_F_radial_cm"]# + offset
-        z_flat = model_data["flattop"][time_ns]["z_F_radial_cm"]# + offset
+        z_flat = model_data["flattop"][time_ns]["z_F_radial_cm"] + 0.005
         
         ax.plot(
-            10*model_data["regular"][time_ns]["r_cm"],
-            10*z_reg,
-            color=hen_color,
+            10*model_data["flattop"][time_ns]["r_cm"],
+            10*z_flat,
+            color=flat_color,
             linestyle=flat_style,
             linewidth=hen_width,
             label=f"Model t={time_ns:.1f} ns",

@@ -22,7 +22,7 @@ from simulation_2d_plots import (
 
 heatmap_times = (1e-9, 2e-9, 2.5e-9)  # default; overridden per-material below
 
-Material = "SiO2_low_energy"
+Material = "SiO2"
 CoatingMaterial = "Gold"
 if Material == "SiO2" or Material == "Ta2O5":
     Experiment = "Back"
@@ -64,8 +64,8 @@ def create_simulation(
     material: str = Material,
     coating_material: str = "Gold",
     R_foam: float | None = None,
-    Nz: int = 320,
-    Nr_foam: int = 320,
+    Nz: int = 450,
+    Nr_foam: int = 450,
     kind_of_D_face: str = "arithmetic",
     chi: float = 1000.0,
     T_material_0_K: float = 300.0,
@@ -538,7 +538,7 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
 
     flux_fig_dir = current_figures_dir / "flux"
     if material == "Ta2O5":
-        detector_pos = [0.25, 0.5, 0.75, 1.0]
+        detector_pos = [0.5]
     elif material == "SiO2":
         detector_pos = [0.25, 0.5, 0.75, 1.0]
     else:
@@ -575,12 +575,14 @@ def run_default_pipeline(*, material: str = "SiO2", coating_material: str = "Gol
         stored_t,
         stored_Tm,
         detector_positions_mm=detector_pos,
-        delay_ns=0.5,
+        delay_ns=0.2,
         show_plot=False,
         out_dir=flux_fig_dir,
         mode="Simulation",
         material=material,
     )
+
+    
 
     heated_gold_cells_by_z = sim.compute_heated_gold_cells_by_z(stored_Tm)
     print("Heated outer-coat cells by z (last stored snapshot):")
