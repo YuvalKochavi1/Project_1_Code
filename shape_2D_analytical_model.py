@@ -24,6 +24,13 @@ def _resolve_wall_output_name(wall, g_gold_scale=1.0):
         return "Gold_100"
     return wall
 
+
+_WALL_CANONICAL_NAMES = {"gold": "Gold", "copper": "Copper", "be": "Be", "vacuum": "Vacuum"}
+
+
+def _canonical_wall_name(wall):
+    return _WALL_CANONICAL_NAMES.get(str(wall).strip().lower(), wall)
+
 def _resolve_colormap_settings(
     color_style="default",
     *,
@@ -446,6 +453,7 @@ def plot_temperature_heatmap_2D(
     """
     # Get material parameters from global scope
     exponent = 1.0 / (4.0 + alpha - beta)  # Self-similar profile exponent
+    wall = _canonical_wall_name(wall)
     if wall == "Gold":
         exponent_wall = 1.0 / (4.0 + alpha_gold - beta_gold)
     elif wall == "Copper":

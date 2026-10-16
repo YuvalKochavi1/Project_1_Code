@@ -293,7 +293,7 @@ def Back_SiO2(times_to_store):
     #                 ablation=True, title_suffix="(const rho)", color_option = "prr_back")
     plot_temperature_heatmap_2D(gold_bessel_data, analytic_position_gold_loss,
                     Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
-                    ablation=False, title_suffix="(gold wall loss)", color_option = "default", wall = 'gold', flattop=Flattop_condition)
+                    ablation=False, title_suffix="(gold wall loss)", color_option = "default", wall = 'Gold', flattop=Flattop_condition)
     plot_temperature_heatmap_2D(bessel_data_vacuum_loss, analytic_positions_vacuum_lost,
                     Ts_1D, times_to_store, times_ns=[1.0, 2.0, 2.5],
                     ablation=False, title_suffix="(vacuum wall loss)", color_option = "default", wall = 'Vacuum', flattop=Flattop_condition)
@@ -715,7 +715,7 @@ def compare_with_article_2_exp4_14(times_to_store):
                     ablation=True, title_suffix="(lam_eff)", color_option = "prr_back")
     plot_temperature_heatmap_2D(gold_bessel_data, analytic_position_gold_loss,
                     Ts_1D, times_to_store, times_ns=[5,8,11],
-                    ablation=False, title_suffix="(gold wall loss)", color_option = "default", wall = 'gold', flattop=Flattop_condition)
+                    ablation=False, title_suffix="(gold wall loss)", color_option = "default", wall = 'Gold', flattop=Flattop_condition)
     plot_temperature_heatmap_2D(bessel_data_vacuum_loss, analytic_positions_vacuum_lost,
                     Ts_1D, times_to_store, times_ns=[5,8,11],
                     ablation=False, title_suffix="(vacuum wall loss)", color_option = "default", wall = 'Vacuum', flattop=Flattop_condition)

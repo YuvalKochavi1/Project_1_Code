@@ -455,10 +455,10 @@ def plot_front_surface(output_dir, wall_name, simulation_data, model_data, front
         z_flat = model_data["flattop"][time_ns]["z_F_radial_cm"] + 0.005
         
         ax.plot(
-            10*model_data["flattop"][time_ns]["r_cm"],
-            10*z_flat,
-            color=flat_color,
-            linestyle=flat_style,
+            10*model_data["regular"][time_ns]["r_cm"],
+            10*z_reg,
+            color=hen_color,
+            linestyle=hen_style,
             linewidth=hen_width,
             label=f"Model t={time_ns:.1f} ns",
         )
