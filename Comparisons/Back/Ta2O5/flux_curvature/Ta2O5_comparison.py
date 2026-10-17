@@ -68,6 +68,31 @@ EXP_FILES = {
     "Gold": EXP_DATA_DIR / "gold_curve.csv",
     "Be":   EXP_DATA_DIR / "be_curve.csv",
 }
+BE_SIMULATION_PATH = (
+    BASE_DIR / "Figures_new" / "Back" / "Ta2O5" / "2D_simulation"
+    / "flux" / "flux_curvature_post_breakout_0.2ns_data.csv"
+)
+
+
+def _load_be_simulation_profile():
+    """Load the supplied dense Be profile, excluding experimental rows."""
+    data = pd.read_csv(BE_SIMULATION_PATH)
+    profile = data.loc[
+        (data["source"] == "model")
+        & (data["material"] == "Ta2O5")
+        & (data["coating"] == "Be")
+        & np.isclose(data["z_mm"], DETECTOR_MM)
+        & (data["r_mm"] >= 0),
+        ["r_mm", "flux_norm"],
+    ].sort_values("r_mm")
+    if profile.empty:
+        raise ValueError(
+            f"No nonnegative-radius Be profile at z={DETECTOR_MM:g} mm "
+            f"in {BE_SIMULATION_PATH}"
+        )
+    if not np.isfinite(profile.to_numpy()).all():
+        raise ValueError(f"Nonfinite Be profile values in {BE_SIMULATION_PATH}")
+    return profile["r_mm"].to_numpy(), profile["flux_norm"].to_numpy()
 
 # ── Helper: run the solver and extract flux profile at breakout + delay ───
 def _compute_profile(wall_material):
@@ -169,6 +194,13 @@ if __name__ == "__main__":
                 label=cfg["label"].replace("model", "expt."),
             )
 
+    r_simulation, flux_simulation = _load_be_simulation_profile()
+    ax.plot(
+        r_simulation, flux_simulation,
+        color="cyan", linestyle="-.", linewidth=2.2,
+        label="Be (simulation)",
+    )
+
     ax.set_xlabel(r"$r$ [mm]")
     ax.set_ylabel(r"Flux [normalised]")
     ax.set_ylim(bottom=0)
@@ -233,8 +265,8 @@ if __name__ == "__main__":
         z_cm = DETECTOR_MM / 10.0
         _, t_breakout = detect_arrival_time(z_cm, times, xF)
         t_snap = t_breakout + DELAY_NS
-        if DETECTOR_MM == 0.5:
-            t_snap -= 0.1
+        # if DETECTOR_MM == 0.5:
+        #     t_snap -= 0.1
 
         available = _numeric_time_keys(bessel_data)
         t_closest = float(available[np.argmin(np.abs(available - t_snap))])

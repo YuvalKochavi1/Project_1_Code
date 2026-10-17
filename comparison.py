@@ -124,7 +124,7 @@ def Back_SiO2(times_to_store):
     analytic_positions_vacuum_lost, Ts_vacuum_lost, E_vacuum_loss, _, data_of_R, bessel_data_vacuum_loss = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Vacuum', lam_eff = True, power=0.9)  # stored_t is ns
     analytic_position_Be_lost, Ts_Be_lost, E_Be_lost, Ew_be_out, data_of_R, Be_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Be', lam_eff = True, power=1.2)  # stored_t is ns
     analytic_position_Cu_lost, Ts_Cu_lost, E_Cu_lost, Ew_cu_out, data_of_R, Cu_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Copper', lam_eff = True, power=1.3)  # stored_t is ns
-    analytic_position_gold_loss, Ts_gold_loss, E_gold_loss, Ew_gold_out, data_of_R, gold_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = True, power=1.7)  # stored_t is ns
+    analytic_position_gold_loss, Ts_gold_loss, E_gold_loss, Ew_gold_out, data_of_R, gold_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = True, power=2)  # stored_t is ns
     # analytic_position_gold_100_lost, Ts_gold_100_lost, E_gold_100_lost, Ew_gold_100_out, data_of_R, gold_100_bessel_data = analytic_wave_front_dispatch(times_to_store,use_seconds=True,mode="marshak_wall_loss",vary_rho=False, wall_material='Gold', lam_eff = True, power=4, g_gold_scale=100)  # stored_t is ns
 
     plt.figure(figsize=(8, 6))
@@ -137,7 +137,7 @@ def Back_SiO2(times_to_store):
         analytic_positions_no_marshak=analytic_positions_no_marshak,
         )
 
-    plot_csv_errorbar(article_front_path("exp_results_back.csv"), y_scale=10,xerr=0.1,fmt='o',capsize=4,elinewidth=1.5,markersize=10,label="Expt. data", color='black')
+    plot_csv_errorbar(article_front_path("exp_results_back.csv"), y_scale=10,xerr=0.1,fmt='o',capsize=4,elinewidth=1.5,markersize=6,label="Expt. data", color='black')
 
     #plot_csv_series(
     #     article_front_path("ablation_block.csv"),
@@ -478,12 +478,12 @@ def compare_with_article_2_exp3_13a(times_to_store):
         plt.plot(
             times_to_store, analytic_position_Be_lost,
             linestyle="-",
-            label="Analytic x_F(t) (Be Lost)",
+            label=r"Be Lost + $\lambda_{\mathrm{eff}}$",
             color='cyan'
         )
     plot_csv_errorbars([
         {"path": article_front_path("exp_results_gold.csv"), "y_scale": 10, "xerr": 0.03, "label": "Expt. Gold", "color": "black"},
-        {"path": article_front_path("exp_results_be.csv"), "y_scale": 10, "xerr": 0.03, "label": "Expt. Be", "color": "orange"},
+        {"path": article_front_path("exp_results_be.csv"), "y_scale": 10, "xerr": 0.03, "label": "Expt. Be", "color": "cyan"},
     ])
 
     # plot_csv_curves([
@@ -893,10 +893,10 @@ def compare_with_article_2_exp7_17(times_to_store):
 
     plt.figure(figsize = (8, 6))
     power_law = (4 + alpha - beta) / 4
-    analytic_positions_vacuum_lost = analytic_positions_vacuum_lost * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    analytic_positions_marshak = analytic_positions_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    analytic_positions_no_marshak = analytic_positions_no_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
-    analytic_positions_2D_lam_eff = analytic_positions_2D_lam_eff * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    # analytic_positions_vacuum_lost = analytic_positions_vacuum_lost * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    # analytic_positions_marshak = analytic_positions_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    # analytic_positions_no_marshak = analytic_positions_no_marshak * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
+    # analytic_positions_2D_lam_eff = analytic_positions_2D_lam_eff * (1 - 0.5**power_law)  # From section V part 2 where f = 0.5 (50% of maximum radiative flux)
     
     plot_standard_front_analytic_models(
         times_to_store,

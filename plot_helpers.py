@@ -108,21 +108,21 @@ def plot_standard_front_analytic_models(
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_marshak,
-        label=r"Model - Marshak BC",
+        label=r"Marshak BC",
         linestyle="-",
         color='blue',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_gold_loss,
-        label=fr"Model - {wall_material} Loss",
+        label=fr"{wall_material} Loss",
         linestyle="-",
         color='orange',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_2D,
-        label=fr"Model - 2D effects",
+        label=fr"2D effects",
         linestyle="-",
         color='black',
     )
@@ -131,14 +131,14 @@ def plot_standard_front_analytic_models(
         _smooth_tail_from_time(times_to_store, analytic_positions_2D_lam_eff, start_time_ns=3.5, window=11)
         if Material == "SiO2_copper"
         else analytic_positions_2D_lam_eff,
-        label=fr"Model - 2D effects + $\lambda_{{\mathrm{{eff}}}}$",
+        label=fr"2D effects + $\lambda_{{\mathrm{{eff}}}}$",
         linestyle="-",
         color='red',
     )
     plot_analytic_if_available(
         times_to_store,
         analytic_positions_ablation_const_rho,
-        label=fr"Model - ({wall_material} Ablation Const $\rho$)",
+        label=fr"({wall_material} Ablation Const $\rho$)",
         linestyle="-",
         color='pink',
     )

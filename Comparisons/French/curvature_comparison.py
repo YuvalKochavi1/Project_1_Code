@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 # Import parameters (base import)
 import parameters
 from pathlib import Path
-from csv_helpers import BASE_DIR, ensure_dir
+from csv_helpers import BASE_DIR, ensure_dir, save_figure_to_path
 
 
 def _extract_sorted_time_items(data_dict):
@@ -107,7 +107,7 @@ def plot_material_albedo(material_name, bessel_data, wall_material):
     plt.legend(prop={'family': 'serif'}, fontsize=11, loc='best')
     plt.tight_layout()
     
-    plt.savefig(fig_dir / "albedo_vs_time.png", dpi=300, bbox_inches='tight')
+    save_figure_to_path(fig_dir / "albedo_vs_time.png", dpi=300, bbox_inches='tight')
     print(f"Saved surface albedo vs time plot to: {fig_dir / 'albedo_vs_time.png'}")
     plt.close()
     
@@ -137,7 +137,7 @@ def plot_material_albedo(material_name, bessel_data, wall_material):
     plt.legend(prop={'family': 'serif'}, fontsize=11, loc='best')
     plt.tight_layout()
     
-    plt.savefig(fig_dir / "albedo_profile.png", dpi=300, bbox_inches='tight')
+    save_figure_to_path(fig_dir / "albedo_profile.png", dpi=300, bbox_inches='tight')
     print(f"Saved albedo profile vs depth plot to: {fig_dir / 'albedo_profile.png'}")
     plt.close()
 
@@ -244,7 +244,7 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     # Ensure directories exist and save plot
     fig_dir = BASE_DIR / "Figures_new" / "French" / material_name
     fig_save_path = fig_dir / f"curvature_comparison_{z_detector_mm}mm.png"
-    plt.savefig(fig_save_path, dpi=300, bbox_inches='tight')
+    save_figure_to_path(fig_save_path, dpi=300, bbox_inches='tight')
     print(f"Saved comparison plot to: {fig_save_path}")
     plt.close()
     
@@ -268,7 +268,7 @@ def run_material_comparison(material_name, z_detector_mm, csv_data_filename, wal
     }
 
 def plot_combined_comparison(gold_results, copper_results):
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(4.3, 8))
     plt.rcParams.update({
         'font.family': 'serif',
         'text.usetex': True,
@@ -277,11 +277,11 @@ def plot_combined_comparison(gold_results, copper_results):
     
     # Plot Gold model & experiment
     plt.plot(10*gold_results['r_symmetric'], 0.47+gold_results['t_arr_ablation_lam_eff_sym'], color='red', linestyle='-', linewidth=2.2, label=r'Gold Model')
-    plt.scatter(10*gold_results['exp_x'], gold_results['exp_y'], color='red', marker='o', s=45, label='Gold Experiment', zorder=5)
+    plt.scatter(-10*gold_results['exp_x'], gold_results['exp_y'], color='red', marker='o', s=45, label='Gold Expt.', zorder=5)
     
     # Plot Copper model & experiment
     plt.plot(10*copper_results['r_symmetric'], 0.165+copper_results['t_arr_ablation_lam_eff_sym'], color='blue', linestyle='-', linewidth=2.2, label=r'Copper Model')
-    plt.scatter(10*copper_results['exp_x'], copper_results['exp_y'], color='blue', marker='o', s=45, label='Copper Experiment', zorder=5)
+    plt.scatter(-10*copper_results['exp_x'], copper_results['exp_y'], color='blue', marker='o', s=45, label='Copper Expt.', zorder=5)
     
     # Interface boundaries
     # plt.axvline(x=0.05, color='red', linestyle=':', alpha=0.5, label='Foam-Gold Interface (R = 0.05 cm)')
@@ -295,18 +295,18 @@ def plot_combined_comparison(gold_results, copper_results):
 
     ax = plt.gca()
     for spine in ax.spines.values():
-        spine.set_linewidth(spine.get_linewidth() * 2.0)
+        spine.set_linewidth(spine.get_linewidth() * 1.2)
     
-    plt.xlim(10*(-0.11), 10*(0.11))
+    plt.xlim(0, 10*(0.11))
     ax.grid(False)
     ax.xaxis.grid(False, which='both')
     ax.yaxis.grid(False, which='both')
     plt.legend(
-        prop={'family': 'serif', 'size': 19},
+        prop={'family': 'serif', 'size': 17},
         loc='best',
-        markerscale=1.3,
-        handlelength=2.0,
-        borderpad=0.4,
+        markerscale=1.2,
+        handlelength=1.7,
+        borderpad=0.35,
         labelspacing=0.35,
     )
     plt.tight_layout()
@@ -314,7 +314,7 @@ def plot_combined_comparison(gold_results, copper_results):
     fig_dir = BASE_DIR / "Figures_new" / "French"
     ensure_dir(fig_dir)
     fig_save_path = fig_dir / "combined_curvature_comparison.png"
-    plt.savefig(fig_save_path, dpi=300, bbox_inches='tight')
+    save_figure_to_path(fig_save_path, dpi=300, bbox_inches='tight')
     print(f"Saved combined comparison plot to: {fig_save_path}")
     plt.close()
     

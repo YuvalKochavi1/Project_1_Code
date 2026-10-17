@@ -74,3 +74,22 @@ For full run-and-plot pipeline, `simulate()` calls:
 - Optional 2D spatial front and temperature heatmaps.
 
 All outputs are routed through `save_figure(...)` to the current figures directory configuration.
+
+## 7. French Curvature Comparison Output
+
+`Comparisons/French/curvature_comparison.py` saves its albedo, individual
+curvature, and combined comparison PNGs through `csv_helpers.save_figure_to_path(...)`.
+The shared `save_figure(...)` helper uses the same saving mechanism.
+Each image is rendered to a temporary file in the destination directory, closed,
+and then moved over the destination with `os.replace`. This avoids directly
+truncating an existing PNG and preserves it if rendering fails.
+Temporary files are cleaned up.
+
+On Windows, directly overwriting a memory-mapped PNG can raise
+`OSError: [Errno 22] Invalid argument`. Windows can also block replacement of the
+mapped image. In that case, the helper raises `PermissionError` with instructions
+to close the image preview or other program holding the PNG and rerun.
+Directory permissions can also prevent replacement. Save errors still propagate
+to the caller; they are not silently skipped.
+The `FigureCanvasAgg is non-interactive` warning only means that `plt.show()`
+cannot open a window with the script's headless backend; it is not a save error.

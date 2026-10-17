@@ -17,6 +17,13 @@ time t_start (when z_F first reaches z) is also detected and stored.
 All three curves are then normalised to [0, 1] for relative comparison.
 """
 
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -25,7 +32,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 # Font configuration: serif and LaTeX style math font
 plt.rcParams.update({
     'font.family': 'serif',
-    'font.size': 22,
+    'font.size': 18,
     'text.usetex': True,
     'axes.unicode_minus': False,
     'axes.grid': False,
@@ -33,7 +40,7 @@ plt.rcParams.update({
     'axes.linewidth': 2.0,
     'xtick.labelsize': 22,
     'ytick.labelsize': 22,
-    'legend.fontsize': 18,
+    'legend.fontsize': 14,
     'axes.labelsize': 24,
     'axes.titlesize': 24,
 })
@@ -1003,6 +1010,91 @@ def plot_flux_curvature(
     return fig
 
 
+def _post_breakout_profile(result, times, z_mm, delay_ns, wall_material, ablation):
+    """Extract one radial flux profile at the requested delay after local arrival."""
+    _, t_breakout = detect_arrival_time(z_mm / 10.0, times, result[0])
+    if t_breakout is None:
+        raise ValueError(f"{Material}: heat front never reaches z={z_mm:g} mm.")
+    t_target = t_breakout + delay_ns
+    if Material == "Ta2O5" and z_mm in (0.25, 0.5):
+        t_target -= 0.1
+    if Material == "SiO2" and z_mm == 1.0:
+            t_target -= 0.2
+    bessel_data = result[5]
+    available = _numeric_time_keys(bessel_data)
+    if available.size == 0:
+        raise ValueError(f"{Material}: no numeric snapshot times available.")
+    if t_target < available[0] or t_target > available[-1]:
+        raise ValueError(
+            f"{Material}: requested snapshot {t_target:g} ns is outside "
+            f"the available range [{available[0]:g}, {available[-1]:g}] ns. "
+            "Extend times_to_store to cover breakout plus the requested delay."
+        )
+    t_closest = float(available[np.argmin(np.abs(available - t_target))])
+    snapshot = bessel_data[t_closest]
+    ds = compute_flux_curvature_at_position(
+        z_mm / 10.0,
+        np.asarray(snapshot["r_grid"], dtype=float),
+        np.asarray(snapshot["z_F_radial"], dtype=float),
+        float(np.interp(t_closest, times, result[1])),
+        snapshot=snapshot,
+        wall_material=wall_material,
+        ablation=ablation,
+    )
+    return t_breakout, t_closest, ds
+
+
+def _recompute_ta2o5_profile(times_to_store, *, delay_ns, **solver_options):
+    """Compute the 1 mm Ta2O5 overlay in isolation, preserving SiO2 module state."""
+    env = os.environ.copy()
+    env["PHYSICS_MATERIAL"] = "Ta2O5"
+    env["MPLBACKEND"] = "Agg"
+    request = {
+        "times": np.asarray(times_to_store, dtype=float).tolist(),
+        "delay_ns": float(delay_ns),
+        "solver_options": solver_options,
+    }
+    worker = (
+        "import json, sys, numpy as np\n"
+        "from pathlib import Path\n"
+        "import csv_helpers\n"
+        "csv_helpers.FIGURES_DIR = Path(sys.argv[1]).parent / 'figures'\n"
+        "from radiation_flux import analytic_wave_front_dispatch, _post_breakout_profile\n"
+        "request = json.load(sys.stdin)\n"
+        "times = np.asarray(request['times'], dtype=float)\n"
+        "options = request['solver_options']\n"
+        "result = analytic_wave_front_dispatch(times, **options)\n"
+        "arrival, snapshot, ds = _post_breakout_profile("
+        "result, times, 1.0, request['delay_ns'], options['wall_material'], "
+        "'ablation' in options['mode'])\n"
+        "np.savez(sys.argv[1], r_mm=10.0 * ds['r_grid'], "
+        "flux=ds['flux_radial'], arrival_ns=arrival, snapshot_ns=snapshot)\n"
+    )
+    with tempfile.TemporaryDirectory(prefix="ta2o5_profile_") as directory:
+        output_path = Path(directory) / "profile.npz"
+        completed = subprocess.run(
+            [sys.executable, "-c", worker, str(output_path)],
+            input=json.dumps(request), capture_output=True, text=True,
+            cwd=Path(__file__).resolve().parent, env=env, check=False,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(
+                "Ta2O5 post-breakout calculation failed.\n"
+                f"STDOUT:\n{completed.stdout}\nSTDERR:\n{completed.stderr}"
+            )
+        with np.load(output_path) as profile:
+            r_mm = profile["r_mm"].copy()
+            flux = profile["flux"].copy()
+            print(
+                f"Ta2O5: 1 mm breakout at {float(profile['arrival_ns']):.4f} ns; "
+                f"delay={delay_ns:g} ns, snapshot={float(profile['snapshot_ns']):.4f} ns."
+            )
+    peak = float(np.max(flux))
+    if not np.isfinite(peak) or peak <= 0:
+        raise ValueError("Ta2O5 post-breakout profile has no positive finite peak.")
+    return r_mm, flux / peak
+
+
 def plot_flux_curvature_post_breakout(
     times_to_store,
     *,
@@ -1019,7 +1111,9 @@ def plot_flux_curvature_post_breakout(
     """
     For the active material, plot the radial flux curvature at a fixed delay (e.g. 0.5 ns)
     after the breakout time for each detector position, all on the same graph, using global
-    normalization to show relative attenuation.
+    normalization to show relative attenuation. For SiO2 at 1 mm, the Ta2O5
+    model overlay is recomputed using the same solver options and delay;
+    experimental CSV overlays remain fixed measurements.
     """
     if detector_positions_mm is None:
         if Material == "Ta2O5":
@@ -1039,7 +1133,6 @@ def plot_flux_curvature_post_breakout(
     )
 
     xF = result[0]       # heat-front position [cm]
-    Ts = result[1]       # surface temperature [HeV]
     bessel_data = result[5] if len(result) > 5 else {}
     times = np.asarray(times_to_store, dtype=float)
 
@@ -1060,28 +1153,8 @@ def plot_flux_curvature_post_breakout(
         if t_breakout is None:
             print(f"Heat front never reaches z = {z_mm:.1f} mm. Skipping.")
             continue
-        if (z_mm == 0.25 or z_mm == 0.5) and Material == "Ta2O5": 
-            t_target = t_breakout + delay_ns - 0.1
-        else:
-            t_target = t_breakout + delay_ns
-        #t_target = t_breakout + delay_ns
-        
-        # Find closest snapshot in bessel_data
-        available = _numeric_time_keys(bessel_data)
-        if available.size == 0:
-            print("Error: bessel_data contains no numeric time keys. Cannot compute curvature.")
-            return
-        t_closest = float(available[np.argmin(np.abs(available - t_target))])
-        
-        snapshot = bessel_data[t_closest]
-        r_grid_snap = np.asarray(snapshot['r_grid'], dtype=float)
-        z_F_radial = np.asarray(snapshot['z_F_radial'], dtype=float)
-        Ts_t = float(np.interp(t_closest, times, Ts))
-        
-        # Compute curvature at this depth and time
-        ds = compute_flux_curvature_at_position(
-            z_cm, r_grid_snap, z_F_radial, Ts_t,
-            snapshot=snapshot, wall_material=wall_material, ablation=ablation
+        t_breakout, t_closest, ds = _post_breakout_profile(
+            result, times, z_mm, delay_ns, wall_material, ablation
         )
         
         raw_profiles.append((z_mm, t_breakout, t_closest, ds))
@@ -1102,7 +1175,7 @@ def plot_flux_curvature_post_breakout(
     y_norm = 1.0
     exp_sio2 = {}
     exp_sio2_ta2o5 = {}
-    exp_sio2_model_ta2o5 = {}
+    ta2o5_profile = None
     if Material == "Ta2O5":
         base_ta_path = BASE_DIR / "Data_new" / "Back" / "Ta2O5" / "article" / "flux_curvature"
         # files 1.csv -> 0.25mm, 2.csv -> 0.5mm, 3.csv -> 0.75mm, 4.csv -> 1.0mm
@@ -1140,13 +1213,12 @@ def plot_flux_curvature_post_breakout(
             except Exception as e:
                 print(f"Error loading SiO2 Ta2O5_1mm.csv: {e}")
 
-        csv_model_ta2o5_path = base_sio2_path / "modelTa2O5.csv"
-        if csv_model_ta2o5_path.exists():
-            try:
-                df_mta = pd.read_csv(csv_model_ta2o5_path)
-                exp_sio2_model_ta2o5[1.0] = df_mta
-            except Exception as e:
-                print(f"Error loading SiO2 modelTa2O5.csv: {e}")
+        if any(abs(profile[0] - 1.0) < 1e-3 for profile in raw_profiles):
+            ta2o5_profile = _recompute_ta2o5_profile(
+                times_to_store, delay_ns=delay_ns, mode=mode,
+                wall_material=wall_material, use_seconds=use_seconds,
+                vary_rho=vary_rho, lam_eff=lam_eff, power=power,
+            )
 
     r_mm_last = None
     for idx, (z_mm, t_breakout, t_closest, ds) in enumerate(raw_profiles):
@@ -1162,6 +1234,8 @@ def plot_flux_curvature_post_breakout(
         flux_sym = np.concatenate((flux_norm[::-1], flux_norm[1:]))
         
         label = fr"$z = {z_mm:.2f}$ mm"
+        if Material == "SiO2":
+            label = fr"SiO$_2$ Model"
         plt.plot(r_sym, flux_sym, color=colors[idx % len(colors)], linewidth=2.2, label=label)
 
         # Plot Ta2O5 experimental data
@@ -1196,7 +1270,7 @@ def plot_flux_curvature_post_breakout(
                     plt.plot(
                         x_sym, y_sym,
                         color=colors[idx % len(colors)], linestyle='--', linewidth=2.0,
-                        label="Experiment (1mm.csv)",
+                        label=r"SiO$_2$ Experiment",
                         zorder=5
                     )
                     break
@@ -1214,28 +1288,20 @@ def plot_flux_curvature_post_breakout(
                     plt.plot(
                         x_sym, y_sym,
                         color='blue', linestyle=':', linewidth=2.0,
-                        label="Experiment (Ta2O5 1mm.csv)",
+                        label=r"Ta$_2$O$_5$ Experiment",
                         zorder=5
                     )
                     break
 
-            for z_key, df_exp in exp_sio2_model_ta2o5.items():
-                if abs(z_mm - z_key) < 1e-3:
-                    x_exp = df_exp['x'].to_numpy()
-                    y_exp = df_exp['y'].to_numpy()
-                    y_exp_norm = y_exp / np.max(y_exp) if np.max(y_exp) > 0 else y_exp
-                    
-                    # Already spans both positive and negative x
-                    x_sym = x_exp
-                    y_sym = y_exp_norm
-                    
-                    plt.plot(
-                        x_sym, y_sym,
-                        color='blue', linestyle='-.', linewidth=2.0,
-                        label="Model Ta2O5 (modelTa2O5.csv)",
-                        zorder=5
-                    )
-                    break
+            if abs(z_mm - 1.0) < 1e-3 and ta2o5_profile is not None:
+                r_ta, flux_ta = ta2o5_profile
+                plt.plot(
+                    np.concatenate((-r_ta[::-1], r_ta[1:])),
+                    np.concatenate((flux_ta[::-1], flux_ta[1:])),
+                    color='blue', linestyle='-.', linewidth=2.0,
+                    label=fr"Ta$_2$O$_5$ Model",
+                    zorder=5,
+                )
 
 
     # Draw original Foam-Wall interface symmetrically
@@ -1251,7 +1317,10 @@ def plot_flux_curvature_post_breakout(
     ax.grid(False, which='both', axis='both')
     ax.xaxis.grid(False)
     ax.yaxis.grid(False)
-    plt.legend(prop={'family': 'serif'}, loc='upper left')
+    plt.legend(
+        prop={'family': 'serif', 'size': 16}, loc='upper left',
+        borderpad=1, labelspacing=0.35, handlelength=2, handletextpad=0.7,
+    )
     plt.tight_layout()
 
     save_figure(f"flux_curvature_post_breakout_{delay_ns}ns.png", model1_5=False, model2_D=True)
@@ -1695,7 +1764,7 @@ if __name__ == "__main__":
             lam_eff=True,
             power=1,
             detector_positions_mm=[1.0],
-            delay_ns=0.4 - 0.15,
+            delay_ns=0.4,
             show_plot=True,
         )
 

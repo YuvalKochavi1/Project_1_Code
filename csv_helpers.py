@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import tempfile
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -22,6 +23,60 @@ def ensure_figures_dir():
     os.makedirs(_figures_dir(), exist_ok=True)
 
 
+def save_figure_to_path(filename, **save_kwargs):
+    """Save via a sibling temporary file to avoid truncating an open image."""
+    save_path = Path(filename)
+    if not save_path.suffix and not save_kwargs.get("format"):
+        save_path = save_path.with_suffix(f".{plt.rcParams['savefig.format']}")
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        dir=save_path.parent,
+        prefix=f".{save_path.stem}.",
+        suffix=save_path.suffix,
+        delete=False,
+    ) as temporary_file:
+        temporary_path = Path(temporary_file.name)
+    try:
+        plt.savefig(str(temporary_path), **save_kwargs)
+        try:
+            os.replace(temporary_path, save_path)
+        except PermissionError as error:
+            raise PermissionError(
+                error.errno,
+                "Cannot replace the figure. Close any image preview or other "
+                "program using this file, check directory permissions, and rerun.",
+                str(save_path),
+            ) from error
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def save_dataframe_to_csv(dataframe, filename, **to_csv_kwargs):
+    """Save via a sibling temporary file so a failed replacement preserves the existing CSV."""
+    save_path = Path(filename)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        dir=save_path.parent,
+        prefix=f".{save_path.stem}.",
+        suffix=save_path.suffix or ".csv",
+        delete=False,
+    ) as temporary_file:
+        temporary_path = Path(temporary_file.name)
+    try:
+        dataframe.to_csv(temporary_path, **to_csv_kwargs)
+        try:
+            os.replace(temporary_path, save_path)
+        except PermissionError as error:
+            raise PermissionError(
+                error.errno,
+                "Cannot replace the CSV file. Close any CSV preview or other "
+                "program using this file, check directory permissions, and rerun.",
+                str(save_path),
+            ) from error
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
 def save_figure(filename, model1_5=False, model2_D=False, dpi=None, bbox_inches=None):
     ensure_figures_dir()
     relative_path = Path(filename)
@@ -37,7 +92,7 @@ def save_figure(filename, model1_5=False, model2_D=False, dpi=None, bbox_inches=
         save_kwargs["dpi"] = dpi
     if bbox_inches is not None:
         save_kwargs["bbox_inches"] = bbox_inches
-    plt.savefig(str(save_path), **save_kwargs)
+    save_figure_to_path(save_path, **save_kwargs)
     print(f"Saved figure: {save_path}")
 
 

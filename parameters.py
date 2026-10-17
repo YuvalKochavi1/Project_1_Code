@@ -58,8 +58,8 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = os.getenv("PHYSICS_MATERIAL", "SiO2")  # "SiO2", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
-Flattop_condition = False  # True or False, whether to use flat-top temperature profile or not
+Material = os.getenv("PHYSICS_MATERIAL", "SiO2_Moore")  # "SiO2", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Flattop_condition = True  # True or False, whether to use flat-top temperature profile or not
 
 if Material == "SiO2":
     Experiment = "Back"
@@ -151,6 +151,7 @@ if Material == "SiO2_Moore":
     csv_path = article_temperature_path("T_drive.csv")
     t_array_TD, T_array_TD = load_time_temp(csv_path)
     T_array_TD = (340.2/368.1)**0.25 * T_array_TD  # Moore data correction
+    print(T_array_TD)
     #lambda_ross = 0.212 # Rosseland mean free path (cm) at maximum temperature (3.05 Hev)
 
 elif Material == "C8H7Cl":

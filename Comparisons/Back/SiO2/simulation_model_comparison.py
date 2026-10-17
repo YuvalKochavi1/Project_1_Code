@@ -30,11 +30,11 @@ print(f"Experiment: {Experiment}, Material: {Material}")
 FRONT_TIMES_NS = [1, 2, 2.5]
 COMBINED_TIME_NS = 2.5
 COATING_COLORS = {
-    "Be": "tab:blue",
-    "Gold": "tab:orange",
-    "Gold_100": "tab:red",
-    "Vacuum": "tab:green",
-    "Copper": "tab:purple",
+    "Be": "cyan",
+    "Gold": "red",
+    "Gold_100": "red",
+    "Vacuum": "gray",
+    "Copper": "orange",
 }
 
 plt.rcParams.update({
@@ -452,16 +452,24 @@ def plot_front_surface(output_dir, wall_name, simulation_data, model_data, front
         # if wall_name == "Gold_100":
         #     offset = 0.008
         z_reg = model_data["regular"][time_ns]["z_F_radial_cm"]# + offset
-        z_flat = model_data["flattop"][time_ns]["z_F_radial_cm"] + 0.005
+        z_flat = model_data["flattop"][time_ns]["z_F_radial_cm"]# + 0.005
         
         ax.plot(
             10*model_data["regular"][time_ns]["r_cm"],
             10*z_reg,
             color=hen_color,
-            linestyle=hen_style,
+            linestyle=flat_style,
             linewidth=hen_width,
             label=f"Model t={time_ns:.1f} ns",
         )
+        # ax.plot(
+        #         10*model_data["flattop"][time_ns]["r_cm"],
+        #         10*z_flat,
+        #         color=flat_color,
+        #         linestyle=flat_style,
+        #         linewidth=flat_width,
+        #         label=f"Model t={time_ns:.1f} ns",
+        #     )
         # ax.plot(
         #     10*model_data["flattop"][time_ns]["r_cm"],
         #     10*z_flat,
@@ -610,8 +618,8 @@ def plot_all_coatings_front_surface_at_time(configs, requested_time_ns=COMBINED_
             )
             
             plt.plot(
-                10*model_data["regular"][chosen_time_ns]["r_cm"],
-                10*model_data["regular"][chosen_time_ns]["z_F_radial_cm"], #+ offset,
+                10*model_data["flattop"][chosen_time_ns]["r_cm"],
+                10*model_data["flattop"][chosen_time_ns]["z_F_radial_cm"], #+ offset,
                 color=color,
                 linestyle="-",
                 linewidth=2.2,
@@ -625,8 +633,10 @@ def plot_all_coatings_front_surface_at_time(configs, requested_time_ns=COMBINED_
         plt.close()
         return None
 
-    plt.xlabel(r"$r$ [mm]")
-    plt.ylabel(r"$z_F$ [mm]")
+    ax = plt.gca()
+    ax.set_xlabel(r"$r$ [mm]")
+    ax.set_ylabel("")
+    ax.tick_params(axis="y", labelleft=False)
     plt.xlim([0.0, 10*R_cm])
     plt.ylim([0.0, 2])
     plt.gca().set_aspect("equal", adjustable="box")

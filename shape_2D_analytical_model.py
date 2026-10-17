@@ -11,7 +11,7 @@ plt.rcParams.update({
 })
 from scipy.interpolate import interp1d
 
-from csv_helpers import save_figure
+from csv_helpers import save_dataframe_to_csv, save_figure
 from parameters import L, R_cm, alpha, beta, z, r_grid, Experiment, Material, alpha_gold, beta_gold, alpha_copper, beta_copper, alpha_be, beta_be
 from model_main import BASE_DIR
 from scipy import special
@@ -272,21 +272,42 @@ def _save_heatmap_2D_data(r_mesh, z_mesh, z_F_radial, T_mesh_plot, t_closest, r_
         'z_F_radial_cm': z_F_radial_interp,
     })
     if flattop:
-        front_shape_df.to_csv(output_data_dir / f"front_shape_{wall_output_name}_flattop_t{t_closest:.2f}ns.csv", index=False)
+        save_dataframe_to_csv(
+            front_shape_df,
+            output_data_dir / f"front_shape_{wall_output_name}_flattop_t{t_closest:.2f}ns.csv",
+            index=False,
+        )
     else:   
-        front_shape_df.to_csv(output_data_dir / f"front_shape_{wall_output_name}_t{t_closest:.2f}ns.csv", index=False)
+        save_dataframe_to_csv(
+            front_shape_df,
+            output_data_dir / f"front_shape_{wall_output_name}_t{t_closest:.2f}ns.csv",
+            index=False,
+        )
     
     # Save temperature mesh
     T_mesh_df = pd.DataFrame(T_mesh_plot)
-    T_mesh_df.to_csv(output_data_dir / f"T_mesh_{wall_output_name}_t{t_closest:.2f}ns.csv", index=False, header=False)
+    save_dataframe_to_csv(
+        T_mesh_df,
+        output_data_dir / f"T_mesh_{wall_output_name}_t{t_closest:.2f}ns.csv",
+        index=False,
+        header=False,
+    )
     # Save coordinate grids for reference
     coords_df = pd.DataFrame({
         'z_axis_cm': z_mesh,
     })
-    coords_df.to_csv(output_data_dir / f"z_coordinates_{wall_output_name}.csv", index=False)
+    save_dataframe_to_csv(
+        coords_df,
+        output_data_dir / f"z_coordinates_{wall_output_name}.csv",
+        index=False,
+    )
     
     r_coords_df = pd.DataFrame({'r_axis_cm': r_mesh})
-    r_coords_df.to_csv(output_data_dir / f"r_coordinates_{wall_output_name}.csv", index=False)
+    save_dataframe_to_csv(
+        r_coords_df,
+        output_data_dir / f"r_coordinates_{wall_output_name}.csv",
+        index=False,
+    )
 
 
 def plot_2D_front_spatial(bessel_data, z_F_array, times_array, times_ns=[1.0, 2.0, 2.5]):
