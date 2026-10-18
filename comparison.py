@@ -751,11 +751,11 @@ def compare_with_article_2_exp5_15a(times_to_store):
         analytic_positions_2D_lam_eff=analytic_positions_2D_lam_eff,
     )
 
-    plot_csv_curves([
-        {"path": article_front_path("HR.csv"), "y_scale": 10, "linestyle": "--", "label": "HR", "color": "green"},
-        {"path": article_front_path("1D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model", "color": "blue"},
-        {"path": article_front_path("2D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Analytic Model", "color": "black"},
-    ])
+    # plot_csv_curves([
+    #     {"path": article_front_path("HR.csv"), "y_scale": 10, "linestyle": "--", "label": "HR", "color": "green"},
+    #     {"path": article_front_path("1D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "1D Analytic Model", "color": "blue"},
+    #     {"path": article_front_path("2D_front.csv"), "y_scale": 10, "linestyle": "-", "label": "2D Analytic Model", "color": "black"},
+    # ])
 
     plot_csv_errorbars([
         {"path": article_front_path("exp_results.csv"), "y_scale": 10, "yerr": 0.01, "label": "Expt.", "color": "black"},
@@ -1552,7 +1552,7 @@ def compare_for_material():
         times_to_store = np.linspace(0.01, 15, 1000)
         compare_with_article_2_exp4_14(times_to_store)
     elif Material == "SiO2_Moore":
-        times_to_store = np.linspace(0.01, 4, 1000)
+        times_to_store = np.linspace(0.01, 4.5, 1000)
         compare_with_article_2_exp5_15a(times_to_store)
     elif Material == "C8H7Cl":
         times_to_store = np.linspace(0.01, 4, 1000)

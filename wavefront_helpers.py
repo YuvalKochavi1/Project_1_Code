@@ -28,12 +28,45 @@ class WavefrontHelpers:
         Implicit Eq. (A.3), same as your current solve_for_H_new, but fully parameterized.
         Solves for H_new > 0:
             Z1 * ( I_prev + 0.5*(H_prev + H_new)*dt ) * H_new^eps - E2 = 0
+        Bracket near the previous value and solve in scaled coordinates.
         """
+        if (
+            not np.all(np.isfinite([Z1, eps, E2, I_prev, H_prev, dt]))
+            or Z1 <= 0 or eps <= 0 or E2 < 0
+            or I_prev < 0 or H_prev < 0 or dt < 0
+            or (I_prev == 0 and dt == 0)
+        ):
+            raise ValueError("Invalid coefficients for the implicit H equation.")
+        if E2 == 0:
+            return 0.0
+
         def fH(Hx):
             return Z1 * (I_prev + 0.5 * (H_prev + Hx) * dt) * (Hx ** eps) - E2
 
-        H_new = scipy.optimize.brentq(fH, 1e-100, 1e50, maxiter=100)
-        return H_new
+        scale = H_prev if H_prev > 0 else 1.0
+        for _ in range(1024):
+            value = fH(scale)
+            if not np.isfinite(value):
+                raise ValueError("Nonfinite residual while bracketing the implicit H equation.")
+            if value == 0:
+                return scale
+            candidate = scale * (2.0 if value < 0 else 0.5)
+            if not np.isfinite(candidate) or candidate <= 0:
+                raise ValueError("Cannot bracket the implicit H root within floating-point range.")
+            candidate_value = fH(candidate)
+            if not np.isfinite(candidate_value):
+                raise ValueError("Nonfinite residual while bracketing the implicit H equation.")
+            if candidate_value == 0:
+                return candidate
+            if (value < 0) != (candidate_value < 0):
+                lower, upper = sorted((1.0, candidate / scale))
+                root = scipy.optimize.brentq(
+                    lambda scaled_H: fH(scale * scaled_H) / E2,
+                    lower, upper, maxiter=100,
+                )
+                return scale * root
+            scale = candidate
+        raise ValueError("Failed to bracket the implicit H root after 1024 expansions.")
 
     @staticmethod
     def prepare_times(times_to_store, use_seconds=True):
