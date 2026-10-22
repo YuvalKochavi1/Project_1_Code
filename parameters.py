@@ -58,7 +58,7 @@ def load_time_temp(csv_path):
     return np.array(t), np.array(T)
 
 kind_of_D_face = "arithmetic"  # "harmonic", "arithmetic", "geometric"
-Material = os.getenv("PHYSICS_MATERIAL", "C8H7Cl")  # "SiO2", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
+Material = os.getenv("PHYSICS_MATERIAL", "SiO2_copper")  # "SiO2", "C11H16Pb0.3852", "C6H12", "C6H12Cu0.394", "Ta2O5", "Si_Moore", "C8H7Cl", "C15H20O6", "C15H20O6Au0.172", "C8H8"
 Flattop_condition = True  # True or False, whether to use flat-top temperature profile or not
 
 if Material == "SiO2":

@@ -1030,7 +1030,7 @@ def compare_with_french_gold(times_to_store):
     )
 
 def compare_with_french_copper(times_to_store):
-    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Copper", lam_eff_power=2.5)
+    front_series = compute_standard_analytic_front_series(times_to_store, wall_material="Copper", lam_eff_power=3)
     analytic_positions_ablation_varying_rho_lam_eff = front_series["analytic_positions_2D_lam_eff"]
     analytic_positions_ablation_const_rho = front_series["analytic_positions_ablation_const_rho"]
     analytic_positions_copper_loss = front_series["analytic_positions_gold_loss"]
